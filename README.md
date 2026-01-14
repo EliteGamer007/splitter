@@ -1,19 +1,17 @@
-# Splitter
+# Splitter - Federated Social Media Platform
 
-A federated social media application built with Go, Echo framework, and PostgreSQL.
+A federated social media application with Decentralized Identity (DID) authentication built with Go, Echo framework, and PostgreSQL.
 
-## Prerequisites
+## Overview
 
-- **Go**: 1.21 or higher - [Download Go](https://go.dev/dl/)
-- **PostgreSQL**: 14 or higher - [Download PostgreSQL](https://www.postgresql.org/download/)
-- **Git**: For version control
+Splitter uses **passwordless authentication** with Ed25519 cryptographic signatures. Users authenticate using DIDs (Decentralized Identifiers) and cryptographic keypairs instead of traditional passwords.
 
 ## Project Structure
 
 ```
 splitter/
 ├── cmd/server/          # Application entrypoint
-├── internal/            # Internal packages
+├── internal/
 │   ├── config/         # Configuration management
 │   ├── db/             # Database connection
 │   ├── handlers/       # HTTP request handlers
@@ -23,233 +21,236 @@ splitter/
 │   └── server/         # Router setup
 ├── migrations/         # Database migrations
 ├── .env.example        # Environment variables template
-└── Makefile           # Build commands
+└── FRONTEND_TASKS.md  # Frontend implementation guide
 ```
+
+## Prerequisites
+
+- **Go**: 1.21 or higher - [Download Go](https://go.dev/dl/)
+- **PostgreSQL**: 14 or higher - [Download PostgreSQL](https://www.postgresql.org/download/)
+- **Node.js**: 18+ (for frontend)
 
 ## Getting Started
 
-### 1. Clone the Repository
+### 1. Start PostgreSQL
 
-```bash
-git clone <repository-url>
-cd splitter
-```
-
-### 2. Start PostgreSQL Server
-
-**Windows (with PostgreSQL installed):**
+**Windows:**
 ```powershell
-# Check if PostgreSQL service is running
-Get-Service -Name postgresql*
-
-# If not running, start it (run as Administrator)
-Start-Service -Name postgresql-x64-14  # Adjust version number
+Get-Service postgresql* | Start-Service
 ```
 
 **Linux/Mac:**
 ```bash
-# Start PostgreSQL service
-sudo systemctl start postgresql   # Linux
-brew services start postgresql    # Mac
+sudo systemctl start postgresql
 ```
 
-**Verify PostgreSQL is running:**
-```bash
-psql --version
-psql -U postgres -c "SELECT version();"
-```
-
-### 3. Create Database
+### 2. Create Database
 
 ```bash
-# Connect to PostgreSQL
 psql -U postgres
-
-# Create database
 CREATE DATABASE splitter;
-
-# Exit
 \q
 ```
 
-### 4. Run Database Migrations
+### 3. Run Migrations
 
 ```bash
 psql -U postgres -d splitter -f migrations/001_initial_schema.sql
 ```
 
-### 5. Configure Environment
+### 4. Configure Environment
 
 ```bash
-# Copy the example environment file
 cp .env.example .env
-
-# Edit .env with your database credentials
-# Update these values:
-#   DB_HOST=localhost
-#   DB_PORT=5432
-#   DB_USER=postgres
-#   DB_PASSWORD=your_password
-#   DB_NAME=splitter
-#   JWT_SECRET=change-this-to-a-secure-random-string
 ```
 
-### 6. Install Dependencies
+Edit `.env` with your database credentials:
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=splitter
+
+PORT=3000
+ENV=development
+
+JWT_SECRET=your-secret-key-change-this
+```
+
+### 5. Install Dependencies
 
 ```bash
 go mod download
 ```
 
-### 7. Run the Application
+### 6. Run Server
 
-**Option 1: Using Go Run**
 ```bash
 go run cmd/server/main.go
 ```
 
-**Option 2: Using Makefile**
-```bash
-make run
-```
-
-**Option 3: Build and Run Binary**
-```bash
-make build
-./bin/server          # Linux/Mac
-.\bin\server.exe      # Windows
-```
-
-The server will start on `http://localhost:3000`
-
-You should see:
-```
-Database connection established successfully
-Starting server on port 3000
-⇨ http server started on [::]:3000
-```
+Server starts on `http://localhost:3000`
 
 ## API Endpoints
 
-### Public Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/health` | Health check |
-| POST | `/api/v1/auth/register` | Register new user |
-| POST | `/api/v1/auth/login` | User login |
-| GET | `/api/v1/users/:id` | Get user profile |
-| GET | `/api/v1/posts/:id` | Get post by ID |
-
-### Protected Endpoints (Require Authentication)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/users/me` | Get current user |
-| PUT | `/api/v1/users/me` | Update profile |
-| DELETE | `/api/v1/users/me` | Delete account |
-| POST | `/api/v1/posts` | Create new post |
-| GET | `/api/v1/posts/feed` | Get personalized feed |
-| PUT | `/api/v1/posts/:id` | Update post |
-| DELETE | `/api/v1/posts/:id` | Delete post |
-
 ### Authentication
 
-Protected endpoints require a JWT token in the Authorization header:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/register` | Register with DID |
+| POST | `/api/v1/auth/challenge` | Get auth challenge |
+| POST | `/api/v1/auth/verify` | Verify signed challenge |
 
-```bash
-curl -H "Authorization: Bearer <your-jwt-token>" http://localhost:3000/api/v1/users/me
+### Users (🔒 = Requires JWT token)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET 🔒 | `/api/v1/users/me` | Get current user |
+| PUT 🔒 | `/api/v1/users/me` | Update profile |
+| DELETE 🔒 | `/api/v1/users/me` | Delete account |
+| GET | `/api/v1/users/:id` | Get user by ID |
+
+### Posts (🔒 = Requires JWT token)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST 🔒 | `/api/v1/posts` | Create post |
+| GET | `/api/v1/posts/:id` | Get post |
+| PUT 🔒 | `/api/v1/posts/:id` | Update post (owner only) |
+| DELETE 🔒 | `/api/v1/posts/:id` | Delete post (owner only) |
+| GET 🔒 | `/api/v1/posts/feed` | Get personalized feed |
+
+### Follows (🔒 = Requires JWT token)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST 🔒 | `/api/v1/users/:id/follow` | Follow user |
+| DELETE 🔒 | `/api/v1/users/:id/follow` | Unfollow user |
+
+## Authentication Flow
+
+### Registration
+1. Generate Ed25519 keypair (client-side)
+2. Create DID from public key
+3. POST to `/auth/register` with DID + public key
+4. Receive JWT token
+
+### Login
+1. POST to `/auth/challenge` with DID
+2. Receive random nonce
+3. Sign nonce with private key (client-side)
+4. POST to `/auth/verify` with signature
+5. Receive JWT token
+
+### Protected Requests
+Include JWT in Authorization header:
+```
+Authorization: Bearer <jwt_token>
 ```
 
-## Development
+## API Examples
 
-### Available Make Commands
-
-```bash
-make help          # Show all available commands
-make run           # Run the application
-make build         # Build the binary
-make test          # Run tests
-make clean         # Clean build artifacts
-make fmt           # Format code
-make lint          # Run linter
-```
-
-### Testing the API
-
-**Health Check:**
-```bash
-curl http://localhost:3000/api/v1/health
-```
-
-**Register a User:**
+### Register User
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "testuser",
-    "email": "test@example.com",
-    "password": "password123",
-    "full_name": "Test User"
+    "username": "johndoe",
+    "instance_domain": "localhost:3000",
+    "did": "did:key:z6Mkf5rGM...",
+    "display_name": "John Doe",
+    "public_key": "base64EncodedPublicKey==",
+    "bio": "Hello world"
   }'
 ```
 
-**Login:**
+### Get Challenge
 ```bash
-curl -X POST http://localhost:3000/api/v1/auth/login \
+curl -X POST http://localhost:3000/api/v1/auth/challenge \
+  -H "Content-Type: application/json" \
+  -d '{"did": "did:key:z6Mkf5rGM..."}'
+```
+
+### Verify Challenge
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/verify \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "test@example.com",
-    "password": "password123"
+    "did": "did:key:z6Mkf5rGM...",
+    "challenge": "randomNonce==",
+    "signature": "base64Signature=="
   }'
 ```
 
-## Database Schema
+### Get Current User (Protected)
+```bash
+curl http://localhost:3000/api/v1/users/me \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
 
-The application uses a comprehensive schema for federated social media including:
+## Security Features
 
-- **Users & Authentication**: Local and federated user accounts
-- **Posts & Media**: Content creation with attachments
-- **Social Features**: Follows, likes, reposts, bookmarks
-- **Messaging**: End-to-end encrypted direct messages
-- **Federation**: ActivityPub-compatible inbox/outbox
-- **Moderation**: Reports, blocks, and admin actions
+- ✅ **No passwords stored** - Uses cryptographic keypairs
+- ✅ **Challenge-response auth** - Prevents replay attacks
+- ✅ **Ed25519 signatures** - Fast, secure elliptic curve crypto
+- ✅ **JWT tokens** - Stateless authentication
+- ✅ **5-minute challenge expiry** - Time-limited nonces
+- ✅ **Private keys never transmitted** - Signing happens client-side
 
-See [migrations/001_initial_schema.sql](migrations/001_initial_schema.sql) for the complete schema.
+## Frontend Implementation
 
-## Troubleshooting
+**See [FRONTEND_TASKS.md](FRONTEND_TASKS.md) for complete implementation guide.**
 
-### Database Connection Issues
+The frontend needs to implement:
+- ✅ Ed25519 keypair generation
+- ✅ DID creation from public key
+- ✅ Secure private key storage (IndexedDB)
+- ✅ Challenge signing
+- ✅ Registration & login UI
+- ✅ Profile management
+- ✅ Post creation & feed
+- ✅ Follow system
+- ✅ Error handling
 
-**Error: "Failed to initialize database"**
-- Verify PostgreSQL is running: `Get-Service postgresql*` (Windows) or `systemctl status postgresql` (Linux)
-- Check database credentials in `.env` file
-- Ensure database exists: `psql -U postgres -l | grep splitter`
+See detailed code examples, testing checklist, and step-by-step guide in [FRONTEND_TASKS.md](FRONTEND_TASKS.md).
 
-### Port Already in Use
+## Development
 
-**Error: "bind: address already in use"**
-- Change the `PORT` value in `.env` file
-- Check what's using the port: `netstat -ano | findstr :3000` (Windows) or `lsof -i :3000` (Linux/Mac)
+### Run Tests
+```bash
+go test ./...
+```
 
-### Migration Errors
+### Build for Production
+```bash
+make build
+./bin/server
+```
 
-**Error: "relation already exists"**
-- Database tables already exist. Either drop the database and recreate, or use migration rollback tools
+### Format Code
+```bash
+go fmt ./...
+```
+
+## Resources
+
+- [Frontend Implementation Guide](FRONTEND_TASKS.md) - Complete guide with code examples
+- [W3C DID Core](https://www.w3.org/TR/did-core/) - DID specification
+- [Ed25519 Signatures](https://ed25519.cr.yp.to/) - Cryptography details
+- [Echo Framework](https://echo.labstack.com/) - Go web framework docs
 
 ## Contributing
 
-1. Create a new branch for your feature
-2. Make your changes
-3. Run tests: `make test`
-4. Format code: `make fmt`
-5. Commit your changes
-6. Push to your branch
-7. Create a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-See [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Team
+---
 
-Software Engineering Project - Team 5
+**Backend Status:** ✅ Production-ready and tested  
+**Frontend Status:** ⏳ See [FRONTEND_TASKS.md](FRONTEND_TASKS.md) for implementation tasks
+
+
