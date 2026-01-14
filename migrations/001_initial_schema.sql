@@ -1,7 +1,11 @@
 -- Splitter Database Schema
+-- Initial comprehensive schema migration
+-- Note: This includes all planned features for federation, messaging, and governance
+-- Even though some features are not yet implemented in the backend code
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Identity & Users(Epic 1)
+-- Identity & Users (Epic 1)
 
 -- Local user accounts
 CREATE TABLE users (
@@ -43,7 +47,6 @@ CREATE TABLE user_keys (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
-
 -- Follow relationships
 CREATE TABLE follows (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -53,7 +56,7 @@ CREATE TABLE follows (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Content & Streams(Epic 3)
+-- Content & Streams (Epic 3)
 
 -- Posts and replies
 CREATE TABLE posts (
@@ -97,7 +100,7 @@ CREATE TABLE bookmarks (
     UNIQUE(user_id, post_id)
 );
 
--- Messaging (E2EE)(Epic 4)
+-- Messaging (E2EE) (Epic 4)
 
 -- Message conversation threads
 CREATE TABLE message_threads (
@@ -118,7 +121,7 @@ CREATE TABLE messages (
     delivered_at TIMESTAMPTZ
 );
 
--- Federation Engine(Epic 2)
+-- Federation Engine (Epic 2)
 
 -- Incoming federation activities
 CREATE TABLE inbox_activities (
@@ -148,7 +151,7 @@ CREATE TABLE activity_deduplication (
     expires_at TIMESTAMPTZ
 );
 
--- Governance & Resilience(Epic 5)
+-- Governance & Resilience (Epic 5)
 
 -- Blocked remote servers
 CREATE TABLE blocked_domains (
@@ -196,7 +199,7 @@ CREATE TABLE federation_failures (
     circuit_open_until TIMESTAMPTZ
 );
 
---Indexes
+-- Indexes
 CREATE INDEX idx_users_did ON users(did);
 CREATE INDEX idx_posts_author ON posts(author_did);
 CREATE INDEX idx_posts_created ON posts(created_at DESC);

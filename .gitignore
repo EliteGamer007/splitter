@@ -10,6 +10,8 @@
 
 # Output of the go coverage tool
 *.out
+coverage.out
+coverage.html
 
 # Dependency directories
 vendor/
@@ -20,13 +22,36 @@ go.work
 # Environment files
 .env
 
-# IDE
+# Build output
+bin/
+dist/
+build/
+
+# IDE specific files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.settings/
+.classpath
 
-# OS
+# OS specific files
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Log files
+*.log
+logs/
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.cache/
