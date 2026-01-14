@@ -61,14 +61,16 @@ func setupRoutes(
 		})
 	})
 
-	// Auth routes (public)
+	// Auth routes (public) - DID-based authentication
 	auth := api.Group("/auth")
-	auth.POST("/register", authHandler.Register)
-	auth.POST("/login", authHandler.Login)
+	auth.POST("/register", authHandler.Register)      // Register with DID + public key
+	auth.POST("/challenge", authHandler.GetChallenge) // Get challenge nonce for login
+	auth.POST("/verify", authHandler.VerifyChallenge) // Verify signed challenge and get JWT
 
 	// User routes
 	users := api.Group("/users")
-	users.GET("/:id", userHandler.GetProfile) // Public - view any user profile
+	users.GET("/:id", userHandler.GetProfile)      // Public - view any user profile by UUID
+	users.GET("/did", userHandler.GetProfileByDID) // Public - view user profile by DID
 
 	// Protected user routes (require authentication)
 	usersAuth := api.Group("/users")

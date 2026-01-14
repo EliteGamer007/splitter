@@ -1,0 +1,163 @@
+Splitter
+Project Requirements
+Continuously updating doc
+We are building a Twitter-like microblogging platform with a major architectural twist: it is
+Federated (interoperable with other servers) and uses Decentralized Identity (users own their
+data/keys).
+The Core differentiator: unlike a standard clone, our platform prioritizes User Autonomy (identity
+migration), Privacy (E2EE DMs & Groups), and Resilience (surviving network failures).
+. Tech Stack (Confirmed)
+● Backend: Go (Golang) + Echo/Chi Framework
+● Frontend: React (Vite) + Tailwind CSS + ShadcnUI(maybe)
+● Database: PostgreSQL (Relational Data) + Redis (Queues/Cache)
+● Infrastructure: Docker + Docker Compose
+● Protocol: ActivityPub (JSON-LD) + Custom Extensions for E2EE
+Detailed Feature Requirements (By Module)
+Module A: Identity & User Autonomy
+This module handles "Who you are."
+● Decentralized Auth:
+○ Users sign up/login using a Challenge-Response mechanism (signing a server
+nonce), not just a password.
+○ DID Generation: On signup, the Frontend generates a Public/Private Key pair
+(did:key). The Private Key is stored in the browser (IndexedDB), not sent to the
+server.
+● Server Selection: Users can choose a "Home Server" from a dropdown during login
+(simulated multi-instance).
+● Account Migration (Research Feature): A "Digital Suitcase" feature. Users can export
+their data + keys as JSON and "Import" it to a new server instance to move their
+account.
+Module B: Social Feed & Interactions (The "Twitter" Part)
+This module handles "What you see."
+● Post Types:
+○ Standard Post: Text (500 chars) + Images (stored in MinIO/IPFS).
+○ Stories (Ephemeral): Posts that auto-expire/delete after 24 hours. (Backend
+needs a TTL/Garbage Collector).
+● Interactions:
+○ Like: Standard heart.
+○ Repost (Boost): Shares the post to your followers.
+○ Reply: Threaded conversations.
+○ Bookmark: Private "Read Later" list (Local only).
+● Visibility Scopes (Circles):
+○ When posting, user selects audience: Public, Followers Only, or Custom Circle
+(e.g., "Study Group").
+○ Posts sent to a "Circle" must only be deliverable to those specific users.
+Reporting: Users can flag a post as "Spam" or "Harassment" (sends a notification to the Admin
+Dashboard).
+Module C: Discovery & Trending
+This module handles "What is popular."
+● Search Engine:
+○ Support for Keyword search ("Federation") and Hashtag search ("#GoLang").
+○ WebFinger Lookup: Ability to find remote users via handle: @alice@remoteserver.com.
+● Trending Section:
+○ A side widget showing top Hashtags from the last 24 hours (Aggregated via
+Redis).
+Module D: Privacy & Messaging
+This module handles "Private data."
+● Direct Messages (DMs):
+○ Separate UI tab (Inbox style).
+○ E2EE (End-to-End Encryption): Messages are encrypted on the sender's client
+using the recipient's Public Key. The server stores only the cipher blob.
+● Privacy Settings:
+○ "Lock Account" (Manual approval for followers).
+○ "Mute Words" (Regex filter to hide posts containing specific keywords).
+Module E: Federation & Resilience (The Backend Engine)
+This module handles "The Network."
+● ActivityPub Protocol:
+○ Inbox: Endpoint to receive JSON payloads from other servers.
+○ Outbox: Worker to push JSON payloads to followers on other servers.
+○ HTTP Signatures: Every inter-server request must be cryptographically signed.
+● Resilience (Research Feature):
+○ Retry Queue: If a remote server is down, the message sits in a Redis queue and
+retries exponentially (1m, 5m, 1h).
+○ Defederation: Admin panel button to "Block Domain" (stops all traffic from evilserver.com).
+● Visualizations (Demo Feature):
+○ Admin Dashboard: A live Force-Directed Graph showing connected server
+nodes.
+UI/UX Guidelines
+● Design System: Clean, minimalist, "Academic Twitter" vibe.
+● Dark/Light Mode: Toggle in the user menu (persisted).
+● Indicators:
+○ E2EE Lock: Icon on DMs.
+○ Federated Badge: Icon on posts that come from a different server.
+○ Trust Badge: / Indicator showing if a user is in your "Web of Trust."
+Added Core Features (MVP-Critical)
+A1. Key Recovery & Rotation (Added Feature)
+Applies to: Module A – Identity & User Autonomy
+Problem Addressed: Users losing private keys results in permanent account loss.
+Requirements:
+● Support key rotation: a user may register a new public key by signing a rotation request
+with their existing private key.
+● Maintain a key revocation list on the server to invalidate compromised or deprecated
+keys.
+● Optional encrypted recovery bundle exported during signup (encrypted with user
+passphrase, never stored in plaintext).
+Federation Impact:
+● Rotated keys must propagate via ActivityPub Update activities for actor objects.
+A2. Multi-Device Linking (Added Feature)
+Applies to: Module A – Identity & User Autonomy
+Requirements:
+● Users may authorize additional devices.
+● Each device generates its own keypair.
+● Primary device signs a Device Authorization Object linking the new public key to the
+DID.
+● Server accepts multiple active public keys per identity.
+E1. Rate Limiting & Abuse Protection (Added Feature)
+Applies to: Module E – Federation & Resilience
+Requirements:
+● Per-IP and per-actor rate limiting.
+● Activity size limits.
+● DM request throttling.
+● Configurable limits for local vs federated traffic.
+B1. Timeline Types (Added Feature)
+Applies to: Module B – Social Feed
+Required Timelines:
+● Home Timeline – Posts from followed users.
+● Local Timeline – All public posts from the same server.
+● Federated Timeline – Aggregated public posts from remote servers.
+B2. Cursor-Based Pagination (Added Feature)
+Applies to: Module B – Social Feed
+Requirements:
+● Infinite scrolling implemented using cursor-based pagination (since_id, max_id, or
+time-based ULIDs).
+● Prevents performance degradation on large timelines.
+B3. Post Edit & Delete Propagation (Added Feature)
+Applies to: Module B + Module E
+Requirements:
+● Post deletion sends ActivityPub Delete activities.
+● Post edits send Update activities.
+● Remote servers must apply tombstones or updates accordingly.
+E2. Inbox Deduplication (Added Feature)
+Applies to: Module E – Federation
+Requirements:
+● Store hashes of processed Activity IDs for a fixed TTL.
+● Drop duplicate activities safely during retries or network issues.
+Selected Enhancement Features
+C1. Instance Reputation System
+Applies to: Module E + Admin Dashboard
+Description: Maintain a lightweight reputation score for federated servers.
+Signals Include:
+● Spam reports per domain
+● Block / defederation history
+● Activity failure rates
+Usage:
+● Displayed in Admin Dashboard
+● Can influence retry priority or auto-suggest defederation
+B4. Offline-First Read Mode
+Applies to: Frontend UX
+Requirements:
+● Cache timelines locally using IndexedDB.
+● Allow read-only access while offline.
+● Queue posts and interactions locally and sync when connectivity is restored.
+Rationale: Supports the project’s Resilience principle.
+E3. Federation Inspector Dashboard
+Applies to: Module E + Admin Dashboard
+Description: A real-time observability panel for federation traffic.
+Displays:
+● Incoming vs outgoing ActivityPub messages
+● Signature verification status
+● Retry queue depth (Redis)
+● Latency per remote domain
+Purpose:
+● Debugging
+● Demonstration
+● Research & transparency

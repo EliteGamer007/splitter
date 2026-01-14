@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// AuthMiddleware validates JWT tokens and sets user context
+// AuthMiddleware validates JWT tokens and sets user DID context
 func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -47,12 +47,12 @@ func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 
 			// Extract claims
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				// Set user info in context
-				if userID, ok := claims["user_id"].(float64); ok {
-					c.Set("user_id", int(userID))
+				// Set DID (subject) in context
+				if did, ok := claims["sub"].(string); ok {
+					c.Set("did", did)
 				}
-				if email, ok := claims["email"].(string); ok {
-					c.Set("email", email)
+				if username, ok := claims["username"].(string); ok {
+					c.Set("username", username)
 				}
 			} else {
 				return c.JSON(http.StatusUnauthorized, map[string]string{
@@ -89,11 +89,12 @@ func OptionalAuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 
 			if err == nil {
 				if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-					if userID, ok := claims["user_id"].(float64); ok {
-						c.Set("user_id", int(userID))
+					// Set DID (subject) in context
+					if did, ok := claims["sub"].(string); ok {
+						c.Set("did", did)
 					}
-					if email, ok := claims["email"].(string); ok {
-						c.Set("email", email)
+					if username, ok := claims["username"].(string); ok {
+						c.Set("username", username)
 					}
 				}
 			}

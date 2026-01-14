@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"splitter/internal/models"
 	"splitter/internal/repository"
@@ -22,17 +21,30 @@ func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
 	}
 }
 
-// GetProfile retrieves a user's profile by ID
+// GetProfile retrieves a user's profile by UUID
 func (h *UserHandler) GetProfile(c echo.Context) error {
-	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
+	id := c.Param("id") // UUID string
+
+	user, err := h.userRepo.GetByID(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid user ID",
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
 		})
 	}
 
-	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	return c.JSON(http.StatusOK, user)
+}
+
+// GetProfileByDID retrieves a user's profile by DID
+func (h *UserHandler) GetProfileByDID(c echo.Context) error {
+	did := c.QueryParam("did")
+	if did == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "DID parameter required",
+		})
+	}
+
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "User not found",
@@ -44,10 +56,10 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 
 // GetCurrentUser retrieves the authenticated user's profile
 func (h *UserHandler) GetCurrentUser(c echo.Context) error {
-	// Get user ID from JWT token (set by auth middleware)
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token (set by auth middleware)
+	did := c.Get("did").(string)
 
-	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "User not found",
@@ -59,8 +71,16 @@ func (h *UserHandler) GetCurrentUser(c echo.Context) error {
 
 // UpdateProfile updates the authenticated user's profile
 func (h *UserHandler) UpdateProfile(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token
+	did := c.Get("did").(string)
+
+	// First get the user to retrieve their UUID
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
 
 	var req models.UserUpdate
 	if err := c.Bind(&req); err != nil {
@@ -69,22 +89,30 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		})
 	}
 
-	user, err := h.userRepo.Update(c.Request().Context(), userID, &req)
+	updatedUser, err := h.userRepo.Update(c.Request().Context(), user.ID, &req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update profile",
 		})
 	}
 
-	return c.JSON(http.StatusOK, user)
+	return c.JSON(http.StatusOK, updatedUser)
 }
 
 // DeleteAccount deletes the authenticated user's account
 func (h *UserHandler) DeleteAccount(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token
+	did := c.Get("did").(string)
 
-	if err := h.userRepo.Delete(c.Request().Context(), userID); err != nil {
+	// First get the user to retrieve their UUID
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
+
+	if err := h.userRepo.Delete(c.Request().Context(), user.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete account",
 		})
