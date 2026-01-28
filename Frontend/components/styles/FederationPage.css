@@ -1,0 +1,488 @@
+/* FederationPage.css - Dark Mode Theme with Federation Health Focus */
+
+.federation-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+  color: #e8eaed;
+  display: flex;
+  flex-direction: column;
+}
+
+.federation-navbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: rgba(16, 16, 35, 0.95);
+  border-bottom: 1px solid #2d2d44;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.federation-navbar .nav-button {
+  background: transparent;
+  border: none;
+  color: #00d9ff;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.federation-navbar .nav-button:hover {
+  background: rgba(0, 217, 255, 0.1);
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+}
+
+.federation-navbar .navbar-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #e8eaed;
+}
+
+.federation-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Section Title */
+.section-title {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8eaed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Health Section */
+.health-section {
+  margin-bottom: 40px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  border-color: #00d9ff;
+  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.metric-icon {
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 217, 255, 0.1);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #8a8a99;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #00d9ff;
+}
+
+/* Activity Chart */
+.activity-chart {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 40px;
+}
+
+.activity-chart h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8eaed;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 8px;
+  height: 150px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(0, 217, 255, 0.05);
+  border-radius: 8px;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(180deg, #00d9ff 0%, #ff006e 100%);
+  border-radius: 4px 4px 0 0;
+  min-height: 20px;
+  transition: all 0.3s ease;
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+  transform: translateY(-2px);
+}
+
+.chart-labels {
+  text-align: center;
+  font-size: 12px;
+  color: #8a8a99;
+}
+
+/* Servers Section */
+.servers-section {
+  margin-bottom: 40px;
+}
+
+.servers-table {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(0, 217, 255, 0.05);
+  border-bottom: 2px solid #2d2d44;
+  font-weight: 700;
+  font-size: 12px;
+  color: #00d9ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid #2d2d44;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.table-row:hover {
+  background: rgba(0, 217, 255, 0.05);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.col-domain {
+  font-size: 14px;
+  color: #e8eaed;
+  font-weight: 600;
+}
+
+.domain-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-status {
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+}
+
+.status-badge.healthy {
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
+.status-badge.degraded {
+  border-color: #d4af37;
+  color: #d4af37;
+}
+
+.status-badge.blocked {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.col-reputation {
+  text-align: center;
+}
+
+.reputation-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: inherit;
+}
+
+.reputation-tag.trusted {
+  background: rgba(0, 255, 136, 0.2);
+  color: #00ff88;
+}
+
+.reputation-tag.moderate {
+  background: rgba(212, 175, 55, 0.2);
+  color: #d4af37;
+}
+
+.reputation-tag.blocked {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+}
+
+.col-lastseen {
+  font-size: 13px;
+  color: #8a8a99;
+}
+
+.col-activities {
+  font-size: 13px;
+  color: #00d9ff;
+  font-weight: 600;
+}
+
+/* Legend */
+.legend-section {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.legend-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8eaed;
+}
+
+.legend-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #c0c0c5;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.legend-color.healthy {
+  background: rgba(0, 255, 136, 0.3);
+}
+
+.legend-color.degraded {
+  background: rgba(212, 175, 55, 0.3);
+}
+
+.legend-color.blocked {
+  background: rgba(255, 68, 68, 0.3);
+}
+
+/* Advanced Section */
+.advanced-section {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.advanced-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8eaed;
+}
+
+.advanced-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.advanced-btn {
+  background: transparent;
+  border: 1px dashed #d4af37;
+  color: #d4af37;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: not-allowed;
+  font-weight: 600;
+  font-size: 13px;
+  opacity: 0.6;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.advanced-btn:hover {
+  opacity: 0.8;
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.advanced-btn .disabled-label {
+  font-size: 10px;
+  background: rgba(212, 175, 55, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Scrollbar */
+.federation-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.federation-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.federation-content::-webkit-scrollbar-thumb {
+  background: #2d2d44;
+  border-radius: 4px;
+}
+
+.federation-content::-webkit-scrollbar-thumb:hover {
+  background: #3a3a50;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
+
+  .col-activities {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .federation-navbar {
+    padding: 12px 16px;
+  }
+
+  .federation-content {
+    padding: 16px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .table-header > div,
+  .table-row > div {
+    padding: 8px 0;
+  }
+
+  .col-status::before {
+    content: 'Status: ';
+    font-weight: 600;
+  }
+
+  .col-reputation::before {
+    content: 'Reputation: ';
+    font-weight: 600;
+  }
+
+  .col-lastseen::before {
+    content: 'Last Seen: ';
+    font-weight: 600;
+  }
+
+  .legend-items {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-buttons {
+    grid-template-columns: 1fr;
+  }
+}
