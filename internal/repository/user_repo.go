@@ -18,18 +18,25 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
 
-// Create creates a new user in the database with DID
-func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate) (*models.User, error) {
+// Create creates a new user in the database with password
+func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, passwordHash string) (*models.User, error) {
 	query := `
-		INSERT INTO users (username, instance_domain, did, display_name, bio, avatar_url, public_key)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, username, instance_domain, did, display_name, bio, avatar_url, public_key, is_locked, is_suspended, created_at, updated_at
+		INSERT INTO users (username, email, password_hash, instance_domain, did, display_name, bio, avatar_url, public_key, role)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'user')
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 	`
+
+	instanceDomain := user.InstanceDomain
+	if instanceDomain == "" {
+		instanceDomain = "localhost"
+	}
 
 	var newUser models.User
 	err := db.GetDB().QueryRow(ctx, query,
 		user.Username,
-		user.InstanceDomain,
+		user.Email,
+		passwordHash,
+		instanceDomain,
 		user.DID,
 		user.DisplayName,
 		user.Bio,
@@ -38,12 +45,15 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate) (*
 	).Scan(
 		&newUser.ID,
 		&newUser.Username,
+		&newUser.Email,
 		&newUser.InstanceDomain,
 		&newUser.DID,
 		&newUser.DisplayName,
 		&newUser.Bio,
 		&newUser.AvatarURL,
 		&newUser.PublicKey,
+		&newUser.Role,
+		&newUser.ModerationRequested,
 		&newUser.IsLocked,
 		&newUser.IsSuspended,
 		&newUser.CreatedAt,
@@ -60,7 +70,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate) (*
 // GetByID retrieves a user by UUID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	query := `
-		SELECT id, username, instance_domain, did, display_name, bio, avatar_url, public_key, is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -69,12 +79,15 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	err := db.GetDB().QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Username,
+		&user.Email,
 		&user.InstanceDomain,
 		&user.DID,
 		&user.DisplayName,
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.Role,
+		&user.ModerationRequested,
 		&user.IsLocked,
 		&user.IsSuspended,
 		&user.CreatedAt,
@@ -91,10 +104,84 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	return &user, nil
 }
 
+// GetByUsername retrieves a user by username (for login)
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, string, error) {
+	query := `
+		SELECT id, username, COALESCE(email, ''), COALESCE(password_hash, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		FROM users
+		WHERE username = $1 OR email = $1
+	`
+
+	var user models.User
+	var passwordHash string
+	err := db.GetDB().QueryRow(ctx, query, username).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&passwordHash,
+		&user.InstanceDomain,
+		&user.DID,
+		&user.DisplayName,
+		&user.Bio,
+		&user.AvatarURL,
+		&user.PublicKey,
+		&user.Role,
+		&user.ModerationRequested,
+		&user.IsLocked,
+		&user.IsSuspended,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, "", fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, passwordHash, nil
+}
+
+// GetByEmail retrieves a user by email
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+	query := `
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+
+	var user models.User
+	err := db.GetDB().QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.InstanceDomain,
+		&user.DID,
+		&user.DisplayName,
+		&user.Bio,
+		&user.AvatarURL,
+		&user.PublicKey,
+		&user.IsLocked,
+		&user.IsSuspended,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+
+	return &user, nil
+}
+
 // GetByDID retrieves a user by DID (Decentralized Identifier)
 func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User, error) {
 	query := `
-		SELECT id, username, instance_domain, did, display_name, bio, avatar_url, public_key, is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE did = $1
 	`
@@ -103,6 +190,7 @@ func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User
 	err := db.GetDB().QueryRow(ctx, query, did).Scan(
 		&user.ID,
 		&user.Username,
+		&user.Email,
 		&user.InstanceDomain,
 		&user.DID,
 		&user.DisplayName,
@@ -135,7 +223,7 @@ func (r *UserRepository) Update(ctx context.Context, id string, update *models.U
 			avatar_url = COALESCE($3, avatar_url),
 			updated_at = NOW()
 		WHERE id = $4
-		RETURNING id, username, instance_domain, did, display_name, bio, avatar_url, public_key, is_locked, is_suspended, created_at, updated_at
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
 	`
 
 	var user models.User
@@ -147,6 +235,7 @@ func (r *UserRepository) Update(ctx context.Context, id string, update *models.U
 	).Scan(
 		&user.ID,
 		&user.Username,
+		&user.Email,
 		&user.InstanceDomain,
 		&user.DID,
 		&user.DisplayName,
@@ -182,5 +271,248 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("user not found")
 	}
 
+	return nil
+}
+
+// UsernameExists checks if a username is already taken
+func (r *UserRepository) UsernameExists(ctx context.Context, username string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)`
+	var exists bool
+	err := db.GetDB().QueryRow(ctx, query, username).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check username: %w", err)
+	}
+	return exists, nil
+}
+
+// EmailExists checks if an email is already taken
+func (r *UserRepository) EmailExists(ctx context.Context, email string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+	var exists bool
+	err := db.GetDB().QueryRow(ctx, query, email).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check email: %w", err)
+	}
+	return exists, nil
+}
+
+// SearchUsers searches for users by username or display name
+func (r *UserRepository) SearchUsers(ctx context.Context, searchTerm string, limit, offset int) ([]*models.User, error) {
+	query := `
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		FROM users
+		WHERE (username ILIKE $1 OR display_name ILIKE $1 OR instance_domain ILIKE $1)
+		AND is_suspended = false
+		ORDER BY username ASC
+		LIMIT $2 OFFSET $3
+	`
+
+	searchPattern := "%" + searchTerm + "%"
+	rows, err := db.GetDB().Query(ctx, query, searchPattern, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.InstanceDomain,
+			&user.DID,
+			&user.DisplayName,
+			&user.Bio,
+			&user.AvatarURL,
+			&user.PublicKey,
+			&user.Role,
+			&user.ModerationRequested,
+			&user.IsLocked,
+			&user.IsSuspended,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, &user)
+	}
+
+	return users, nil
+}
+
+// GetAllUsers returns all users (admin only)
+func (r *UserRepository) GetAllUsers(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
+	// Get total count
+	countQuery := `SELECT COUNT(*) FROM users`
+	var total int
+	err := db.GetDB().QueryRow(ctx, countQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	query := `
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		FROM users
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get all users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.InstanceDomain,
+			&user.DID,
+			&user.DisplayName,
+			&user.Bio,
+			&user.AvatarURL,
+			&user.PublicKey,
+			&user.Role,
+			&user.ModerationRequested,
+			&user.IsLocked,
+			&user.IsSuspended,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, &user)
+	}
+
+	return users, total, nil
+}
+
+// UpdateUserRole updates a user's role (admin only)
+func (r *UserRepository) UpdateUserRole(ctx context.Context, userID, role string) error {
+	query := `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`
+	result, err := db.GetDB().Exec(ctx, query, role, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user role: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// RequestModeration sets the moderation_requested flag for a user
+func (r *UserRepository) RequestModeration(ctx context.Context, userID string) error {
+	query := `UPDATE users SET moderation_requested = true, moderation_requested_at = NOW(), updated_at = NOW() WHERE id = $1`
+	result, err := db.GetDB().Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to request moderation: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// GetModerationRequests gets all pending moderation requests (admin only)
+func (r *UserRepository) GetModerationRequests(ctx context.Context) ([]*models.User, error) {
+	query := `
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		FROM users
+		WHERE moderation_requested = true AND role = 'user'
+		ORDER BY moderation_requested_at ASC
+	`
+
+	rows, err := db.GetDB().Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get moderation requests: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.InstanceDomain,
+			&user.DID,
+			&user.DisplayName,
+			&user.Bio,
+			&user.AvatarURL,
+			&user.PublicKey,
+			&user.Role,
+			&user.ModerationRequested,
+			&user.IsLocked,
+			&user.IsSuspended,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, &user)
+	}
+
+	return users, nil
+}
+
+// ApproveModerationRequest approves a user's moderation request
+func (r *UserRepository) ApproveModerationRequest(ctx context.Context, userID string) error {
+	query := `UPDATE users SET role = 'moderator', moderation_requested = false, updated_at = NOW() WHERE id = $1`
+	result, err := db.GetDB().Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to approve moderation: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// RejectModerationRequest rejects a user's moderation request
+func (r *UserRepository) RejectModerationRequest(ctx context.Context, userID string) error {
+	query := `UPDATE users SET moderation_requested = false, updated_at = NOW() WHERE id = $1`
+	result, err := db.GetDB().Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to reject moderation: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// SuspendUser suspends a user (admin/moderator only)
+func (r *UserRepository) SuspendUser(ctx context.Context, userID string) error {
+	query := `UPDATE users SET is_suspended = true, updated_at = NOW() WHERE id = $1`
+	result, err := db.GetDB().Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to suspend user: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// UnsuspendUser unsuspends a user (admin/moderator only)
+func (r *UserRepository) UnsuspendUser(ctx context.Context, userID string) error {
+	query := `UPDATE users SET is_suspended = false, updated_at = NOW() WHERE id = $1`
+	result, err := db.GetDB().Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to unsuspend user: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
 	return nil
 }

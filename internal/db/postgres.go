@@ -23,6 +23,8 @@ func InitDB(cfg *config.Config) error {
 		cfg.Database.Name,
 	)
 
+	log.Printf("Connecting to database: %s:%s/%s as %s", cfg.Database.Host, cfg.Database.Port, cfg.Database.Name, cfg.Database.User)
+
 	// Parse connection config
 	poolConfig, err := pgxpool.ParseConfig(connString)
 	if err != nil {

@@ -19,24 +19,29 @@ func NewPostRepository() *PostRepository {
 }
 
 // Create creates a new post in the database
-func (r *PostRepository) Create(ctx context.Context, userID int, post *models.PostCreate) (*models.Post, error) {
+func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate) (*models.Post, error) {
+	visibility := post.Visibility
+	if visibility == "" {
+		visibility = "public"
+	}
+
 	query := `
-		INSERT INTO posts (user_id, content, image_url)
+		INSERT INTO posts (author_did, content, visibility)
 		VALUES ($1, $2, $3)
-		RETURNING id, user_id, content, image_url, like_count, created_at, updated_at
+		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at
 	`
 
 	var newPost models.Post
 	err := db.GetDB().QueryRow(ctx, query,
-		userID,
+		authorDID,
 		post.Content,
-		post.ImageURL,
+		visibility,
 	).Scan(
 		&newPost.ID,
-		&newPost.UserID,
+		&newPost.AuthorDID,
 		&newPost.Content,
-		&newPost.ImageURL,
-		&newPost.LikeCount,
+		&newPost.Visibility,
+		&newPost.IsRemote,
 		&newPost.CreatedAt,
 		&newPost.UpdatedAt,
 	)
@@ -49,25 +54,27 @@ func (r *PostRepository) Create(ctx context.Context, userID int, post *models.Po
 }
 
 // GetByID retrieves a post by ID
-func (r *PostRepository) GetByID(ctx context.Context, id int) (*models.Post, error) {
+func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.like_count, 
-		       p.created_at, p.updated_at, u.username
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		       p.created_at, p.updated_at, u.username,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
 		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		WHERE p.id = $1
+		LEFT JOIN users u ON p.author_did = u.did
+		WHERE p.id = $1 AND p.deleted_at IS NULL
 	`
 
 	var post models.Post
 	err := db.GetDB().QueryRow(ctx, query, id).Scan(
 		&post.ID,
-		&post.UserID,
+		&post.AuthorDID,
 		&post.Content,
-		&post.ImageURL,
-		&post.LikeCount,
+		&post.Visibility,
+		&post.IsRemote,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 		&post.Username,
+		&post.LikeCount,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -80,19 +87,20 @@ func (r *PostRepository) GetByID(ctx context.Context, id int) (*models.Post, err
 	return &post, nil
 }
 
-// GetByUserID retrieves all posts by a specific user
-func (r *PostRepository) GetByUserID(ctx context.Context, userID int, limit, offset int) ([]*models.Post, error) {
+// GetByAuthorDID retrieves all posts by a specific author
+func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.like_count, 
-		       p.created_at, p.updated_at, u.username
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		       p.created_at, p.updated_at, u.username,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
 		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		WHERE p.user_id = $1
+		LEFT JOIN users u ON p.author_did = u.did
+		WHERE p.author_did = $1 AND p.deleted_at IS NULL
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := db.GetDB().Query(ctx, query, userID, limit, offset)
+	rows, err := db.GetDB().Query(ctx, query, authorDID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user posts: %w", err)
 	}
@@ -103,13 +111,14 @@ func (r *PostRepository) GetByUserID(ctx context.Context, userID int, limit, off
 		var post models.Post
 		if err := rows.Scan(
 			&post.ID,
-			&post.UserID,
+			&post.AuthorDID,
 			&post.Content,
-			&post.ImageURL,
-			&post.LikeCount,
+			&post.Visibility,
+			&post.IsRemote,
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.Username,
+			&post.LikeCount,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan post: %w", err)
 		}
@@ -120,19 +129,21 @@ func (r *PostRepository) GetByUserID(ctx context.Context, userID int, limit, off
 }
 
 // GetFeed retrieves posts from users that the given user follows
-func (r *PostRepository) GetFeed(ctx context.Context, userID int, limit, offset int) ([]*models.Post, error) {
+func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT p.id, p.user_id, p.content, p.image_url, p.like_count, 
-		       p.created_at, p.updated_at, u.username
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		       p.created_at, p.updated_at, u.username,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
 		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		JOIN follows f ON p.user_id = f.following_id
-		WHERE f.follower_id = $1
+		LEFT JOIN users u ON p.author_did = u.did
+		LEFT JOIN follows f ON p.author_did = f.following_did
+		WHERE (f.follower_did = $1 OR p.author_did = $1) AND p.deleted_at IS NULL
+		  AND (p.visibility = 'public' OR (p.visibility = 'followers' AND f.follower_did = $1))
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := db.GetDB().Query(ctx, query, userID, limit, offset)
+	rows, err := db.GetDB().Query(ctx, query, userDID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get feed: %w", err)
 	}
@@ -143,13 +154,55 @@ func (r *PostRepository) GetFeed(ctx context.Context, userID int, limit, offset 
 		var post models.Post
 		if err := rows.Scan(
 			&post.ID,
-			&post.UserID,
+			&post.AuthorDID,
 			&post.Content,
-			&post.ImageURL,
-			&post.LikeCount,
+			&post.Visibility,
+			&post.IsRemote,
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.Username,
+			&post.LikeCount,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan post: %w", err)
+		}
+		posts = append(posts, &post)
+	}
+
+	return posts, nil
+}
+
+// GetPublicFeed retrieves public posts for unauthenticated users
+func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		       p.created_at, p.updated_at, u.username,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
+		FROM posts p
+		LEFT JOIN users u ON p.author_did = u.did
+		WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+		ORDER BY p.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public feed: %w", err)
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		var post models.Post
+		if err := rows.Scan(
+			&post.ID,
+			&post.AuthorDID,
+			&post.Content,
+			&post.Visibility,
+			&post.IsRemote,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&post.Username,
+			&post.LikeCount,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan post: %w", err)
 		}
@@ -160,29 +213,29 @@ func (r *PostRepository) GetFeed(ctx context.Context, userID int, limit, offset 
 }
 
 // Update updates a post's content
-func (r *PostRepository) Update(ctx context.Context, postID, userID int, update *models.PostUpdate) (*models.Post, error) {
+func (r *PostRepository) Update(ctx context.Context, postID, authorDID string, update *models.PostUpdate) (*models.Post, error) {
 	query := `
 		UPDATE posts
 		SET 
 			content = COALESCE($1, content),
-			image_url = COALESCE($2, image_url),
+			visibility = COALESCE($2, visibility),
 			updated_at = NOW()
-		WHERE id = $3 AND user_id = $4
-		RETURNING id, user_id, content, image_url, like_count, created_at, updated_at
+		WHERE id = $3 AND author_did = $4 AND deleted_at IS NULL
+		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at
 	`
 
 	var post models.Post
 	err := db.GetDB().QueryRow(ctx, query,
 		update.Content,
-		update.ImageURL,
+		update.Visibility,
 		postID,
-		userID,
+		authorDID,
 	).Scan(
 		&post.ID,
-		&post.UserID,
+		&post.AuthorDID,
 		&post.Content,
-		&post.ImageURL,
-		&post.LikeCount,
+		&post.Visibility,
+		&post.IsRemote,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	)
@@ -197,11 +250,11 @@ func (r *PostRepository) Update(ctx context.Context, postID, userID int, update 
 	return &post, nil
 }
 
-// Delete deletes a post
-func (r *PostRepository) Delete(ctx context.Context, postID, userID int) error {
-	query := `DELETE FROM posts WHERE id = $1 AND user_id = $2`
+// Delete soft-deletes a post
+func (r *PostRepository) Delete(ctx context.Context, postID, authorDID string) error {
+	query := `UPDATE posts SET deleted_at = NOW() WHERE id = $1 AND author_did = $2 AND deleted_at IS NULL`
 
-	result, err := db.GetDB().Exec(ctx, query, postID, userID)
+	result, err := db.GetDB().Exec(ctx, query, postID, authorDID)
 	if err != nil {
 		return fmt.Errorf("failed to delete post: %w", err)
 	}
