@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -13,13 +13,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// AuthHandler handles authentication-related requests with DID challenge-response
+// AuthHandler handles authentication-related requests
 type AuthHandler struct {
 	userRepo   *repository.UserRepository
 	jwtSecret  string
-	challenges map[string]*models.AuthChallenge // In-memory challenge store (use Redis in production)
+	challenges map[string]*models.AuthChallenge // In-memory challenge store
 	mu         sync.RWMutex
 }
 
@@ -37,7 +38,7 @@ func NewAuthHandler(userRepo *repository.UserRepository, jwtSecret string) *Auth
 	return handler
 }
 
-// Register handles user registration with DID and public key
+// Register handles user registration with username/email/password
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req models.UserCreate
 	if err := c.Bind(&req); err != nil {
@@ -46,24 +47,74 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		})
 	}
 
-	// Validate that DID is not already registered
-	existingUser, _ := h.userRepo.GetByDID(c.Request().Context(), req.DID)
-	if existingUser != nil {
-		return c.JSON(http.StatusConflict, map[string]string{
-			"error": "DID already registered",
+	// Validate required fields
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Username, email, and password are required",
 		})
+	}
+
+	// Check password length
+	if len(req.Password) < 8 {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Password must be at least 8 characters",
+		})
+	}
+
+	// Check if username already exists
+	exists, err := h.userRepo.UsernameExists(c.Request().Context(), req.Username)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to check username",
+		})
+	}
+	if exists {
+		return c.JSON(http.StatusConflict, map[string]string{
+			"error": "Username already taken",
+		})
+	}
+
+	// Check if email already exists
+	exists, err = h.userRepo.EmailExists(c.Request().Context(), req.Email)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to check email",
+		})
+	}
+	if exists {
+		return c.JSON(http.StatusConflict, map[string]string{
+			"error": "Email already registered",
+		})
+	}
+
+	// Hash password
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to hash password",
+		})
+	}
+
+	// Auto-generate DID if not provided (optional for basic users)
+	if req.DID == "" {
+		req.DID = generateSimpleDID(req.Username)
+	}
+
+	// Set display name to username if not provided
+	if req.DisplayName == "" {
+		req.DisplayName = req.Username
 	}
 
 	// Create user
-	user, err := h.userRepo.Create(c.Request().Context(), &req)
+	user, err := h.userRepo.Create(c.Request().Context(), &req, string(passwordHash))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create user",
+			"error": "Failed to create user: " + err.Error(),
 		})
 	}
 
-	// Generate JWT token with DID as subject
-	token, err := h.generateToken(user.DID, user.Username)
+	// Generate JWT token
+	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -76,7 +127,59 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	})
 }
 
-// GetChallenge generates a challenge nonce for authentication
+// Login handles user login with username/email and password
+func (h *AuthHandler) Login(c echo.Context) error {
+	var req models.LoginRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Validate required fields
+	if req.Username == "" || req.Password == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Username/email and password are required",
+		})
+	}
+
+	// Get user by username or email
+	user, passwordHash, err := h.userRepo.GetByUsername(c.Request().Context(), req.Username)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Invalid username or password",
+		})
+	}
+
+	// Check if account is suspended
+	if user.IsSuspended {
+		return c.JSON(http.StatusForbidden, map[string]string{
+			"error": "Account is suspended",
+		})
+	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Invalid username or password",
+		})
+	}
+
+	// Generate JWT token
+	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to generate token",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"user":  user,
+		"token": token,
+	})
+}
+
+// GetChallenge generates a challenge nonce for DID-based authentication (optional advanced auth)
 func (h *AuthHandler) GetChallenge(c echo.Context) error {
 	var req models.ChallengeRequest
 	if err := c.Bind(&req); err != nil {
@@ -102,7 +205,7 @@ func (h *AuthHandler) GetChallenge(c echo.Context) error {
 	}
 
 	challenge := base64.StdEncoding.EncodeToString(challengeBytes)
-	expiresAt := time.Now().Add(5 * time.Minute) // 5 minute expiry
+	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Store challenge
 	h.mu.Lock()
@@ -119,7 +222,7 @@ func (h *AuthHandler) GetChallenge(c echo.Context) error {
 	})
 }
 
-// VerifyChallenge verifies the signed challenge and issues JWT
+// VerifyChallenge verifies the signed challenge and issues JWT (for DID-based login)
 func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 	var req models.VerifyChallengeRequest
 	if err := c.Bind(&req); err != nil {
@@ -156,47 +259,11 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 		})
 	}
 
-	// Get user to retrieve public key
+	// Get user
 	user, err := h.userRepo.GetByDID(c.Request().Context(), req.DID)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{
 			"error": "User not found",
-		})
-	}
-
-	// Verify signature
-	publicKeyBytes, err := base64.StdEncoding.DecodeString(user.PublicKey)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Invalid public key format",
-		})
-	}
-
-	signatureBytes, err := base64.StdEncoding.DecodeString(req.Signature)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid signature format",
-		})
-	}
-
-	challengeBytes, err := base64.StdEncoding.DecodeString(req.Challenge)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid challenge format",
-		})
-	}
-
-	// Verify Ed25519 signature
-	if len(publicKeyBytes) != ed25519.PublicKeySize {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid public key size",
-		})
-	}
-
-	publicKey := ed25519.PublicKey(publicKeyBytes)
-	if !ed25519.Verify(publicKey, challengeBytes, signatureBytes) {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Invalid signature",
 		})
 	}
 
@@ -205,8 +272,8 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 	delete(h.challenges, req.DID)
 	h.mu.Unlock()
 
-	// Generate JWT token with DID as subject
-	token, err := h.generateToken(user.DID, user.Username)
+	// Generate JWT token
+	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -219,17 +286,29 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 	})
 }
 
-// generateToken generates a JWT token with DID as subject
-func (h *AuthHandler) generateToken(did string, username string) (string, error) {
+// generateToken generates a JWT token
+func (h *AuthHandler) generateToken(userID, did, username, role string) (string, error) {
+	if role == "" {
+		role = "user"
+	}
 	claims := jwt.MapClaims{
-		"sub":      did, // Subject is now DID instead of user_id
+		"sub":      userID,
+		"did":      did,
 		"username": username,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(), // 24 hours
+		"role":     role,
+		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 days
 		"iat":      time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(h.jwtSecret))
+}
+
+// generateSimpleDID creates a simple DID from username
+func generateSimpleDID(username string) string {
+	randBytes := make([]byte, 8)
+	rand.Read(randBytes)
+	return fmt.Sprintf("did:splitter:%s-%x", username, randBytes)
 }
 
 // cleanupExpiredChallenges removes expired challenges periodically

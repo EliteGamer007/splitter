@@ -47,12 +47,22 @@ func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 
 			// Extract claims
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				// Set DID (subject) in context
-				if did, ok := claims["sub"].(string); ok {
+				// Set user ID (subject) in context
+				if userID, ok := claims["sub"].(string); ok {
+					c.Set("user_id", userID)
+				}
+				// Set DID in context
+				if did, ok := claims["did"].(string); ok {
 					c.Set("did", did)
 				}
 				if username, ok := claims["username"].(string); ok {
 					c.Set("username", username)
+				}
+				// Set role in context
+				if role, ok := claims["role"].(string); ok {
+					c.Set("role", role)
+				} else {
+					c.Set("role", "user") // Default to user role
 				}
 			} else {
 				return c.JSON(http.StatusUnauthorized, map[string]string{

@@ -174,3 +174,44 @@ export function clearStoredKeys(): void {
   localStorage.removeItem('did');
   localStorage.removeItem('jwt_token');
 }
+
+// Alias for loadKeyPair (for backward compatibility)
+export const getStoredKeyPair = loadKeyPair;
+
+// Import recovery file
+export async function importRecoveryFile(file: File): Promise<KeyPair> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const recoveryData = JSON.parse(content);
+        
+        if (!recoveryData.private_key || !recoveryData.public_key || !recoveryData.did) {
+          throw new Error('Invalid recovery file format');
+        }
+        
+        const privateKey = await importPrivateKey(recoveryData.private_key);
+        
+        const keyPair: KeyPair = {
+          privateKey,
+          publicKey: null as any,
+          publicKeyBase64: recoveryData.public_key,
+          privateKeyBase64: recoveryData.private_key,
+          did: recoveryData.did,
+        };
+        
+        // Store the imported keys
+        storeKeyPair(keyPair);
+        
+        resolve(keyPair);
+      } catch (error) {
+        reject(new Error('Failed to parse recovery file'));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsText(file);
+  });
+}

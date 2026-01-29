@@ -24,8 +24,13 @@ func NewPostHandler(postRepo *repository.PostRepository) *PostHandler {
 
 // CreatePost creates a new post
 func (h *PostHandler) CreatePost(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token (set by auth middleware)
+	did, ok := c.Get("did").(string)
+	if !ok || did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
+	}
 
 	var req models.PostCreate
 	if err := c.Bind(&req); err != nil {
@@ -34,7 +39,7 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		})
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), userID, &req)
+	post, err := h.postRepo.Create(c.Request().Context(), did, &req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
@@ -46,9 +51,8 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 
 // GetPost retrieves a post by ID
 func (h *PostHandler) GetPost(c echo.Context) error {
-	idParam := c.Param("id")
-	postID, err := strconv.Atoi(idParam)
-	if err != nil {
+	postID := c.Param("id")
+	if postID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid post ID",
 		})
@@ -64,13 +68,12 @@ func (h *PostHandler) GetPost(c echo.Context) error {
 	return c.JSON(http.StatusOK, post)
 }
 
-// GetUserPosts retrieves all posts by a specific user
+// GetUserPosts retrieves all posts by a specific user (by DID)
 func (h *PostHandler) GetUserPosts(c echo.Context) error {
-	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
-	if err != nil {
+	authorDID := c.Param("did")
+	if authorDID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid user ID",
+			"error": "Invalid user DID",
 		})
 	}
 
@@ -88,7 +91,7 @@ func (h *PostHandler) GetUserPosts(c echo.Context) error {
 		}
 	}
 
-	posts, err := h.postRepo.GetByUserID(c.Request().Context(), userID, limit, offset)
+	posts, err := h.postRepo.GetByAuthorDID(c.Request().Context(), authorDID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve posts",
@@ -100,8 +103,12 @@ func (h *PostHandler) GetUserPosts(c echo.Context) error {
 
 // GetFeed retrieves the authenticated user's feed
 func (h *PostHandler) GetFeed(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token
+	did, ok := c.Get("did").(string)
+	if !ok || did == "" {
+		// Return public feed for unauthenticated users
+		return h.GetPublicFeed(c)
+	}
 
 	// Parse pagination parameters
 	limit := 20
@@ -117,7 +124,7 @@ func (h *PostHandler) GetFeed(c echo.Context) error {
 		}
 	}
 
-	posts, err := h.postRepo.GetFeed(c.Request().Context(), userID, limit, offset)
+	posts, err := h.postRepo.GetFeed(c.Request().Context(), did, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve feed",
@@ -127,14 +134,44 @@ func (h *PostHandler) GetFeed(c echo.Context) error {
 	return c.JSON(http.StatusOK, posts)
 }
 
+// GetPublicFeed retrieves public posts for unauthenticated users
+func (h *PostHandler) GetPublicFeed(c echo.Context) error {
+	// Parse pagination parameters
+	limit := 20
+	offset := 0
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := c.QueryParam("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	posts, err := h.postRepo.GetPublicFeed(c.Request().Context(), limit, offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to retrieve public feed",
+		})
+	}
+
+	return c.JSON(http.StatusOK, posts)
+}
+
 // UpdatePost updates a post
 func (h *PostHandler) UpdatePost(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token
+	did, ok := c.Get("did").(string)
+	if !ok || did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
+	}
 
-	idParam := c.Param("id")
-	postID, err := strconv.Atoi(idParam)
-	if err != nil {
+	postID := c.Param("id")
+	if postID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid post ID",
 		})
@@ -147,7 +184,7 @@ func (h *PostHandler) UpdatePost(c echo.Context) error {
 		})
 	}
 
-	post, err := h.postRepo.Update(c.Request().Context(), postID, userID, &req)
+	post, err := h.postRepo.Update(c.Request().Context(), postID, did, &req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update post",
@@ -159,18 +196,22 @@ func (h *PostHandler) UpdatePost(c echo.Context) error {
 
 // DeletePost deletes a post
 func (h *PostHandler) DeletePost(c echo.Context) error {
-	// Get user ID from JWT token
-	userID := c.Get("user_id").(int)
+	// Get DID from JWT token
+	did, ok := c.Get("did").(string)
+	if !ok || did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
+	}
 
-	idParam := c.Param("id")
-	postID, err := strconv.Atoi(idParam)
-	if err != nil {
+	postID := c.Param("id")
+	if postID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid post ID",
 		})
 	}
 
-	if err := h.postRepo.Delete(c.Request().Context(), postID, userID); err != nil {
+	if err := h.postRepo.Delete(c.Request().Context(), postID, did); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete post",
 		})

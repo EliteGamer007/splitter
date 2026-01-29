@@ -23,14 +23,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // Auth API
 export const authApi = {
+  // Register with username, email, and password
   async register(data: {
     username: string;
-    instance_domain: string;
-    did: string;
-    display_name: string;
-    public_key: string;
-    bio?: string;
-    avatar_url?: string;
+    email: string;
+    password: string;
+    display_name?: string;
   }) {
     const response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
@@ -40,10 +38,34 @@ export const authApi = {
     const result = await handleResponse<{ user: any; token: string }>(response);
     if (result.token) {
       localStorage.setItem('jwt_token', result.token);
+      if (result.user) {
+        localStorage.setItem('user', JSON.stringify(result.user));
+      }
     }
     return result;
   },
 
+  // Login with username/email and password
+  async login(data: {
+    username: string;  // Can be username or email
+    password: string;
+  }) {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await handleResponse<{ user: any; token: string }>(response);
+    if (result.token) {
+      localStorage.setItem('jwt_token', result.token);
+      if (result.user) {
+        localStorage.setItem('user', JSON.stringify(result.user));
+      }
+    }
+    return result;
+  },
+
+  // DID-based challenge (optional advanced auth)
   async getChallenge(did: string) {
     const response = await fetch(`${API_BASE}/auth/challenge`, {
       method: 'POST',
@@ -53,6 +75,7 @@ export const authApi = {
     return handleResponse<{ challenge: string; expires_at: number }>(response);
   },
 
+  // Verify DID challenge (optional advanced auth)
   async verifyChallenge(data: {
     did: string;
     challenge: string;
@@ -70,9 +93,23 @@ export const authApi = {
     return result;
   },
 
+  // Check if user is logged in
+  isLoggedIn() {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('jwt_token');
+  },
+
+  // Get current user from storage
+  getCurrentUserFromStorage() {
+    if (typeof window === 'undefined') return null;
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  },
+
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('jwt_token');
+      localStorage.removeItem('user');
       localStorage.removeItem('private_key');
       localStorage.removeItem('did');
     }
@@ -147,6 +184,13 @@ export const postApi = {
     const response = await fetch(
       `${API_BASE}/posts/feed?limit=${limit}&offset=${offset}`,
       { headers: getAuthHeaders() }
+    );
+    return handleResponse<any[]>(response);
+  },
+
+  async getPublicFeed(limit = 20, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/posts/public?limit=${limit}&offset=${offset}`
     );
     return handleResponse<any[]>(response);
   },
@@ -273,6 +317,127 @@ export const healthApi = {
   }
 };
 
+// Search API
+export const searchApi = {
+  async searchUsers(query: string, limit = 20, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/users/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
+      { headers: getAuthHeaders() }
+    );
+    return handleResponse<{ users: any[] }>(response);
+  }
+};
+
+// Message API
+export const messageApi = {
+  async getThreads() {
+    const response = await fetch(`${API_BASE}/messages/threads`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ threads: any[] }>(response);
+  },
+
+  async getMessages(threadId: string, limit = 50, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/messages/threads/${threadId}?limit=${limit}&offset=${offset}`,
+      { headers: getAuthHeaders() }
+    );
+    return handleResponse<{ messages: any[], thread: any }>(response);
+  },
+
+  async sendMessage(recipientId: string, content: string) {
+    const response = await fetch(`${API_BASE}/messages/send`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ recipient_id: recipientId, content })
+    });
+    return handleResponse<{ message: any, thread: any, recipient: any }>(response);
+  },
+
+  async startConversation(userId: string) {
+    const response = await fetch(`${API_BASE}/messages/conversation/${userId}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ thread: any }>(response);
+  },
+
+  async markAsRead(threadId: string) {
+    const response = await fetch(`${API_BASE}/messages/threads/${threadId}/read`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  }
+};
+
+// Admin API
+export const adminApi = {
+  async getAllUsers(limit = 50, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/admin/users?limit=${limit}&offset=${offset}`,
+      { headers: getAuthHeaders() }
+    );
+    return handleResponse<{ users: any[], total: number }>(response);
+  },
+
+  async getModerationRequests() {
+    const response = await fetch(`${API_BASE}/admin/moderation-requests`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ requests: any[] }>(response);
+  },
+
+  async approveModerationRequest(userId: string) {
+    const response = await fetch(`${API_BASE}/admin/moderation-requests/${userId}/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async rejectModerationRequest(userId: string) {
+    const response = await fetch(`${API_BASE}/admin/moderation-requests/${userId}/reject`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async updateUserRole(userId: string, role: string) {
+    const response = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ role })
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async suspendUser(userId: string) {
+    const response = await fetch(`${API_BASE}/admin/users/${userId}/suspend`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async unsuspendUser(userId: string) {
+    const response = await fetch(`${API_BASE}/admin/users/${userId}/unsuspend`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async requestModeration() {
+    const response = await fetch(`${API_BASE}/users/me/request-moderation`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  }
+};
+
 // Export all APIs
 export const api = {
   auth: authApi,
@@ -280,7 +445,10 @@ export const api = {
   post: postApi,
   follow: followApi,
   interaction: interactionApi,
-  health: healthApi
+  health: healthApi,
+  search: searchApi,
+  message: messageApi,
+  admin: adminApi
 };
 
 export default api;

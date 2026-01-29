@@ -25,6 +25,7 @@ func NewServer(cfg *config.Config) *Server {
 	postRepo := repository.NewPostRepository()
 	followRepo := repository.NewFollowRepository()
 	interactionRepo := repository.NewInteractionRepository()
+	messageRepo := repository.NewMessageRepository()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
@@ -32,6 +33,8 @@ func NewServer(cfg *config.Config) *Server {
 	postHandler := handlers.NewPostHandler(postRepo)
 	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
+	adminHandler := handlers.NewAdminHandler(userRepo)
+	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo)
 
 	// Global middleware
 	e.Use(echomiddleware.Logger())
@@ -44,7 +47,7 @@ func NewServer(cfg *config.Config) *Server {
 	}))
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler)
 
 	return &Server{
 		echo: e,
@@ -61,6 +64,8 @@ func setupRoutes(
 	postHandler *handlers.PostHandler,
 	followHandler *handlers.FollowHandler,
 	interactionHandler *handlers.InteractionHandler,
+	adminHandler *handlers.AdminHandler,
+	messageHandler *handlers.MessageHandler,
 ) {
 	// API v1 group
 	api := e.Group("/api/v1")
@@ -72,11 +77,12 @@ func setupRoutes(
 		})
 	})
 
-	// Auth routes (public) - DID-based authentication
+	// Auth routes (public)
 	auth := api.Group("/auth")
-	auth.POST("/register", authHandler.Register)      // Register with DID + public key
-	auth.POST("/challenge", authHandler.GetChallenge) // Get challenge nonce for login
-	auth.POST("/verify", authHandler.VerifyChallenge) // Verify signed challenge and get JWT
+	auth.POST("/register", authHandler.Register)      // Register with username/email/password
+	auth.POST("/login", authHandler.Login)            // Login with username/email + password
+	auth.POST("/challenge", authHandler.GetChallenge) // Get challenge nonce for DID login (optional)
+	auth.POST("/verify", authHandler.VerifyChallenge) // Verify signed challenge and get JWT (optional)
 
 	// User routes
 	users := api.Group("/users")
@@ -92,8 +98,9 @@ func setupRoutes(
 
 	// Post routes
 	posts := api.Group("/posts")
-	posts.GET("/:id", postHandler.GetPost)           // Public - view any post
-	posts.GET("/user/:id", postHandler.GetUserPosts) // Public - view user's posts
+	posts.GET("/:id", postHandler.GetPost)            // Public - view any post
+	posts.GET("/user/:did", postHandler.GetUserPosts) // Public - view user's posts by DID
+	posts.GET("/public", postHandler.GetPublicFeed)   // Public - get public feed
 
 	// Protected post routes (require authentication)
 	postsAuth := api.Group("/posts")
@@ -126,6 +133,32 @@ func setupRoutes(
 
 	// Bookmarks
 	usersAuth.GET("/me/bookmarks", interactionHandler.GetBookmarks)
+
+	// Search users (authenticated)
+	usersAuth.GET("/search", adminHandler.SearchUsers)
+
+	// Message routes (require authentication)
+	messagesAuth := api.Group("/messages")
+	messagesAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	messagesAuth.GET("/threads", messageHandler.GetThreads)
+	messagesAuth.GET("/threads/:threadId", messageHandler.GetMessages)
+	messagesAuth.POST("/send", messageHandler.SendMessage)
+	messagesAuth.POST("/conversation/:userId", messageHandler.StartConversation)
+	messagesAuth.POST("/threads/:threadId/read", messageHandler.MarkAsRead)
+
+	// Moderation request (authenticated users)
+	usersAuth.POST("/me/request-moderation", adminHandler.RequestModeration)
+
+	// Admin routes (require authentication + admin role)
+	admin := api.Group("/admin")
+	admin.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	admin.GET("/users", adminHandler.GetAllUsers)
+	admin.GET("/moderation-requests", adminHandler.GetModerationRequests)
+	admin.POST("/moderation-requests/:id/approve", adminHandler.ApproveModerationRequest)
+	admin.POST("/moderation-requests/:id/reject", adminHandler.RejectModerationRequest)
+	admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
+	admin.POST("/users/:id/suspend", adminHandler.SuspendUser)
+	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)
 }
 
 // Start starts the HTTP server
