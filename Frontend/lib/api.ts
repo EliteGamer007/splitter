@@ -23,7 +23,6 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // Auth API
 export const authApi = {
-  // Register with username, email, and password
   async register(data: {
     username: string;
     email: string;
@@ -45,11 +44,7 @@ export const authApi = {
     return result;
   },
 
-  // Login with username/email and password
-  async login(data: {
-    username: string;  // Can be username or email
-    password: string;
-  }) {
+  async login(data: { username: string; password: string }) {
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -65,7 +60,6 @@ export const authApi = {
     return result;
   },
 
-  // DID-based challenge (optional advanced auth)
   async getChallenge(did: string) {
     const response = await fetch(`${API_BASE}/auth/challenge`, {
       method: 'POST',
@@ -75,12 +69,7 @@ export const authApi = {
     return handleResponse<{ challenge: string; expires_at: number }>(response);
   },
 
-  // Verify DID challenge (optional advanced auth)
-  async verifyChallenge(data: {
-    did: string;
-    challenge: string;
-    signature: string;
-  }) {
+  async verifyChallenge(data: { did: string; challenge: string; signature: string }) {
     const response = await fetch(`${API_BASE}/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -93,13 +82,11 @@ export const authApi = {
     return result;
   },
 
-  // Check if user is logged in
   isLoggedIn() {
     if (typeof window === 'undefined') return false;
     return !!localStorage.getItem('jwt_token');
   },
 
-  // Get current user from storage
   getCurrentUserFromStorage() {
     if (typeof window === 'undefined') return null;
     const user = localStorage.getItem('user');
@@ -139,6 +126,9 @@ export const userApi = {
     display_name?: string;
     bio?: string;
     avatar_url?: string;
+    default_visibility?: string;
+    message_privacy?: string;
+    account_locked?: boolean;
   }) {
     const response = await fetch(`${API_BASE}/users/me`, {
       method: 'PUT',
@@ -159,11 +149,11 @@ export const userApi = {
 
 // Post API
 export const postApi = {
-  async createPost(content: string, imageUrl?: string) {
+  async createPost(content: string, visibility: string = 'public', imageUrl?: string) {
     const response = await fetch(`${API_BASE}/posts`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ content, image_url: imageUrl })
+      body: JSON.stringify({ content, visibility, image_url: imageUrl })
     });
     return handleResponse<any>(response);
   },
@@ -188,9 +178,9 @@ export const postApi = {
     return handleResponse<any[]>(response);
   },
 
-  async getPublicFeed(limit = 20, offset = 0) {
+  async getPublicFeed(limit = 20, offset = 0, localOnly = false) {
     const response = await fetch(
-      `${API_BASE}/posts/public?limit=${limit}&offset=${offset}`
+      `${API_BASE}/posts/public?limit=${limit}&offset=${offset}&local_only=${localOnly}`
     );
     return handleResponse<any[]>(response);
   },
@@ -433,6 +423,48 @@ export const adminApi = {
     const response = await fetch(`${API_BASE}/users/me/request-moderation`, {
       method: 'POST',
       headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  // Content moderation queue
+  async getModerationQueue() {
+    const response = await fetch(`${API_BASE}/admin/moderation-queue`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ items: any[] }>(response);
+  },
+
+  async approveContent(reportId: string) {
+    const response = await fetch(`${API_BASE}/admin/moderation-queue/${reportId}/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async removeContent(reportId: string) {
+    const response = await fetch(`${API_BASE}/admin/moderation-queue/${reportId}/remove`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async warnUser(userId: string, reason: string) {
+    const response = await fetch(`${API_BASE}/admin/users/${userId}/warn`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ reason })
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async blockDomain(domain: string) {
+    const response = await fetch(`${API_BASE}/admin/domains/block`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ domain })
     });
     return handleResponse<{ message: string }>(response);
   }

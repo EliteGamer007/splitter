@@ -53,6 +53,7 @@ const SAMPLE_POSTS = [
 export default function HomePage({ onNavigate, userData, updateUserData, isDarkMode, toggleTheme, handleLogout }) {
   const [activeTab, setActiveTab] = useState('home');
   const [newPostText, setNewPostText] = useState('');
+  const [newPostVisibility, setNewPostVisibility] = useState('public');
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
@@ -61,11 +62,16 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Edit/Delete state
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
-  // Fetch posts on mount
+  // Fetch posts on mount and when tab changes
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [activeTab]);
 
   // Search users
   const handleSearch = async () => {
@@ -112,36 +118,44 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     setIsLoading(true);
     setError(null);
     try {
-      // Try authenticated feed first, fall back to public feed
       let feedPosts;
       const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
       
-      if (token) {
-        try {
-          feedPosts = await postApi.getFeed(20, 0);
-        } catch (authErr) {
-          // Auth feed failed, try public
-          feedPosts = await postApi.getPublicFeed(20, 0);
+      if (activeTab === 'home') {
+        // Home tab: authenticated feed
+        if (token) {
+          try {
+            feedPosts = await postApi.getFeed(20, 0);
+          } catch (authErr) {
+            feedPosts = await postApi.getPublicFeed(20, 0, false);
+          }
+        } else {
+          feedPosts = await postApi.getPublicFeed(20, 0, false);
         }
-      } else {
-        // No token, use public feed
-        feedPosts = await postApi.getPublicFeed(20, 0);
+      } else if (activeTab === 'local') {
+        // Local tab: local_only = true
+        feedPosts = await postApi.getPublicFeed(20, 0, true);
+      } else if (activeTab === 'federated') {
+        // Federated tab: all public posts (local_only = false)
+        feedPosts = await postApi.getPublicFeed(20, 0, false);
       }
       
       if (feedPosts && feedPosts.length > 0) {
-        // Transform API posts to display format
         const transformedPosts = feedPosts.map(post => ({
           id: post.id,
           author: post.username ? `${post.username}@localhost` : `${post.author_did?.split(':').pop() || 'unknown'}@local`,
+          authorId: post.author_id || post.user_id,
           avatar: post.avatar_url || '👤',
           displayName: post.username || post.author_did?.split(':').pop() || 'Unknown',
           handle: `@${post.username || post.author_did?.split(':').pop() || 'unknown'}`,
           timestamp: formatTimestamp(post.created_at),
+          createdAt: post.created_at,
+          updatedAt: post.updated_at,
           content: post.content,
           replies: post.reply_count || 0,
           boosts: post.repost_count || 0,
           likes: post.like_count || 0,
-          local: true,
+          local: post.is_local !== undefined ? post.is_local : true,
           visibility: post.visibility || 'public',
           liked: post.liked || false,
           reposted: post.reposted || false,
@@ -149,12 +163,10 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         }));
         setPosts(transformedPosts);
       } else {
-        // No posts from API, show samples
         setPosts(SAMPLE_POSTS);
       }
     } catch (err) {
       console.error('Failed to fetch posts:', err);
-      // Fall back to sample posts on error
       setPosts(SAMPLE_POSTS);
     } finally {
       setIsLoading(false);
@@ -181,30 +193,72 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
 
     setIsPosting(true);
     try {
-      const newPost = await postApi.createPost(newPostText);
+      const newPost = await postApi.createPost(newPostText, newPostVisibility);
       
-      // Add to top of posts list
       const transformedPost = {
         id: newPost.id,
         author: `${userData.username}@${userData.server}`,
+        authorId: userData.id,
         avatar: userData.avatar,
         displayName: userData.displayName,
         handle: `@${userData.username}`,
         timestamp: 'now',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         content: newPost.content,
         replies: 0,
         boosts: 0,
         likes: 0,
         local: true,
-        visibility: 'public'
+        visibility: newPostVisibility
       };
       
       setPosts(prev => [transformedPost, ...prev]);
       setNewPostText('');
+      setNewPostVisibility('public');
     } catch (err) {
       setError('Failed to create post: ' + err.message);
     } finally {
       setIsPosting(false);
+    }
+  };
+
+  // Edit post
+  const handleEditStart = (post) => {
+    setEditingPostId(post.id);
+    setEditText(post.content);
+  };
+
+  const handleEditCancel = () => {
+    setEditingPostId(null);
+    setEditText('');
+  };
+
+  const handleEditSave = async (postId) => {
+    if (!editText.trim()) return;
+    
+    try {
+      await postApi.updatePost(postId, editText);
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, content: editText, updatedAt: new Date().toISOString() } 
+          : p
+      ));
+      setEditingPostId(null);
+      setEditText('');
+    } catch (err) {
+      alert('Failed to update post: ' + err.message);
+    }
+  };
+
+  // Delete post
+  const handleDeleteConfirm = async (postId) => {
+    try {
+      await postApi.deletePost(postId);
+      setPosts(prev => prev.filter(p => p.id !== postId));
+      setDeleteConfirmId(null);
+    } catch (err) {
+      alert('Failed to delete post: ' + err.message);
     }
   };
 
@@ -246,13 +300,25 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     }
   };
 
-  const getFilteredPosts = () => {
-    if (activeTab === 'local') {
-      return posts.filter(post => post.local);
-    } else if (activeTab === 'federated') {
-      return posts.filter(post => !post.local);
+  // Check if post was edited
+  const isEdited = (post) => {
+    if (!post.createdAt || !post.updatedAt) return false;
+    return new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 1000;
+  };
+
+  // Check if current user owns the post
+  const isOwnPost = (post) => {
+    return post.authorId === userData?.id || 
+           post.handle === `@${userData?.username}` ||
+           post.author?.startsWith(userData?.username);
+  };
+
+  const getVisibilityIcon = (visibility) => {
+    switch (visibility) {
+      case 'followers': return '👥';
+      case 'circle': return '🔒';
+      default: return '🌐';
     }
-    return posts;
   };
 
   return (
@@ -559,7 +625,24 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   <span className="char-count">
                     {newPostText.length}/500
                   </span>
-                  <span className="visibility-icon">🌐 Public</span>
+                  {/* Visibility Selector */}
+                  <select
+                    value={newPostVisibility}
+                    onChange={(e) => setNewPostVisibility(e.target.value)}
+                    style={{
+                      padding: '4px 8px',
+                      background: '#1a1a2e',
+                      border: '1px solid #333',
+                      color: '#00d9ff',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="public">🌐 Public</option>
+                    <option value="followers">👥 Followers</option>
+                    <option value="circle">🔒 Circle</option>
+                  </select>
                 </div>
                 <div className="composer-actions">
                   <button 
@@ -593,7 +676,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
 
           {/* Posts */}
           <div className="feed-posts">
-            {getFilteredPosts().map(post => (
+            {posts.map(post => (
               <article key={post.id} className={`post ${post.local ? 'local' : 'remote'}`}>
                 <div className="post-header">
                   <div className="post-author" style={{ cursor: 'pointer' }} onClick={() => onNavigate('profile')}>
@@ -604,22 +687,130 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                         <span className="post-handle">{post.handle}</span>
                         {post.local && <span className="post-badge local">🏠 Local</span>}
                         {!post.local && <span className="post-badge remote">🌐 Remote</span>}
+                        {/* Edited Badge */}
+                        {isEdited(post) && (
+                          <span 
+                            className="post-badge" 
+                            style={{ background: 'rgba(255,170,0,0.2)', color: '#ffaa00' }}
+                            title={`Edited: ${new Date(post.updatedAt).toLocaleString()}`}
+                          >
+                            ✏️ Edited
+                          </span>
+                        )}
                       </div>
                       <span className="post-time">{post.timestamp}</span>
                     </div>
                   </div>
-                  {post.visibility === 'followers' && (
-                    <span className="post-visibility">🔒 Followers Only</span>
+                  {post.visibility && post.visibility !== 'public' && (
+                    <span className="post-visibility" style={{ color: '#888', fontSize: '12px' }}>
+                      {getVisibilityIcon(post.visibility)} {post.visibility === 'followers' ? 'Followers Only' : 'Circle Only'}
+                    </span>
                   )}
                 </div>
 
-                <div 
-                  className="post-content"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onNavigate('thread')}
-                >
-                  {post.content}
-                </div>
+                {/* Post Content or Edit Form */}
+                {editingPostId === post.id ? (
+                  <div style={{ margin: '12px 0' }}>
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      maxLength="500"
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '12px',
+                        background: '#1a1a2e',
+                        border: '1px solid #00d9ff',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        resize: 'vertical'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                      <span style={{ color: '#666', fontSize: '12px' }}>{editText.length}/500</span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={handleEditCancel}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'rgba(255,68,68,0.1)',
+                            border: '1px solid #ff4444',
+                            color: '#ff4444',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleEditSave(post.id)}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'rgba(0,255,136,0.2)',
+                            border: '1px solid #00ff88',
+                            color: '#00ff88',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    className="post-content"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onNavigate('thread')}
+                  >
+                    {post.content}
+                  </div>
+                )}
+
+                {/* Delete Confirmation */}
+                {deleteConfirmId === post.id && (
+                  <div style={{
+                    background: 'rgba(255,68,68,0.1)',
+                    border: '1px solid #ff4444',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    margin: '12px 0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ color: '#ff4444' }}>⚠️ Delete this post?</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => setDeleteConfirmId(null)}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'transparent',
+                          border: '1px solid #666',
+                          color: '#666',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleDeleteConfirm(post.id)}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#ff4444',
+                          border: 'none',
+                          color: '#fff',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="post-actions">
                   <button 
@@ -645,9 +836,34 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                     <span className="action-icon">{post.liked ? '❤️' : '🤍'}</span>
                     <span className="action-count">{post.likes}</span>
                   </button>
-                  <button className="post-action post-action-delete">
-                    <span className="action-icon">⋯</span>
-                  </button>
+                  
+                  {/* Edit/Delete buttons for own posts */}
+                  {isOwnPost(post) && !editingPostId && !deleteConfirmId && (
+                    <>
+                      <button 
+                        className="post-action"
+                        onClick={() => handleEditStart(post)}
+                        title="Edit post"
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <span className="action-icon">✏️</span>
+                      </button>
+                      <button 
+                        className="post-action"
+                        onClick={() => setDeleteConfirmId(post.id)}
+                        title="Delete post"
+                        style={{ color: '#ff4444' }}
+                      >
+                        <span className="action-icon">🗑️</span>
+                      </button>
+                    </>
+                  )}
+                  
+                  {!isOwnPost(post) && (
+                    <button className="post-action post-action-delete">
+                      <span className="action-icon">⋯</span>
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

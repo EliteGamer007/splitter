@@ -2,19 +2,45 @@
 
 import { useState } from 'react';
 import '../styles/SecurityPage.css';
+import { userApi } from '@/lib/api';
 
-export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme }) {
+export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, userData, updateUserData }) {
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Privacy settings
+  const [defaultVisibility, setDefaultVisibility] = useState(userData?.default_visibility || 'public');
+  const [messagePrivacy, setMessagePrivacy] = useState(userData?.message_privacy || 'everyone');
+  const [accountLocked, setAccountLocked] = useState(userData?.account_locked || false);
 
   const recoveryCode = 'RECOVERY_CODE_9c8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d';
-  const did = 'did:key:z6Mkjx9J5aQ2vP7nL4mK8vQ5wR2xT9nY6bZ3cD5eF7gH9...';
+  const did = userData?.did || 'did:key:z6Mkjx9J5aQ2vP7nL4mK8vQ5wR2xT9nY6bZ3cD5eF7gH9...';
   const publicKeyFingerprint = 'A4:9C:2B:7D:E1:5F:8A:3C:9B:6E:2A:4D:7C:1F:8E:5B';
 
   const handleCopyToClipboard = (text, fieldName) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleSavePrivacySettings = async () => {
+    setIsSaving(true);
+    try {
+      await userApi.updateProfile({
+        default_visibility: defaultVisibility,
+        message_privacy: messagePrivacy,
+        account_locked: accountLocked
+      });
+      if (updateUserData) {
+        updateUserData({ ...userData, default_visibility: defaultVisibility, message_privacy: messagePrivacy, account_locked: accountLocked });
+      }
+      alert('Privacy settings saved!');
+    } catch (err) {
+      alert('Failed to save: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -45,6 +71,51 @@ export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme }) {
               This device controls your identity. Your private key is stored
               only on this device. Losing access means losing your account.
             </p>
+          </div>
+        </div>
+
+        {/* Privacy Settings Card */}
+        <div className="status-card" style={{ marginBottom: '24px' }}>
+          <h3 className="card-title">🔒 Privacy Settings</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Default Post Visibility</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Who can see your new posts</div>
+              </div>
+              <select value={defaultVisibility} onChange={(e) => setDefaultVisibility(e.target.value)}
+                style={{ padding: '8px 12px', background: '#1a1a2e', border: '1px solid #333', color: '#fff', borderRadius: '6px', cursor: 'pointer', minWidth: '150px' }}>
+                <option value="public">🌐 Public</option>
+                <option value="followers">👥 Followers Only</option>
+                <option value="circle">🔒 Circle Only</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Who Can Message You</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Control direct message access</div>
+              </div>
+              <select value={messagePrivacy} onChange={(e) => setMessagePrivacy(e.target.value)}
+                style={{ padding: '8px 12px', background: '#1a1a2e', border: '1px solid #333', color: '#fff', borderRadius: '6px', cursor: 'pointer', minWidth: '150px' }}>
+                <option value="everyone">🌐 Everyone</option>
+                <option value="followers">👥 Followers Only</option>
+                <option value="none">🚫 No One</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Lock Account</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Require approval for followers</div>
+              </div>
+              <button onClick={() => setAccountLocked(!accountLocked)}
+                style={{ padding: '8px 16px', background: accountLocked ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,68,0.1)', border: `1px solid ${accountLocked ? '#00ff88' : '#ff4444'}`, color: accountLocked ? '#00ff88' : '#ff4444', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minWidth: '100px' }}>
+                {accountLocked ? '🔒 Locked' : '🔓 Open'}
+              </button>
+            </div>
+            <button onClick={handleSavePrivacySettings} disabled={isSaving}
+              style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #00d9ff, #00ff88)', border: 'none', color: '#000', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '14px', marginTop: '8px', opacity: isSaving ? 0.7 : 1 }}>
+              {isSaving ? 'Saving...' : '💾 Save Privacy Settings'}
+            </button>
           </div>
         </div>
 
