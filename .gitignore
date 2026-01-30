@@ -19,8 +19,22 @@ vendor/
 # Go workspace file
 go.work
 
-# Environment files
+# Environment variables
 .env
+.env.local
+.env.production
+
+# Docker volumes
+postgres_data/
+pgadmin_data/
+
+# Docker temporary files
+.docker/
+docker-compose.override.yml
+
+# Database dumps
+*.dump
+*.backup
 
 # Build output
 bin/
