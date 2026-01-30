@@ -42,9 +42,9 @@ func Load() *Config {
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "postgres"),
+			User:     getEnv("DB_USER", "splitter_user"),
 			Password: os.Getenv("DB_PASSWORD"),
-			Name:     getEnv("DB_NAME", "splitter"),
+			Name:     getEnv("DB_NAME", "splitter_db"),
 			MaxConns: 25,
 			MinConns: 5,
 		},

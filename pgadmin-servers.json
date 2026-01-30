@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Splitter PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "splitter_db",
+      "Username": "splitter_user",
+      "SSLMode": "prefer",
+      "PassFile": "/tmp/pgpassfile"
+    }
+  }
+}
