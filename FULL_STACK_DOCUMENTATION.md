@@ -146,9 +146,9 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/v1/health"
 |--------|----------|------|-------------|
 | POST | `/users/:id/follow` | ✅ | Follow user |
 | DELETE | `/users/:id/follow` | ✅ | Unfollow user |
-| GET | `/users/:id/followers` | ❌ | Get followers list |
-| GET | `/users/:id/following` | ❌ | Get following list |
-| GET | `/users/:id/stats` | ❌ | Get follow statistics |
+| GET | `/users/:id/followers` | ✅ | Get followers list |
+| GET | `/users/:id/following` | ✅ | Get following list |
+| GET | `/users/:id/stats` | ✅ | Get follow statistics |
 
 ### Interactions (Likes, Reposts, Bookmarks)
 | Method | Endpoint | Auth | Description |
@@ -271,7 +271,7 @@ The following backend features exist but are **not yet implemented in frontend p
 ### 3. Advanced Post Features
 - Threaded replies
 - Quote posts
-- Post editing
+- ~~Post editing~~ ✅ IMPLEMENTED
 - Rich media attachments
 
 ### 4. Moderation System
@@ -280,7 +280,7 @@ The following backend features exist but are **not yet implemented in frontend p
 - User blocking/muting
 
 ### 5. Search
-- User search
+- ~~User search~~ ✅ IMPLEMENTED (dynamic search bar with follow buttons)
 - Post search
 - Hashtag search
 
@@ -288,6 +288,12 @@ The following backend features exist but are **not yet implemented in frontend p
 - Real-time notifications
 - Notification preferences
 - Push notifications
+
+### 7. ✅ Recently Implemented
+- **User Search** - Dynamic search bar with profile navigation and follow buttons
+- **Follow System** - Full follow/unfollow with state persistence
+- **Profile Stats** - Real-time follower/following/post counts
+- **Post Display** - User posts with visibility badges on profile pages
 
 ---
 

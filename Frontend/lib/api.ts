@@ -15,8 +15,20 @@ const getAuthHeaders = (): HeadersInit => {
 // Helper to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const errorText = await response.text();
+    console.error('API Error Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      body: errorText
+    });
+    
+    try {
+      const error = JSON.parse(errorText);
+      throw new Error(error.error || `HTTP ${response.status}`);
+    } catch (parseError) {
+      throw new Error(errorText || `HTTP ${response.status}`);
+    }
   }
   return response.json();
 }
@@ -206,14 +218,24 @@ export const postApi = {
 // Follow API
 export const followApi = {
   async followUser(userId: string) {
+    console.log('followApi.followUser called with userId:', userId);
+    console.log('API endpoint:', `${API_BASE}/users/${userId}/follow`);
+    const headers = getAuthHeaders();
+    console.log('Auth headers:', headers);
+    
     const response = await fetch(`${API_BASE}/users/${userId}/follow`, {
       method: 'POST',
-      headers: getAuthHeaders()
+      headers: headers
     });
-    return handleResponse<any>(response);
+    
+    console.log('Follow response status:', response.status);
+    const result = await handleResponse<any>(response);
+    console.log('Follow result:', result);
+    return result;
   },
 
   async unfollowUser(userId: string) {
+    console.log('followApi.unfollowUser called with userId:', userId);
     const response = await fetch(`${API_BASE}/users/${userId}/follow`, {
       method: 'DELETE',
       headers: getAuthHeaders()

@@ -62,6 +62,8 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [followingUsers, setFollowingUsers] = useState(new Set());
+  const [followLoading, setFollowLoading] = useState(new Set());
   
   // Edit/Delete state
   const [editingPostId, setEditingPostId] = useState(null);
@@ -73,6 +75,29 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     fetchPosts();
   }, [activeTab]);
 
+  // Fetch current user's following list on mount
+  useEffect(() => {
+    const loadFollowingList = async () => {
+      if (!userData?.id) return;
+      
+      try {
+        const { followApi } = await import('@/lib/api');
+        const following = await followApi.getFollowing(userData.id);
+        
+        // Create a Set of user IDs that the current user is following
+        const followingIds = new Set(
+          (following || []).map(user => user.id)
+        );
+        setFollowingUsers(followingIds);
+        console.log('Loaded following list:', followingIds);
+      } catch (err) {
+        console.error('Failed to load following list:', err);
+      }
+    };
+
+    loadFollowingList();
+  }, [userData?.id]);
+
   // Search users
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
@@ -80,7 +105,11 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     setIsSearching(true);
     try {
       const result = await searchApi.searchUsers(searchQuery);
+      console.log('Search results:', result);
       setSearchResults(result.users || []);
+      if (result.users && result.users.length > 0) {
+        console.log('First user object:', result.users[0]);
+      }
       setShowSearchResults(true);
     } catch (err) {
       console.error('Search failed:', err);
@@ -111,6 +140,44 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     } catch (err) {
       console.error('Failed to start conversation:', err);
       alert('Failed to start conversation: ' + err.message);
+    }
+  };
+
+  // Follow/Unfollow user
+  const handleFollowToggle = async (userId) => {
+    console.log('Follow toggle called for userId:', userId);
+    const isFollowing = followingUsers.has(userId);
+    
+    // Add to loading set
+    setFollowLoading(prev => new Set(prev).add(userId));
+    
+    try {
+      const { followApi } = await import('@/lib/api');
+      
+      if (isFollowing) {
+        console.log('Unfollowing user:', userId);
+        await followApi.unfollowUser(userId);
+        setFollowingUsers(prev => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      } else {
+        console.log('Following user:', userId);
+        await followApi.followUser(userId);
+        setFollowingUsers(prev => new Set(prev).add(userId));
+      }
+      console.log('Follow operation successful');
+    } catch (err) {
+      console.error('Follow operation failed:', err);
+      alert(`Failed to ${isFollowing ? 'unfollow' : 'follow'} user: ${err.message}`);
+    } finally {
+      // Remove from loading set
+      setFollowLoading(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
@@ -357,7 +424,11 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
               className="nav-search"
-              style={{ minWidth: '200px' }}
+              style={{ 
+                minWidth: showSearchResults ? '400px' : '300px',
+                width: showSearchResults ? '450px' : '300px',
+                transition: 'all 0.3s ease'
+              }}
             />
             {/* Search Results Dropdown */}
             {showSearchResults && (
@@ -390,35 +461,70 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                       style={{
                         padding: '12px 16px',
                         borderBottom: '1px solid #333',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '12px',
                         transition: 'background 0.2s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,217,255,0.1)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #00d9ff, #00ff88)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '18px'
-                      }}>
-                        {user.avatar_url || '👤'}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: '#fff', fontWeight: '600' }}>
-                          {user.display_name || user.username}
+                      <div 
+                        onClick={() => {
+                          setShowSearchResults(false);
+                          setSearchQuery('');
+                          onNavigate('profile', { userId: user.id });
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          flex: 1,
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                      >
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #00d9ff, #00ff88)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px'
+                        }}>
+                          {user.avatar_url || '👤'}
                         </div>
-                        <div style={{ color: '#666', fontSize: '12px' }}>
-                          @{user.username}@{user.instance_domain}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: '#fff', fontWeight: '600' }}>
+                            {user.display_name || user.username}
+                          </div>
+                          <div style={{ color: '#666', fontSize: '12px' }}>
+                            @{user.username}@{user.instance_domain}
+                          </div>
                         </div>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('Follow button clicked for user:', user);
+                          handleFollowToggle(user.id);
+                        }}
+                        disabled={followLoading.has(user.id)}
+                        style={{
+                          padding: '6px 16px',
+                          background: followingUsers.has(user.id) ? 'rgba(0,255,136,0.2)' : 'rgba(0,217,255,0.2)',
+                          border: `1px solid ${followingUsers.has(user.id) ? '#00ff88' : '#00d9ff'}`,
+                          color: followingUsers.has(user.id) ? '#00ff88' : '#00d9ff',
+                          borderRadius: '4px',
+                          cursor: followLoading.has(user.id) ? 'not-allowed' : 'pointer',
+                          fontSize: '12px',
+                          minWidth: '80px',
+                          opacity: followLoading.has(user.id) ? 0.6 : 1
+                        }}
+                      >
+                        {followLoading.has(user.id) ? '...' : followingUsers.has(user.id) ? '✓ Following' : 'Follow'}
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

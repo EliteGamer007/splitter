@@ -863,14 +863,14 @@
 7. **Follow System** - Follow/unfollow users, view followers/following
 8. **Like & Repost** - Engagement interactions fully functional
 9. **Bookmarks** - Private saved posts
-10. **User Search** - Search for users to follow/message
+10. **User Search** - Search for users to follow/message with dynamic search bar, profile navigation, and follow buttons
 11. **Direct Messages** - Send/receive plaintext DMs (not yet encrypted)
 12. **Admin Controls** - User suspension, role management, moderation requests
 13. **Soft Delete** - Posts can be deleted (soft delete with deleted_at)
-14. **Profile Management** - View/edit profiles, display stats
+14. **Profile Management** - View/edit profiles, display stats, follow/unfollow with proper API integration
 
 ### 🟡 Partially Implemented
-1. **Post Editing** - Backend supports edit, frontend lacks UI
+1. **Post Editing** - Backend supports edit, frontend has UI with edit icon in post actions
 2. **Threaded Replies** - UI mockup exists, backend not implemented
 3. **Ephemeral Posts** - expires_at column exists, no expiration enforcement
 4. **Media Uploads** - Database schema ready, no file upload flow
@@ -1000,6 +1000,90 @@
 
 **Critical Finding:**  
 6 out of 17 HIGH priority stories are not started, and all 6 are in **Epic 2 (Federation)**. Without federation, the platform cannot demonstrate its unique value proposition.
+
+---
+
+## Recent Updates (Current Session)
+
+### Search & Follow Enhancements ✅ COMPLETED
+**Files Modified:**
+- `Frontend/components/pages/HomePage.jsx` - Enhanced search functionality
+- `Frontend/components/pages/ProfilePage.jsx` - Added proper follow API integration
+
+**Changes Implemented:**
+1. **Dynamic Search Bar** - Search input now expands from 300px to 450px when showing results, with smooth transition animation
+2. **Profile Navigation** - Clicking on a user in search results navigates directly to their profile page with proper userId parameter
+3. **Follow Button in Search** - Added follow/unfollow button next to each search result with:
+   - Real-time follow state tracking using `followApi.followUser()` and `followApi.unfollowUser()`
+   - Loading state while follow operation is in progress
+   - Visual distinction between following (green) and not following (cyan) states
+   - Proper error handling with user feedback
+4. **Follow Button in Profile** - Profile page now properly calls follow API instead of just toggling local state:
+   - Integrated with `followApi.followUser(userId)` and `followApi.unfollowUser(userId)`
+   - Loading indicator during follow operations
+   - Disabled state when viewing own profile (can't follow yourself)
+   - Error handling with user alerts
+5. **Consistent Follow UX** - Follow/unfollow functionality now works consistently across:
+   - Search results dropdown
+   - User profile pages
+   - With proper state synchronization
+
+---
+
+### Follow System Backend Fixes ✅ COMPLETED
+**Files Modified:**
+- `internal/repository/follow_repo.go` - Fixed Follow struct and CREATE query
+- `internal/handlers/follow_handler.go` - Added better error logging and messages
+
+**Backend Fixes:**
+1. **Follow Struct Update** - Added missing `ID` field to Follow struct to match database schema
+2. **RETURNING Clause Fix** - Updated INSERT query to return `id` and cast `created_at::text` for proper scanning
+3. **Self-Follow Prevention** - Added check to prevent users from following themselves
+4. **Enhanced Error Messages** - Backend now returns specific error messages (already following, cannot follow yourself, etc.)
+5. **Logging** - Added comprehensive logging for debugging follow operations
+
+---
+
+### Profile Page Enhancements ✅ COMPLETED
+**Files Modified:**
+- `Frontend/components/pages/ProfilePage.jsx` - Complete rewrite of profile data fetching
+- `Frontend/app/page.tsx` - Fixed navigation parameter handling
+
+**Profile Improvements:**
+1. **Correct Profile Display** - Fixed issue where clicking a user showed your own profile instead of theirs
+   - `navigateTo` function now properly extracts `userId` from params
+   - ProfilePage fetches the correct user's data when `viewingUserId` is provided
+
+2. **Real-time Stats** - Profile now fetches and displays accurate stats:
+   - **Followers Count** - Fetched from `followApi.getFollowStats(userId)`
+   - **Following Count** - Fetched from `followApi.getFollowStats(userId)`
+   - **Post Count** - Fetched by counting posts from `postApi.getUserPosts(did)`
+
+3. **Dynamic Follow State** - When viewing another user's profile:
+   - Checks if current user is already following them
+   - Follow button shows correct state (Follow / ✓ Following)
+   - Follow/unfollow updates the follower count in real-time
+
+4. **Context-Aware Navigation Bar** - When viewing another user's profile:
+   - "Threads" button is hidden (only show on own profile)
+   - "Message User" button replaces "Messages" (opens DM with that specific user)
+
+5. **Real Posts Display** - Profile shows actual user posts from database:
+   - Fetches posts using `postApi.getUserPosts(did)`
+   - Displays post content, visibility badges, and formatted timestamps
+   - Shows "No posts yet" message when user has no posts
+
+---
+
+### Follow State Persistence ✅ COMPLETED
+**Files Modified:**
+- `Frontend/components/pages/HomePage.jsx` - Load following list on mount
+
+**Follow State Improvements:**
+1. **Load Following on Mount** - HomePage now fetches the current user's following list when component mounts
+2. **Initialize State** - `followingUsers` Set is populated with IDs of all users the current user follows
+3. **Consistent Display** - Previously followed users now correctly show "✓ Following" in search results
+4. **Efficient Lookup** - Using Set for O(1) follow status checks
 
 ---
 

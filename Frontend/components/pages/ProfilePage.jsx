@@ -1,52 +1,161 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/ProfilePage.css';
+import { followApi, userApi, postApi } from '@/lib/api';
 
 export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTheme, viewingUserId = null }) {
   const [activeTab, setActiveTab] = useState('posts');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [stats, setStats] = useState({ followers: 0, following: 0, posts: 0 });
+  const [userPosts, setUserPosts] = useState([]);
 
-  // Use passed userData or mock profile data
-  const profile = {
-    username: userData.username,
-    server: userData.server,
-    displayName: userData.displayName,
-    did: 'did:key:z6Mkg5r9Z4x2bK7nQ9pL2m8vN3tC5wJ6...',
-    reputation: 'Trusted',
-    reputationColor: '#00d9ff',
-    avatar: userData.avatar,
-    bio: userData.bio,
-    email: userData.email,
-    isLocal: true,
-    followers: userData.followers,
-    following: userData.following,
-    posts: userData.postsCount,
+  // Fetch user profile and stats
+  useEffect(() => {
+    const fetchProfileAndStats = async () => {
+      const targetId = viewingUserId || userData?.id;
+      if (!targetId) {
+        setProfileData(userData);
+        return;
+      }
+
+      setIsLoadingProfile(true);
+      try {
+        let profile;
+        if (viewingUserId) {
+          // Viewing another user's profile
+          profile = await userApi.getUserProfile(viewingUserId);
+          setProfileData({
+            username: profile.username,
+            server: profile.instance_domain || 'localhost:8000',
+            displayName: profile.display_name || profile.username,
+            avatar: profile.avatar_url || '👤',
+            bio: profile.bio || 'No bio yet',
+            email: profile.email,
+            did: profile.did,
+          });
+          
+          // Check if current user is following this user
+          if (userData?.id) {
+            try {
+              const following = await followApi.getFollowing(userData.id);
+              const isCurrentlyFollowing = (following || []).some(u => u.id === viewingUserId);
+              setIsFollowing(isCurrentlyFollowing);
+            } catch (err) {
+              console.error('Failed to check follow status:', err);
+            }
+          }
+        } else {
+          // Viewing own profile
+          setProfileData(userData);
+        }
+
+        // Fetch follow stats
+        try {
+          const followStats = await followApi.getFollowStats(targetId);
+          setStats(prev => ({
+            ...prev,
+            followers: followStats.followers || 0,
+            following: followStats.following || 0,
+          }));
+        } catch (err) {
+          console.error('Failed to fetch follow stats:', err);
+        }
+
+        // Fetch post count (get user's posts)
+        try {
+          const targetDid = viewingUserId ? profile?.did : userData?.did;
+          if (targetDid) {
+            const posts = await postApi.getUserPosts(targetDid);
+            setStats(prev => ({
+              ...prev,
+              posts: (posts || []).length,
+            }));
+            setUserPosts(posts || []);
+          }
+        } catch (err) {
+          console.error('Failed to fetch user posts:', err);
+        }
+
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+        setProfileData(userData);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfileAndStats();
+  }, [viewingUserId, userData]);
+
+  // Handle follow/unfollow
+  const handleFollowToggle = async () => {
+    if (!viewingUserId) return; // Can't follow yourself
+    
+    setIsFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await followApi.unfollowUser(viewingUserId);
+        setIsFollowing(false);
+        setStats(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+      } else {
+        await followApi.followUser(viewingUserId);
+        setIsFollowing(true);
+        setStats(prev => ({ ...prev, followers: prev.followers + 1 }));
+      }
+    } catch (err) {
+      console.error('Follow operation failed:', err);
+      alert(`Failed to ${isFollowing ? 'unfollow' : 'follow'} user: ${err.message}`);
+    } finally {
+      setIsFollowLoading(false);
+    }
   };
 
-  const userPosts = [
-    {
-      id: 1,
-      content: 'Just deployed a new federated instance! 🚀',
-      timestamp: '2 hours ago',
-      isLocal: true,
-      isFollowersOnly: false,
-    },
-    {
-      id: 2,
-      content: 'Understanding DIDs has been a game-changer for decentralized auth.',
-      timestamp: '1 day ago',
-      isLocal: true,
-      isFollowersOnly: false,
-    },
-    {
-      id: 3,
-      content: 'Thoughts on ActivityPub compliance and federation standards.',
-      timestamp: '3 days ago',
-      isLocal: true,
-      isFollowersOnly: false,
-    },
-  ];
+  // Use fetched profile data
+  const displayData = profileData || userData;
+  const profile = {
+    username: displayData?.username || 'unknown',
+    server: displayData?.server || 'localhost:8000',
+    displayName: displayData?.displayName || displayData?.display_name || displayData?.username || 'Unknown User',
+    did: displayData?.did || 'did:key:...',
+    reputation: 'Trusted',
+    reputationColor: '#00d9ff',
+    avatar: displayData?.avatar || '👤',
+    bio: displayData?.bio || 'No bio yet',
+    email: displayData?.email,
+    isLocal: true,
+    followers: stats.followers,
+    following: stats.following,
+    posts: stats.posts,
+  };
+
+  // Format post timestamp
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'recently';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000);
+    
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (isLoadingProfile) {
+    return (
+      <div className="profile-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center', color: '#00d9ff' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <div>Loading profile...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="profile-container">
@@ -66,8 +175,14 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
           <button className="nav-badge">Federated</button>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-          <button onClick={() => onNavigate('thread')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>💬 Threads</button>
-          <button onClick={() => onNavigate('dm')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>📨 Messages</button>
+          {!viewingUserId && (
+            <button onClick={() => onNavigate('thread')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>💬 Threads</button>
+          )}
+          {viewingUserId ? (
+            <button onClick={() => onNavigate('dm', { selectedUser: { id: viewingUserId, username: displayData.username, display_name: displayData.displayName } })} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>💬 Message User</button>
+          ) : (
+            <button onClick={() => onNavigate('dm')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>📨 Messages</button>
+          )}
           <button onClick={() => onNavigate('security')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>🔐 Security</button>
           <button onClick={toggleTheme} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>{isDarkMode ? '🌙' : '☀️'}</button>
         </div>
@@ -102,9 +217,14 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
             <div className="profile-actions">
               <button
                 className={`follow-button ${isFollowing ? 'following' : ''}`}
-                onClick={() => setIsFollowing(!isFollowing)}
+                onClick={handleFollowToggle}
+                disabled={isFollowLoading || !viewingUserId}
+                style={{
+                  opacity: isFollowLoading ? 0.6 : 1,
+                  cursor: isFollowLoading || !viewingUserId ? 'not-allowed' : 'pointer'
+                }}
               >
-                {isFollowing ? '✓ Following' : 'Follow'}
+                {isFollowLoading ? '...' : isFollowing ? '✓ Following' : 'Follow'}
               </button>
               <button className="message-button" title="DMs available on /dm page">
                 Message 🔒
@@ -163,27 +283,36 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
         {/* Posts Tab */}
         {activeTab === 'posts' && (
           <div className="profile-posts-list">
-            {userPosts.map((post) => (
-              <div
-                key={post.id}
-                className="post-card-profile"
-                onClick={() => onNavigate('thread')}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="post-badges">
-                  {post.isLocal ? (
-                    <span className="local-badge">🏠 Local</span>
-                  ) : (
-                    <span className="federated-badge">🌐 Remote</span>
-                  )}
-                  {post.isFollowersOnly && (
-                    <span className="followers-badge">👥 Followers Only</span>
-                  )}
-                </div>
-                <div className="post-content">{post.content}</div>
-                <div className="post-timestamp">{post.timestamp}</div>
+            {userPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#666', padding: '32px' }}>
+                No posts yet
               </div>
-            ))}
+            ) : (
+              userPosts.map((post) => (
+                <div
+                  key={post.id}
+                  className="post-card-profile"
+                  onClick={() => onNavigate('thread')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="post-badges">
+                    {post.is_remote ? (
+                      <span className="federated-badge">🌐 Remote</span>
+                    ) : (
+                      <span className="local-badge">🏠 Local</span>
+                    )}
+                    {post.visibility === 'followers' && (
+                      <span className="followers-badge">👥 Followers Only</span>
+                    )}
+                    {post.visibility === 'circle' && (
+                      <span className="followers-badge">🔒 Circle</span>
+                    )}
+                  </div>
+                  <div className="post-content">{post.content}</div>
+                  <div className="post-timestamp">{formatTimestamp(post.created_at)}</div>
+                </div>
+              ))
+            )}
           </div>
         )}
 

@@ -95,7 +95,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const navigateTo = (page: string, userDataParam?: any) => {
+  const navigateTo = (page: string, params?: any) => {
     // Redirect to login if trying to access protected pages without auth
     const protectedPages = ['home', 'profile', 'dm', 'security', 'moderation', 'federation', 'thread', 'admin'];
     if (protectedPages.includes(page) && !isAuthenticated) {
@@ -104,16 +104,19 @@ export default function App() {
     }
     
     // Handle DM navigation with selected user
-    if (page === 'dm' && userDataParam?.selectedUser) {
-      setSelectedDMUser(userDataParam.selectedUser);
-    } else if (page !== 'dm') {
+    if (page === 'dm' && params?.selectedUser) {
+      setSelectedDMUser(params.selectedUser);
+      setViewingUserId(null);
+    } else if (page === 'profile' && params?.userId) {
+      // Handle profile navigation with userId
+      setViewingUserId(params.userId);
       setSelectedDMUser(null);
+    } else {
+      setSelectedDMUser(null);
+      setViewingUserId(null);
     }
     
     setCurrentPage(page);
-    if (userDataParam && !userDataParam.selectedUser) {
-      setViewingUserId(userDataParam);
-    }
   };
 
   const updateUserData = (newData: any) => {

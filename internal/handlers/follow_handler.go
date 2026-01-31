@@ -31,6 +31,7 @@ func (h *FollowHandler) FollowUser(c echo.Context) error {
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
 	if err != nil {
+		c.Logger().Errorf("Failed to get current user by DID %s: %v", did, err)
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -38,24 +39,30 @@ func (h *FollowHandler) FollowUser(c echo.Context) error {
 
 	// Get target user ID from path
 	targetIDStr := c.Param("id")
+	c.Logger().Infof("Follow request: current user DID=%s, target ID=%s", did, targetIDStr)
 
 	// Try to parse as UUID first (user ID), or lookup by DID
 	targetUser, err := h.userRepo.GetByID(c.Request().Context(), targetIDStr)
 	if err != nil {
+		c.Logger().Infof("Target not found by ID, trying DID: %v", err)
 		// Try as DID
 		targetUser, err = h.userRepo.GetByDID(c.Request().Context(), targetIDStr)
 		if err != nil {
+			c.Logger().Errorf("Target user not found by ID or DID: %v", err)
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Target user not found",
 			})
 		}
 	}
 
+	c.Logger().Infof("Following: %s -> %s", currentUser.DID, targetUser.DID)
+
 	// Create follow relationship
 	follow, err := h.followRepo.Create(c.Request().Context(), currentUser.DID, targetUser.DID)
 	if err != nil {
+		c.Logger().Errorf("Failed to create follow: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to follow user",
+			"error": "Failed to follow user: " + err.Error(),
 		})
 	}
 

@@ -10,6 +10,37 @@ export default function ModerationPage({ onNavigate, isDarkMode, toggleTheme, us
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
+  // Check permissions
+  if (userData?.role !== 'admin' && userData?.role !== 'moderator') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#0f0f1a',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff'
+      }}>
+        <h1 style={{ color: '#ff4444', marginBottom: '16px' }}>⛔ Access Denied</h1>
+        <p style={{ color: '#666', marginBottom: '24px' }}>You need moderator privileges to access this page.</p>
+        <button
+          onClick={() => onNavigate('home')}
+          style={{
+            padding: '12px 24px',
+            background: 'rgba(0,217,255,0.2)',
+            border: '1px solid #00d9ff',
+            color: '#00d9ff',
+            borderRadius: '8px',
+            cursor: 'pointer'
+          }}
+        >
+          ← Back to Home
+        </button>
+      </div>
+    );
+  }
+
   useEffect(() => {
     fetchModerationQueue();
   }, []);
@@ -21,60 +52,71 @@ export default function ModerationPage({ onNavigate, isDarkMode, toggleTheme, us
       setQueue(result.items || []);
     } catch (err) {
       console.error('Failed to fetch moderation queue:', err);
-      // Keep mock data as fallback for demo
-      setQueue([
-        { id: 1, preview: 'Buy crypto now! Guaranteed 1000% returns!!!', author: '@spam_bot', server: 'evil.net', isFederated: true, reason: 'Spam' },
-        { id: 2, preview: 'This user is a complete idiot...', author: '@angry_user', server: 'local', isFederated: false, reason: 'Harassment' },
-      ]);
+      // Fall back to empty queue on error
+      setQueue([]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const getActionsForItem = (item) => {
-    const reason = (item.reason || '').toLowerCase();
-    if (reason.includes('spam')) return ['Remove', 'Block User'];
-    if (reason.includes('harassment')) return ['Warn', 'Mute', 'Remove'];
-    if (reason.includes('hate')) return ['Remove', 'Block Domain'];
-    if (item.isFederated) return ['Remove', 'Block Domain'];
-    return ['Approve', 'Dismiss', 'Remove'];
   };
 
   const handleAction = async (id, action, item) => {
     setActionLoading(id);
     try {
       if (action === 'Remove') {
-        try { await adminApi.removeContent(id); } catch(e) {}
+        await adminApi.removeContent(id);
         setQueue(queue.filter((q) => q.id !== id));
-        alert('Content removed');
+        alert(`Content removed successfully`);
       } else if (action === 'Block Domain') {
-        try { await adminApi.blockDomain(item.server); } catch(e) {}
+        await adminApi.blockDomain(item.server);
         setQueue(queue.filter((q) => q.id !== id));
         alert(`Domain ${item.server} blocked`);
       } else if (action === 'Warn') {
-        try { await adminApi.warnUser(item.author_id, item.reason); } catch(e) {}
+        await adminApi.warnUser(item.author_id, item.reason);
         setQueue(queue.filter((q) => q.id !== id));
-        alert('User warned');
-      } else if (action === 'Approve' || action === 'Dismiss') {
-        try { await adminApi.approveContent(id); } catch(e) {}
+        alert(`User warned for: ${item.reason}`);
+      } else if (action === 'Approve') {
+        await adminApi.approveContent(id);
         setQueue(queue.filter((q) => q.id !== id));
-        alert(action === 'Approve' ? 'Content approved' : 'Report dismissed');
-      } else if (action === 'Mute' || action === 'Block User') {
-        try { await adminApi.suspendUser(item.author_id); } catch(e) {}
+        alert(`Content approved`);
+      } else if (action === 'Mute') {
+        await adminApi.suspendUser(item.author_id);
         setQueue(queue.filter((q) => q.id !== id));
-        alert('User suspended');
+        alert(`User muted`);
+      } else if (action === 'Dismiss') {
+        await adminApi.approveContent(id);
+        setQueue(queue.filter((q) => q.id !== id));
+        alert(`Report dismissed`);
+      } else if (action === 'Block User') {
+        await adminApi.suspendUser(item.author_id);
+        setQueue(queue.filter((q) => q.id !== id));
+        alert(`User blocked`);
       }
     } catch (err) {
-      alert('Action failed: ' + err.message);
+      alert(`Action failed: ${err.message}`);
     } finally {
       setActionLoading(null);
     }
   };
 
+  const getActionsForItem = (item) => {
+    const reason = item.reason?.toLowerCase() || '';
+    if (reason.includes('spam')) {
+      return ['Remove', 'Block User'];
+    } else if (reason.includes('harassment')) {
+      return ['Warn', 'Mute', 'Remove'];
+    } else if (reason.includes('hate')) {
+      return ['Remove', 'Block Domain'];
+    } else if (item.isFederated) {
+      return ['Remove', 'Block Domain'];
+    } else {
+      return ['Approve', 'Dismiss', 'Remove'];
+    }
+  };
+
   const filteredQueue = queue.filter((item) => {
-    if (filterType === 'spam') return (item.reason || '').toLowerCase().includes('spam');
-    if (filterType === 'harassment') return (item.reason || '').toLowerCase().includes('harassment');
-    if (filterType === 'federated') return item.isFederated;
+    if (filterType === 'spam') return item.reason?.toLowerCase().includes('spam');
+    if (filterType === 'harassment') return item.reason?.toLowerCase().includes('harassment');
+    if (filterType === 'federated') return item.isFederated || item.is_federated;
     return true;
   });
 
@@ -147,61 +189,65 @@ export default function ModerationPage({ onNavigate, isDarkMode, toggleTheme, us
           </button>
         </div>
 
-        {/* Moderation Queue Table */}
+        {/* Loading State */}
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Loading...</div>
-        ) : (
-        <div className="queue-table">
-          <div className="table-header">
-            <div className="col-preview">Preview</div>
-            <div className="col-user">User</div>
-            <div className="col-server">Server</div>
-            <div className="col-reason">Reason</div>
-            <div className="col-action">Action</div>
+          <div style={{ textAlign: 'center', padding: '60px', color: '#666' }}>
+            Loading moderation queue...
           </div>
+        ) : (
+          /* Moderation Queue Table */
+          <div className="queue-table">
+            <div className="table-header">
+              <div className="col-preview">Preview</div>
+              <div className="col-user">User</div>
+              <div className="col-server">Server</div>
+              <div className="col-reason">Reason</div>
+              <div className="col-action">Action</div>
+            </div>
 
-          {filteredQueue.length > 0 ? (
-            filteredQueue.map((item) => (
-              <div key={item.id} className="table-row">
-                <div className="col-preview">
-                  <div className="preview-text">{item.preview || item.content}</div>
-                </div>
-                <div className="col-user">{item.author || item.username}</div>
-                <div className="col-server">
-                  {item.server || 'local'}
-                  {item.isFederated && (
-                    <span className="federated-badge">🌐</span>
-                  )}
-                </div>
-                <div className="col-reason">
-                  <span className={`reason-tag ${(item.reason || 'reported').toLowerCase().replace(' ', '-')}`}>
-                    {item.reason || 'Reported'}
-                  </span>
-                </div>
-                <div className="col-action">
-                  <div className="action-buttons">
-                    {getActionsForItem(item).map((action) => (
-                      <button
-                        key={action}
-                        className={`action-btn ${action.toLowerCase().replace(' ', '-')}`}
-                        onClick={() => handleAction(item.id, action, item)}
-                        disabled={actionLoading === item.id}
-                        style={{ opacity: actionLoading === item.id ? 0.5 : 1 }}
-                      >
-                        {actionLoading === item.id ? '...' : action}
-                      </button>
-                    ))}
+            {filteredQueue.length > 0 ? (
+              filteredQueue.map((item) => (
+                <div key={item.id} className="table-row">
+                  <div className="col-preview">
+                    <div className="preview-text">{item.preview || item.content}</div>
+                  </div>
+                  <div className="col-user">{item.author || item.username || '@unknown'}</div>
+                  <div className="col-server">
+                    {item.server || item.instance_domain || 'local'}
+                    {(item.isFederated || item.is_federated) && (
+                      <span className="federated-badge">🌐</span>
+                    )}
+                  </div>
+                  <div className="col-reason">
+                    <span className={`reason-tag ${(item.reason || 'reported').toLowerCase().replace(' ', '-')}`}>
+                      {item.reason || 'Reported by User'}
+                    </span>
+                  </div>
+                  <div className="col-action">
+                    <div className="action-buttons">
+                      {getActionsForItem(item).map((action) => (
+                        <button
+                          key={action}
+                          className={`action-btn ${action.toLowerCase().replace(' ', '-')}`}
+                          onClick={() => handleAction(item.id, action, item)}
+                          disabled={actionLoading === item.id}
+                          style={{ opacity: actionLoading === item.id ? 0.5 : 1 }}
+                        >
+                          {actionLoading === item.id ? '...' : action}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="empty-queue">
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
+                <p>No items in queue</p>
+                <p style={{ color: '#666', fontSize: '14px' }}>All caught up! Great work.</p>
               </div>
-            ))
-          ) : (
-            <div className="empty-queue">
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
-              <p>No items in queue</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         )}
 
         {/* Moderation Notes */}
