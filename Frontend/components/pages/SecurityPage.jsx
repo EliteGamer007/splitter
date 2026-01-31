@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/SecurityPage.css';
 import { userApi } from '@/lib/api';
 
@@ -9,7 +9,7 @@ export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, user
   const [copiedField, setCopiedField] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Privacy settings
+  // Privacy settings state
   const [defaultVisibility, setDefaultVisibility] = useState(userData?.default_visibility || 'public');
   const [messagePrivacy, setMessagePrivacy] = useState(userData?.message_privacy || 'everyone');
   const [accountLocked, setAccountLocked] = useState(userData?.account_locked || false);
@@ -33,11 +33,16 @@ export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, user
         account_locked: accountLocked
       });
       if (updateUserData) {
-        updateUserData({ ...userData, default_visibility: defaultVisibility, message_privacy: messagePrivacy, account_locked: accountLocked });
+        updateUserData({
+          ...userData,
+          default_visibility: defaultVisibility,
+          message_privacy: messagePrivacy,
+          account_locked: accountLocked
+        });
       }
-      alert('Privacy settings saved!');
+      alert('Privacy settings saved successfully!');
     } catch (err) {
-      alert('Failed to save: ' + err.message);
+      alert('Failed to save settings: ' + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -74,46 +79,101 @@ export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, user
           </div>
         </div>
 
-        {/* Privacy Settings Card */}
+        {/* Privacy Settings Card - NEW */}
         <div className="status-card" style={{ marginBottom: '24px' }}>
           <h3 className="card-title">🔒 Privacy Settings</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
+            
+            {/* Default Post Visibility */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: '600', marginBottom: '4px' }}>Default Post Visibility</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Who can see your new posts</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Who can see your new posts by default</div>
               </div>
-              <select value={defaultVisibility} onChange={(e) => setDefaultVisibility(e.target.value)}
-                style={{ padding: '8px 12px', background: '#1a1a2e', border: '1px solid #333', color: '#fff', borderRadius: '6px', cursor: 'pointer', minWidth: '150px' }}>
+              <select
+                value={defaultVisibility}
+                onChange={(e) => setDefaultVisibility(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  background: '#1a1a2e',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  minWidth: '150px'
+                }}
+              >
                 <option value="public">🌐 Public</option>
                 <option value="followers">👥 Followers Only</option>
                 <option value="circle">🔒 Circle Only</option>
               </select>
             </div>
+
+            {/* Message Privacy */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: '600', marginBottom: '4px' }}>Who Can Message You</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Control direct message access</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Control who can send you direct messages</div>
               </div>
-              <select value={messagePrivacy} onChange={(e) => setMessagePrivacy(e.target.value)}
-                style={{ padding: '8px 12px', background: '#1a1a2e', border: '1px solid #333', color: '#fff', borderRadius: '6px', cursor: 'pointer', minWidth: '150px' }}>
+              <select
+                value={messagePrivacy}
+                onChange={(e) => setMessagePrivacy(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  background: '#1a1a2e',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  minWidth: '150px'
+                }}
+              >
                 <option value="everyone">🌐 Everyone</option>
                 <option value="followers">👥 Followers Only</option>
                 <option value="none">🚫 No One</option>
               </select>
             </div>
+
+            {/* Account Lock Toggle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: '600', marginBottom: '4px' }}>Lock Account</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Require approval for followers</div>
+                <div style={{ fontSize: '12px', color: '#888' }}>Require approval for new followers</div>
               </div>
-              <button onClick={() => setAccountLocked(!accountLocked)}
-                style={{ padding: '8px 16px', background: accountLocked ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,68,0.1)', border: `1px solid ${accountLocked ? '#00ff88' : '#ff4444'}`, color: accountLocked ? '#00ff88' : '#ff4444', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', minWidth: '100px' }}>
+              <button
+                onClick={() => setAccountLocked(!accountLocked)}
+                style={{
+                  padding: '8px 16px',
+                  background: accountLocked ? 'rgba(0,255,136,0.2)' : 'rgba(255,68,68,0.1)',
+                  border: `1px solid ${accountLocked ? '#00ff88' : '#ff4444'}`,
+                  color: accountLocked ? '#00ff88' : '#ff4444',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  minWidth: '100px'
+                }}
+              >
                 {accountLocked ? '🔒 Locked' : '🔓 Open'}
               </button>
             </div>
-            <button onClick={handleSavePrivacySettings} disabled={isSaving}
-              style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #00d9ff, #00ff88)', border: 'none', color: '#000', borderRadius: '8px', cursor: isSaving ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '14px', marginTop: '8px', opacity: isSaving ? 0.7 : 1 }}>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSavePrivacySettings}
+              disabled={isSaving}
+              style={{
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #00d9ff, #00ff88)',
+                border: 'none',
+                color: '#000',
+                borderRadius: '8px',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+                marginTop: '8px',
+                opacity: isSaving ? 0.7 : 1
+              }}
+            >
               {isSaving ? 'Saving...' : '💾 Save Privacy Settings'}
             </button>
           </div>

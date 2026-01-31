@@ -20,6 +20,7 @@ func NewFollowRepository() *FollowRepository {
 
 // Follow represents a follow relationship with DID-based identification
 type Follow struct {
+	ID           string `json:"id"`
 	FollowerDID  string `json:"follower_did"`
 	FollowingDID string `json:"following_did"`
 	Status       string `json:"status"` // pending, accepted, rejected
@@ -28,6 +29,11 @@ type Follow struct {
 
 // Create creates a new follow relationship
 func (r *FollowRepository) Create(ctx context.Context, followerDID, followingDID string) (*Follow, error) {
+	// Can't follow yourself
+	if followerDID == followingDID {
+		return nil, fmt.Errorf("cannot follow yourself")
+	}
+
 	// Check if already following
 	var exists bool
 	checkQuery := `SELECT EXISTS(SELECT 1 FROM follows WHERE follower_did = $1 AND following_did = $2)`
@@ -43,11 +49,12 @@ func (r *FollowRepository) Create(ctx context.Context, followerDID, followingDID
 	query := `
 		INSERT INTO follows (follower_did, following_did, status)
 		VALUES ($1, $2, 'accepted')
-		RETURNING follower_did, following_did, status, created_at
+		RETURNING id, follower_did, following_did, status, created_at::text
 	`
 
 	var follow Follow
 	err = db.GetDB().QueryRow(ctx, query, followerDID, followingDID).Scan(
+		&follow.ID,
 		&follow.FollowerDID,
 		&follow.FollowingDID,
 		&follow.Status,
