@@ -162,39 +162,27 @@ export const userApi = {
 // Post API
 export const postApi = {
   async createPost(content: string, visibility: string = 'public', file?: File) {
-    const headers: HeadersInit = {};
+    const fd = new FormData();
+
+    // Always send content (even empty string)
+    fd.append('content', content || '');
+
+    fd.append('visibility', visibility);
+
+    if (file) {
+      fd.append('file', file);
+    }
+
     const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // -------- MEDIA POST --------
-    if (file) {
-      const fd = new FormData();
-
-      // MUST match backend names exactly
-      fd.append('content', content);
-      fd.append('visibility', visibility);
-      fd.append('file', file);
-
-      return fetch(`${API_BASE}/posts`, {
-        method: 'POST',
-        headers: headers, // DO NOT set Content-Type here
-        body: fd
-      }).then(r => handleResponse<any>(r));
-    }
-
-    // -------- TEXT ONLY POST --------
     return fetch(`${API_BASE}/posts`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      },
-      body: JSON.stringify({
-        content,
-        visibility
-      })
+      headers: headers, // IMPORTANT: DO NOT set Content-Type manually
+      body: fd
     }).then(r => handleResponse<any>(r));
   },
 

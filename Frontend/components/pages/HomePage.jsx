@@ -259,15 +259,16 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   };
 
   const handlePostCreate = async () => {
+    // allow text OR image OR both
     if (!newPostText.trim() && !selectedFile) return;
 
     setIsPosting(true);
 
     try {
       const newPost = await postApi.createPost(
-        newPostText,
+        newPostText.trim(),          // always send content
         newPostVisibility,
-        selectedFile
+        selectedFile || undefined   // always send file if exists
       );
 
       const transformedPost = {
@@ -291,15 +292,10 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
 
       setPosts(prev => [transformedPost, ...prev]);
 
+      // reset composer
       setNewPostText('');
-      setNewPostVisibility('public');
-
-      // clear media
       setSelectedFile(null);
       setPreviewUrl(null);
-
-      const fileInput = document.getElementById('post-media-input');
-      if (fileInput) fileInput.value = '';
 
     } catch (err) {
       setError('Failed to create post: ' + err.message);
