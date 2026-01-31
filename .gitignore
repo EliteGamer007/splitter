@@ -69,3 +69,6 @@ logs/
 tmp/
 temp/
 .cache/
+
+# Local uploads
+uploads/
