@@ -5,6 +5,7 @@ import (
 	"splitter/internal/handlers"
 	"splitter/internal/middleware"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
@@ -20,6 +21,11 @@ type Server struct {
 func NewServer(cfg *config.Config) *Server {
 	e := echo.New()
 
+	// Initialize services
+	// Use current working directory + uploads for local storage
+	// in production this would come from config
+	storageService := service.NewLocalStorage(".", cfg.Server.BaseURL)
+
 	// Initialize repositories
 	userRepo := repository.NewUserRepository()
 	postRepo := repository.NewPostRepository()
@@ -30,7 +36,7 @@ func NewServer(cfg *config.Config) *Server {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
 	userHandler := handlers.NewUserHandler(userRepo)
-	postHandler := handlers.NewPostHandler(postRepo)
+	postHandler := handlers.NewPostHandler(postRepo, storageService)
 	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
@@ -39,12 +45,16 @@ func NewServer(cfg *config.Config) *Server {
 	// Global middleware
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.BodyLimit("6M")) // Limit body size to 6MB (allow overhead for 5MB file)
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
 		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
 		AllowCredentials: true,
 	}))
+
+	// Static routes
+	e.Static("/uploads", "uploads")
 
 	// Routes
 	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler)

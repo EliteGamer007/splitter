@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -13,12 +15,14 @@ import (
 // PostHandler handles post-related requests
 type PostHandler struct {
 	postRepo *repository.PostRepository
+	storage  service.FileStorage
 }
 
 // NewPostHandler creates a new PostHandler
-func NewPostHandler(postRepo *repository.PostRepository) *PostHandler {
+func NewPostHandler(postRepo *repository.PostRepository, storage service.FileStorage) *PostHandler {
 	return &PostHandler{
 		postRepo: postRepo,
+		storage:  storage,
 	}
 }
 
@@ -32,14 +36,49 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		})
 	}
 
-	var req models.PostCreate
-	if err := c.Bind(&req); err != nil {
+	// Parse multipart form
+	// Limit handled by middleware, but good to have fallback checks
+	content := c.FormValue("content")
+	visibility := c.FormValue("visibility")
+
+	// Validate content
+	if len(content) > 500 {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request body",
+			"error": "Content too long (max 500 characters)",
+		})
+	}
+	if content == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Content is required",
 		})
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), did, &req)
+	// Handle file upload
+	var mediaURL, mediaType string
+	file, err := c.FormFile("file")
+	if err == nil {
+		// File present, save it
+		url, mType, err := h.storage.Save(file)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("Failed to upload file: %v", err),
+			})
+		}
+		mediaURL = url
+		mediaType = mType
+	} else if err != http.ErrMissingFile {
+		// Real error occurred
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Failed to process file: %v", err),
+		})
+	}
+
+	req := models.PostCreate{
+		Content:    content,
+		Visibility: visibility,
+	}
+
+	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaURL, mediaType)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",

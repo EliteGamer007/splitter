@@ -23,6 +23,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// Run migrations
+	if err := db.RunMigrations("migrations"); err != nil {
+		log.Printf("Warning: Failed to run migrations: %v", err)
+		// Don't fail fatal here, maybe migrations are already applied or dir missing in prod
+	}
+
 	// Ensure admin user exists
 	if err := ensureAdminUser(); err != nil {
 		log.Printf("Warning: Failed to ensure admin user: %v", err)

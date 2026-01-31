@@ -58,13 +58,15 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [followingUsers, setFollowingUsers] = useState(new Set());
   const [followLoading, setFollowLoading] = useState(new Set());
-  
+
   // Edit/Delete state
   const [editingPostId, setEditingPostId] = useState(null);
   const [editText, setEditText] = useState('');
@@ -79,11 +81,11 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   useEffect(() => {
     const loadFollowingList = async () => {
       if (!userData?.id) return;
-      
+
       try {
         const { followApi } = await import('@/lib/api');
         const following = await followApi.getFollowing(userData.id);
-        
+
         // Create a Set of user IDs that the current user is following
         const followingIds = new Set(
           (following || []).map(user => user.id)
@@ -101,7 +103,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   // Search users
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
-    
+
     setIsSearching(true);
     try {
       const result = await searchApi.searchUsers(searchQuery);
@@ -147,13 +149,13 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   const handleFollowToggle = async (userId) => {
     console.log('Follow toggle called for userId:', userId);
     const isFollowing = followingUsers.has(userId);
-    
+
     // Add to loading set
     setFollowLoading(prev => new Set(prev).add(userId));
-    
+
     try {
       const { followApi } = await import('@/lib/api');
-      
+
       if (isFollowing) {
         console.log('Unfollowing user:', userId);
         await followApi.unfollowUser(userId);
@@ -187,7 +189,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     try {
       let feedPosts;
       const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
-      
+
       if (activeTab === 'home') {
         // Home tab: authenticated feed
         if (token) {
@@ -206,7 +208,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         // Federated tab: all public posts (local_only = false)
         feedPosts = await postApi.getPublicFeed(20, 0, false);
       }
-      
+
       if (feedPosts && feedPosts.length > 0) {
         const transformedPosts = feedPosts.map(post => ({
           id: post.id,
@@ -248,7 +250,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 1) return 'now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -261,7 +263,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
     setIsPosting(true);
     try {
       const newPost = await postApi.createPost(newPostText, newPostVisibility);
-      
+
       const transformedPost = {
         id: newPost.id,
         author: `${userData.username}@${userData.server}`,
@@ -279,7 +281,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         local: true,
         visibility: newPostVisibility
       };
-      
+
       setPosts(prev => [transformedPost, ...prev]);
       setNewPostText('');
       setNewPostVisibility('public');
@@ -303,12 +305,12 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
 
   const handleEditSave = async (postId) => {
     if (!editText.trim()) return;
-    
+
     try {
       await postApi.updatePost(postId, editText);
-      setPosts(prev => prev.map(p => 
-        p.id === postId 
-          ? { ...p, content: editText, updatedAt: new Date().toISOString() } 
+      setPosts(prev => prev.map(p =>
+        p.id === postId
+          ? { ...p, content: editText, updatedAt: new Date().toISOString() }
           : p
       ));
       setEditingPostId(null);
@@ -334,12 +336,12 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
       const post = posts.find(p => p.id === postId);
       if (post?.liked) {
         await interactionApi.unlikePost(postId);
-        setPosts(prev => prev.map(p => 
+        setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, liked: false, likes: p.likes - 1 } : p
         ));
       } else {
         await interactionApi.likePost(postId);
-        setPosts(prev => prev.map(p => 
+        setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, liked: true, likes: p.likes + 1 } : p
         ));
       }
@@ -353,12 +355,12 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
       const post = posts.find(p => p.id === postId);
       if (post?.reposted) {
         await interactionApi.unrepostPost(postId);
-        setPosts(prev => prev.map(p => 
+        setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, reposted: false, boosts: p.boosts - 1 } : p
         ));
       } else {
         await interactionApi.repostPost(postId);
-        setPosts(prev => prev.map(p => 
+        setPosts(prev => prev.map(p =>
           p.id === postId ? { ...p, reposted: true, boosts: p.boosts + 1 } : p
         ));
       }
@@ -375,9 +377,9 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
 
   // Check if current user owns the post
   const isOwnPost = (post) => {
-    return post.authorId === userData?.id || 
-           post.handle === `@${userData?.username}` ||
-           post.author?.startsWith(userData?.username);
+    return post.authorId === userData?.id ||
+      post.handle === `@${userData?.username}` ||
+      post.author?.startsWith(userData?.username);
   };
 
   const getVisibilityIcon = (visibility) => {
@@ -396,19 +398,19 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
           <h1 className="nav-logo">🌐 SPLITTER</h1>
         </div>
         <div className="nav-center">
-          <button 
+          <button
             className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
             onClick={() => setActiveTab('home')}
           >
             Home
           </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'local' ? 'active' : ''}`}
             onClick={() => setActiveTab('local')}
           >
             Local
           </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'federated' ? 'active' : ''}`}
             onClick={() => setActiveTab('federated')}
           >
@@ -417,14 +419,14 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         </div>
         <div className="nav-right">
           <div style={{ position: 'relative' }}>
-            <input 
-              type="text" 
-              placeholder="Search users..." 
+            <input
+              type="text"
+              placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
               className="nav-search"
-              style={{ 
+              style={{
                 minWidth: showSearchResults ? '400px' : '300px',
                 width: showSearchResults ? '450px' : '300px',
                 transition: 'all 0.3s ease'
@@ -456,7 +458,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   </div>
                 ) : (
                   searchResults.map(user => (
-                    <div 
+                    <div
                       key={user.id}
                       style={{
                         padding: '12px 16px',
@@ -467,7 +469,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                         transition: 'background 0.2s'
                       }}
                     >
-                      <div 
+                      <div
                         onClick={() => {
                           setShowSearchResults(false);
                           setSearchQuery('');
@@ -546,9 +548,9 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   ))
                 )}
                 {searchResults.length > 0 && (
-                  <div 
-                    style={{ 
-                      padding: '8px 16px', 
+                  <div
+                    style={{
+                      padding: '8px 16px',
                       textAlign: 'center',
                       borderTop: '1px solid #333'
                     }}
@@ -570,13 +572,13 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
               </div>
             )}
           </div>
-          <button 
+          <button
             className="nav-btn-profile"
             onClick={() => onNavigate('profile')}
           >
             👤 {userData.username || 'User'}
           </button>
-          <button 
+          <button
             className="nav-btn-profile"
             onClick={toggleTheme}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -593,7 +595,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
             {isDarkMode ? '🌙' : '☀️'}
           </button>
           {handleLogout && (
-            <button 
+            <button
               className="nav-btn-profile"
               onClick={handleLogout}
               title="Logout"
@@ -620,7 +622,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
           <div className="sidebar-section">
             <h3 className="sidebar-title">Navigation</h3>
             <div className="sidebar-links">
-              <button 
+              <button
                 className="sidebar-link active"
                 onClick={() => setActiveTab('home')}
                 style={{ textAlign: 'left', width: '100%' }}
@@ -628,7 +630,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                 <span className="icon">🏠</span>
                 <span>Home</span>
               </button>
-              <button 
+              <button
                 className="sidebar-link"
                 onClick={() => onNavigate('dm')}
                 style={{ textAlign: 'left', width: '100%' }}
@@ -636,7 +638,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                 <span className="icon">💬</span>
                 <span>Messages 🔒</span>
               </button>
-              <button 
+              <button
                 className="sidebar-link"
                 onClick={() => onNavigate('security')}
                 style={{ textAlign: 'left', width: '100%' }}
@@ -658,7 +660,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   <strong>{userData.following}</strong> Following • <strong>{userData.followers}</strong> Followers
                 </p>
               </div>
-              <button 
+              <button
                 className="sidebar-btn"
                 onClick={() => onNavigate('security')}
               >
@@ -676,12 +678,12 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
               </div>
               <div className="info-item">
                 <span className="info-label">Your Role</span>
-                <span className="info-value" style={{ 
-                  color: userData.role === 'admin' ? '#ff4444' : 
-                         userData.role === 'moderator' ? '#00d9ff' : '#00ff88'
+                <span className="info-value" style={{
+                  color: userData.role === 'admin' ? '#ff4444' :
+                    userData.role === 'moderator' ? '#00d9ff' : '#00ff88'
                 }}>
-                  {userData.role === 'admin' ? '👑 Admin' : 
-                   userData.role === 'moderator' ? '🛡️ Moderator' : '👤 User'}
+                  {userData.role === 'admin' ? '👑 Admin' :
+                    userData.role === 'moderator' ? '🛡️ Moderator' : '👤 User'}
                 </span>
               </div>
               <div className="info-item">
@@ -700,9 +702,9 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         <main className="home-feed">
           {/* Error display */}
           {error && (
-            <div style={{ 
-              background: 'rgba(255, 68, 68, 0.1)', 
-              border: '1px solid #ff4444', 
+            <div style={{
+              background: 'rgba(255, 68, 68, 0.1)',
+              border: '1px solid #ff4444',
               color: '#ff4444',
               padding: '12px',
               borderRadius: '8px',
@@ -726,6 +728,50 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                 maxLength="500"
                 disabled={isPosting}
               />
+
+              {/* Media Preview */}
+              {previewUrl && (
+                <div style={{ position: 'relative', margin: '10px 0', maxWidth: '100%' }}>
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    style={{
+                      maxHeight: '300px',
+                      maxWidth: '100%',
+                      borderRadius: '8px',
+                      objectFit: 'cover'
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                      // Reset file input
+                      const fileInput = document.getElementById('post-media-input');
+                      if (fileInput) fileInput.value = '';
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      background: 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <div className="composer-footer">
                 <div className="composer-info">
                   <span className="char-count">
@@ -751,17 +797,45 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   </select>
                 </div>
                 <div className="composer-actions">
-                  <button 
-                    className="composer-btn-media disabled"
-                    disabled
-                    title="Media upload - Sprint 2"
+                  <input
+                    type="file"
+                    id="post-media-input"
+                    accept="image/png, image/jpeg, image/gif"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+
+                        // Validate size
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('File size exceeds 5MB limit.');
+                          return;
+                        }
+
+                        setSelectedFile(file);
+                        const url = URL.createObjectURL(file);
+                        setPreviewUrl(url);
+                      }
+                    }}
+                  />
+                  <button
+                    className="composer-btn-media"
+                    onClick={() => document.getElementById('post-media-input').click()}
+                    title="Attach media (max 5MB)"
+                    disabled={isPosting}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      opacity: isPosting ? 0.5 : 1
+                    }}
                   >
                     🖼️ Media
                   </button>
-                  <button 
-                    className={`composer-btn-post ${!newPostText.trim() || isPosting ? 'disabled' : ''}`}
+                  <button
+                    className={`composer-btn-post ${(!newPostText.trim() && !selectedFile) || isPosting ? 'disabled' : ''}`}
                     onClick={handlePostCreate}
-                    disabled={!newPostText.trim() || isPosting}
+                    disabled={(!newPostText.trim() && !selectedFile) || isPosting}
                   >
                     {isPosting ? 'Posting...' : 'Post 🚀'}
                   </button>
@@ -795,8 +869,8 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                         {!post.local && <span className="post-badge remote">🌐 Remote</span>}
                         {/* Edited Badge */}
                         {isEdited(post) && (
-                          <span 
-                            className="post-badge" 
+                          <span
+                            className="post-badge"
                             style={{ background: 'rgba(255,170,0,0.2)', color: '#ffaa00' }}
                             title={`Edited: ${new Date(post.updatedAt).toLocaleString()}`}
                           >
@@ -865,7 +939,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                     </div>
                   </div>
                 ) : (
-                  <div 
+                  <div
                     className="post-content"
                     style={{ cursor: 'pointer' }}
                     onClick={() => onNavigate('thread')}
@@ -919,14 +993,14 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                 )}
 
                 <div className="post-actions">
-                  <button 
+                  <button
                     className="post-action"
                     onClick={() => onNavigate('thread')}
                   >
                     <span className="action-icon">💬</span>
                     <span className="action-count">{post.replies}</span>
                   </button>
-                  <button 
+                  <button
                     className={`post-action ${post.reposted ? 'active' : ''}`}
                     onClick={() => handleRepost(post.id)}
                     style={post.reposted ? { color: '#00d9ff' } : {}}
@@ -934,7 +1008,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                     <span className="action-icon">🚀</span>
                     <span className="action-count">{post.boosts}</span>
                   </button>
-                  <button 
+                  <button
                     className={`post-action ${post.liked ? 'active' : ''}`}
                     onClick={() => handleLike(post.id)}
                     style={post.liked ? { color: '#ff4444' } : {}}
@@ -942,11 +1016,11 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                     <span className="action-icon">{post.liked ? '❤️' : '🤍'}</span>
                     <span className="action-count">{post.likes}</span>
                   </button>
-                  
+
                   {/* Edit/Delete buttons for own posts */}
                   {isOwnPost(post) && !editingPostId && !deleteConfirmId && (
                     <>
-                      <button 
+                      <button
                         className="post-action"
                         onClick={() => handleEditStart(post)}
                         title="Edit post"
@@ -954,7 +1028,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                       >
                         <span className="action-icon">✏️</span>
                       </button>
-                      <button 
+                      <button
                         className="post-action"
                         onClick={() => setDeleteConfirmId(post.id)}
                         title="Delete post"
@@ -964,7 +1038,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                       </button>
                     </>
                   )}
-                  
+
                   {!isOwnPost(post) && (
                     <button className="post-action post-action-delete">
                       <span className="action-icon">⋯</span>
@@ -1011,7 +1085,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
           {(userData.role === 'admin' || userData.role === 'moderator') && (
             <div className="trends-section">
               <h3 className="trends-title">⚙️ Admin Panel</h3>
-              <button 
+              <button
                 onClick={() => onNavigate('moderation')}
                 style={{
                   width: '100%',
@@ -1029,7 +1103,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
               >
                 📋 Moderation Queue
               </button>
-              <button 
+              <button
                 onClick={() => onNavigate('federation')}
                 style={{
                   width: '100%',
@@ -1047,7 +1121,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                 🌐 Federation Inspector
               </button>
               {userData.role === 'admin' && (
-                <button 
+                <button
                   onClick={() => onNavigate('admin')}
                   style={{
                     width: '100%',
@@ -1086,7 +1160,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   ⏳ Moderation request pending approval
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={async () => {
                     try {
                       await adminApi.requestModeration();
@@ -1114,9 +1188,9 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                   🙋 Request Moderation Access
                 </button>
               )}
-              <p style={{ 
-                fontSize: '12px', 
-                color: '#666', 
+              <p style={{
+                fontSize: '12px',
+                color: '#666',
                 marginTop: '8px',
                 lineHeight: '1.4'
               }}>

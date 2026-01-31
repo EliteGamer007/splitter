@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"splitter/internal/db"
 	"splitter/internal/models"
@@ -19,11 +20,17 @@ func NewPostRepository() *PostRepository {
 }
 
 // Create creates a new post in the database
-func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate) (*models.Post, error) {
+func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaURL, mediaType string) (*models.Post, error) {
 	visibility := post.Visibility
 	if visibility == "" {
 		visibility = "public"
 	}
+
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
 	query := `
 		INSERT INTO posts (author_did, content, visibility)
@@ -32,7 +39,7 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 	`
 
 	var newPost models.Post
-	err := db.GetDB().QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		authorDID,
 		post.Content,
 		visibility,
@@ -50,6 +57,31 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		return nil, fmt.Errorf("failed to create post: %w", err)
 	}
 
+	// Insert media if present
+	if mediaURL != "" {
+		mediaQuery := `
+			INSERT INTO media (post_id, media_url, media_type)
+			VALUES ($1, $2, $3)
+			RETURNING id, post_id, media_url, media_type, created_at
+		`
+		var media models.Media
+		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaURL, mediaType).Scan(
+			&media.ID,
+			&media.PostID,
+			&media.MediaURL,
+			&media.MediaType,
+			&media.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create media: %w", err)
+		}
+		newPost.Media = []models.Media{media}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return &newPost, nil
 }
 
@@ -58,13 +90,18 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
-		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
+		LEFT JOIN media m ON p.id = m.post_id
 		WHERE p.id = $1 AND p.deleted_at IS NULL
 	`
 
 	var post models.Post
+	var mediaID, mediaURL, mediaType *string
+	var mediaCreatedAt *time.Time
+
 	err := db.GetDB().QueryRow(ctx, query, id).Scan(
 		&post.ID,
 		&post.AuthorDID,
@@ -75,6 +112,10 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		&post.UpdatedAt,
 		&post.Username,
 		&post.LikeCount,
+		&mediaID,
+		&mediaURL,
+		&mediaType,
+		&mediaCreatedAt,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -82,6 +123,16 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get post: %w", err)
+	}
+
+	if mediaID != nil {
+		post.Media = []models.Media{{
+			ID:        *mediaID,
+			PostID:    post.ID,
+			MediaURL:  *mediaURL,
+			MediaType: *mediaType,
+			CreatedAt: *mediaCreatedAt,
+		}}
 	}
 
 	return &post, nil
@@ -133,10 +184,12 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
-		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
 		LEFT JOIN follows f ON p.author_did = f.following_did
+		LEFT JOIN media m ON p.id = m.post_id
 		WHERE (f.follower_did = $1 OR p.author_did = $1) AND p.deleted_at IS NULL
 		  AND (p.visibility = 'public' OR (p.visibility = 'followers' AND f.follower_did = $1))
 		ORDER BY p.created_at DESC
@@ -152,6 +205,9 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 	var posts []*models.Post
 	for rows.Next() {
 		var post models.Post
+		var mediaID, mediaURL, mediaType *string
+		var mediaCreatedAt *time.Time
+
 		if err := rows.Scan(
 			&post.ID,
 			&post.AuthorDID,
@@ -162,8 +218,21 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 			&post.UpdatedAt,
 			&post.Username,
 			&post.LikeCount,
+			&mediaID,
+			&mediaURL,
+			&mediaType,
+			&mediaCreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan post: %w", err)
+		}
+		if mediaID != nil {
+			post.Media = []models.Media{{
+				ID:        *mediaID,
+				PostID:    post.ID,
+				MediaURL:  *mediaURL,
+				MediaType: *mediaType,
+				CreatedAt: *mediaCreatedAt,
+			}}
 		}
 		posts = append(posts, &post)
 	}
@@ -176,9 +245,11 @@ func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) (
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
-		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
+		LEFT JOIN media m ON p.id = m.post_id
 		WHERE p.visibility = 'public' AND p.deleted_at IS NULL
 		ORDER BY p.created_at DESC
 		LIMIT $1 OFFSET $2
@@ -193,6 +264,9 @@ func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) (
 	var posts []*models.Post
 	for rows.Next() {
 		var post models.Post
+		var mediaID, mediaURL, mediaType *string
+		var mediaCreatedAt *time.Time
+
 		if err := rows.Scan(
 			&post.ID,
 			&post.AuthorDID,
@@ -203,8 +277,21 @@ func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) (
 			&post.UpdatedAt,
 			&post.Username,
 			&post.LikeCount,
+			&mediaID,
+			&mediaURL,
+			&mediaType,
+			&mediaCreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan post: %w", err)
+		}
+		if mediaID != nil {
+			post.Media = []models.Media{{
+				ID:        *mediaID,
+				PostID:    post.ID,
+				MediaURL:  *mediaURL,
+				MediaType: *mediaType,
+				CreatedAt: *mediaCreatedAt,
+			}}
 		}
 		posts = append(posts, &post)
 	}
