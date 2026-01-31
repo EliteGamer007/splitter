@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -64,6 +65,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	// Check if username already exists
 	exists, err := h.userRepo.UsernameExists(c.Request().Context(), req.Username)
 	if err != nil {
+		log.Printf("UsernameExists DB error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to check username",
 		})
@@ -77,6 +79,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	// Check if email already exists
 	exists, err = h.userRepo.EmailExists(c.Request().Context(), req.Email)
 	if err != nil {
+		log.Printf("EmailExists DB error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to check email",
 		})
@@ -108,6 +111,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	// Create user
 	user, err := h.userRepo.Create(c.Request().Context(), &req, string(passwordHash))
 	if err != nil {
+		log.Printf("Create User DB error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create user: " + err.Error(),
 		})

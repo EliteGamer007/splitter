@@ -26,8 +26,9 @@ type DatabaseConfig struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Port string
-	Env  string
+	Port    string
+	Env     string
+	BaseURL string
 }
 
 // JWTConfig holds JWT-related configuration
@@ -49,8 +50,9 @@ func Load() *Config {
 			MinConns: 5,
 		},
 		Server: ServerConfig{
-			Port: getEnv("PORT", "8080"),
-			Env:  getEnv("ENV", "development"),
+			Port:    getEnv("PORT", "8080"),
+			Env:     getEnv("ENV", "development"),
+			BaseURL: getEnv("BASE_URL", "http://localhost:3000"),
 		},
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "your-secret-key"),

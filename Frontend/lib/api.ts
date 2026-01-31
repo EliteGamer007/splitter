@@ -22,7 +22,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
       url: response.url,
       body: errorText
     });
-    
+
     try {
       const error = JSON.parse(errorText);
       throw new Error(error.error || `HTTP ${response.status}`);
@@ -161,13 +161,47 @@ export const userApi = {
 
 // Post API
 export const postApi = {
-  async createPost(content: string, visibility: string = 'public', imageUrl?: string) {
-    const response = await fetch(`${API_BASE}/posts`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ content, visibility, image_url: imageUrl })
-    });
-    return handleResponse<any>(response);
+  async createPost(content: string, visibility: string = 'public', file?: File) {
+    const headers: HeadersInit = {};
+    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (file) {
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('visibility', visibility);
+      formData.append('file', file);
+
+      // Note: Do NOT set Content-Type header for FormData, browser does it automatically with boundary
+      const response = await fetch(`${API_BASE}/posts`, {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+      return handleResponse<any>(response);
+    } else {
+      // Form-data fallback for text only too, or keep JSON? 
+      // The backend expects multipart/form-data now for creating posts if we only have one handler.
+      // Actually backend handles standard form fields via c.FormValue which works for multipart.
+      // But if we send JSON, c.FormValue might be empty if not parsed?
+      // Our backend uses `c.FormValue` which usually requires `application/x-www-form-urlencoded` or `multipart/form-data`.
+      // It does NOT parse JSON body for FormValue.
+      // So we MUST use FormData for everything or x-www-form-urlencoded.
+      // Let's use FormData for consistency.
+
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('visibility', visibility);
+
+      const response = await fetch(`${API_BASE}/posts`, {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+      return handleResponse<any>(response);
+    }
   },
 
   async getPost(id: string) {
@@ -222,12 +256,12 @@ export const followApi = {
     console.log('API endpoint:', `${API_BASE}/users/${userId}/follow`);
     const headers = getAuthHeaders();
     console.log('Auth headers:', headers);
-    
+
     const response = await fetch(`${API_BASE}/users/${userId}/follow`, {
       method: 'POST',
       headers: headers
     });
-    
+
     console.log('Follow response status:', response.status);
     const result = await handleResponse<any>(response);
     console.log('Follow result:', result);

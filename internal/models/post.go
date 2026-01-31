@@ -6,15 +6,25 @@ import (
 
 // Post represents a post/content created by a user
 type Post struct {
-	ID         string     `json:"id"`                 // UUID
-	AuthorDID  string     `json:"author_did"`         // DID of the author
-	Username   string     `json:"username,omitempty"` // Joined from User table
+	ID         string     `json:"id"`
+	AuthorDID  string     `json:"author_did"`
+	Username   string     `json:"username,omitempty"`
 	Content    string     `json:"content"`
-	Visibility string     `json:"visibility,omitempty"` // public, followers, circle
+	Visibility string     `json:"visibility,omitempty"`
 	IsRemote   bool       `json:"is_remote"`
 	LikeCount  int        `json:"like_count"`
+	Media      []Media    `json:"media,omitempty"` // Attached media
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
+}
+
+// Media represents a media attachment
+type Media struct {
+	ID        string    `json:"id"`
+	PostID    string    `json:"post_id"`
+	MediaURL  string    `json:"media_url"`
+	MediaType string    `json:"media_type"` // image/jpeg, image/png, etc.
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // PostCreate represents the data needed to create a new post
