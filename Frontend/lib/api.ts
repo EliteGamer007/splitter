@@ -168,40 +168,34 @@ export const postApi = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // -------- MEDIA POST --------
     if (file) {
-      const formData = new FormData();
-      formData.append('content', content);
-      formData.append('visibility', visibility);
-      formData.append('file', file);
+      const fd = new FormData();
 
-      // Note: Do NOT set Content-Type header for FormData, browser does it automatically with boundary
-      const response = await fetch(`${API_BASE}/posts`, {
+      // MUST match backend names exactly
+      fd.append('content', content);
+      fd.append('visibility', visibility);
+      fd.append('file', file);
+
+      return fetch(`${API_BASE}/posts`, {
         method: 'POST',
-        headers: headers,
-        body: formData
-      });
-      return handleResponse<any>(response);
-    } else {
-      // Form-data fallback for text only too, or keep JSON? 
-      // The backend expects multipart/form-data now for creating posts if we only have one handler.
-      // Actually backend handles standard form fields via c.FormValue which works for multipart.
-      // But if we send JSON, c.FormValue might be empty if not parsed?
-      // Our backend uses `c.FormValue` which usually requires `application/x-www-form-urlencoded` or `multipart/form-data`.
-      // It does NOT parse JSON body for FormValue.
-      // So we MUST use FormData for everything or x-www-form-urlencoded.
-      // Let's use FormData for consistency.
-
-      const formData = new FormData();
-      formData.append('content', content);
-      formData.append('visibility', visibility);
-
-      const response = await fetch(`${API_BASE}/posts`, {
-        method: 'POST',
-        headers: headers,
-        body: formData
-      });
-      return handleResponse<any>(response);
+        headers: headers, // DO NOT set Content-Type here
+        body: fd
+      }).then(r => handleResponse<any>(r));
     }
+
+    // -------- TEXT ONLY POST --------
+    return fetch(`${API_BASE}/posts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify({
+        content,
+        visibility
+      })
+    }).then(r => handleResponse<any>(r));
   },
 
   async getPost(id: string) {
