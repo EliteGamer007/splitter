@@ -41,22 +41,26 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	content := c.FormValue("content")
 	visibility := c.FormValue("visibility")
 
-	// Validate content
+	// Handle file upload check first to validate
+	file, fileErr := c.FormFile("file")
+
+	// Validate content or media presence
 	if len(content) > 500 {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Content too long (max 500 characters)",
 		})
 	}
-	if content == "" {
+	// Check if both content is empty and no file is provided
+	// fileErr will be nil if file exists
+	if content == "" && fileErr != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Content is required",
+			"error": "Either content or media is required",
 		})
 	}
 
 	// Handle file upload
 	var mediaURL, mediaType string
-	file, err := c.FormFile("file")
-	if err == nil {
+	if fileErr == nil {
 		// File present, save it
 		url, mType, err := h.storage.Save(file)
 		if err != nil {
@@ -66,10 +70,10 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		}
 		mediaURL = url
 		mediaType = mType
-	} else if err != http.ErrMissingFile {
+	} else if fileErr != http.ErrMissingFile {
 		// Real error occurred
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("Failed to process file: %v", err),
+			"error": fmt.Sprintf("Failed to process file: %v", fileErr),
 		})
 	}
 

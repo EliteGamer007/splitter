@@ -285,8 +285,6 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         boosts: 0,
         likes: 0,
         local: true,
-        likes: 0,
-        local: true,
         visibility: newPostVisibility,
         imageUrl: newPost.media?.[0]?.media_url || null
       };
