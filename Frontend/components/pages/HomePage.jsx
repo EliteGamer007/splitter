@@ -228,7 +228,8 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
           visibility: post.visibility || 'public',
           liked: post.liked || false,
           reposted: post.reposted || false,
-          bookmarked: post.bookmarked || false
+          bookmarked: post.bookmarked || false,
+          imageUrl: post.media?.[0]?.media_url || null
         }));
         setPosts(transformedPosts);
       } else {
@@ -258,11 +259,16 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
   };
 
   const handlePostCreate = async () => {
-    if (!newPostText.trim()) return;
+    if (!newPostText.trim() && !selectedFile) return;
 
     setIsPosting(true);
+
     try {
-      const newPost = await postApi.createPost(newPostText, newPostVisibility);
+      const newPost = await postApi.createPost(
+        newPostText,
+        newPostVisibility,
+        selectedFile
+      );
 
       const transformedPost = {
         id: newPost.id,
@@ -279,12 +285,24 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
         boosts: 0,
         likes: 0,
         local: true,
-        visibility: newPostVisibility
+        likes: 0,
+        local: true,
+        visibility: newPostVisibility,
+        imageUrl: newPost.media?.[0]?.media_url || null
       };
 
       setPosts(prev => [transformedPost, ...prev]);
+
       setNewPostText('');
       setNewPostVisibility('public');
+
+      // clear media
+      setSelectedFile(null);
+      setPreviewUrl(null);
+
+      const fileInput = document.getElementById('post-media-input');
+      if (fileInput) fileInput.value = '';
+
     } catch (err) {
       setError('Failed to create post: ' + err.message);
     } finally {
@@ -945,6 +963,20 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
                     onClick={() => onNavigate('thread')}
                   >
                     {post.content}
+                    {post.imageUrl && (
+                      <div style={{ marginTop: '10px' }}>
+                        <img
+                          src={`http://localhost:8000${post.imageUrl}`}
+                          alt="Post attachment"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '400px',
+                            borderRadius: '8px',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
