@@ -146,7 +146,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -162,6 +162,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.Role,
+		&user.ModerationRequested,
 		&user.IsLocked,
 		&user.IsSuspended,
 		&user.CreatedAt,
@@ -181,7 +183,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // GetByDID retrieves a user by DID (Decentralized Identifier)
 func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE did = $1
 	`
@@ -197,6 +199,8 @@ func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.Role,
+		&user.ModerationRequested,
 		&user.IsLocked,
 		&user.IsSuspended,
 		&user.CreatedAt,
@@ -515,4 +519,55 @@ func (r *UserRepository) UnsuspendUser(ctx context.Context, userID string) error
 		return fmt.Errorf("user not found")
 	}
 	return nil
+}
+
+// GetSuspendedUsers returns all suspended users
+func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset int) ([]*models.User, error) {
+	query := `
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, bio, avatar_url, 
+		       COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), 
+		       is_locked, is_suspended, created_at, updated_at
+		FROM users
+		WHERE is_suspended = true
+		ORDER BY updated_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get suspended users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.InstanceDomain,
+			&user.DID,
+			&user.DisplayName,
+			&user.Bio,
+			&user.AvatarURL,
+			&user.PublicKey,
+			&user.Role,
+			&user.ModerationRequested,
+			&user.IsLocked,
+			&user.IsSuspended,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		users = append(users, &user)
+	}
+
+	if users == nil {
+		users = []*models.User{}
+	}
+
+	return users, nil
 }

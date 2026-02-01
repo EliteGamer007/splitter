@@ -1226,13 +1226,18 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
           )}
 
           <div className="trends-section">
-            <h3 className="trends-title">🚀 Future Features (Disabled)</h3>
+            <h3 className="trends-title">Coming Soon</h3>
             <ul className="features-list">
-              <li>📁 Media Upload - Sprint 2</li>
-              <li>👥 Custom Circles - Sprint 2</li>
-              <li>🔍 Search - Sprint 2</li>
-              <li>📊 Federation Graph - Sprint 3</li>
-              <li>⭐ Reputation Scoring - Sprint 3</li>
+              <li>🌐 WebFinger Discovery - Sprint 2</li>
+              <li>📡 ActivityPub Federation - Sprint 2</li>
+              <li>🔒 Instance Blocking - Sprint 2</li>
+              <li>💬 Reply Threading - Sprint 2</li>
+              <li>🔐 E2E Encrypted DMs - Sprint 2</li>
+              <li>📁 Media Upload UI - Sprint 2</li>
+              <li>🚨 Content Reporting - Sprint 2</li>
+              <li>#️⃣ Hashtag Support - Sprint 3</li>
+              <li>📊 Trending Topics - Sprint 3</li>
+              <li>📱 Mobile PWA - Sprint 3</li>
             </ul>
           </div>
         </aside>

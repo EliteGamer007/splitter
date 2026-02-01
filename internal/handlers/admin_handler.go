@@ -1,13 +1,26 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"time"
 
+	"splitter/internal/db"
 	"splitter/internal/repository"
 
 	"github.com/labstack/echo/v4"
 )
+
+// AdminAction represents an admin action in the audit log
+type AdminAction struct {
+	ID         string    `json:"id"`
+	AdminID    string    `json:"admin_id"`
+	ActionType string    `json:"action_type"`
+	Target     string    `json:"target,omitempty"`
+	Reason     string    `json:"reason,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
 
 // AdminHandler handles admin-related requests
 type AdminHandler struct {
@@ -19,6 +32,16 @@ func NewAdminHandler(userRepo *repository.UserRepository) *AdminHandler {
 	return &AdminHandler{
 		userRepo: userRepo,
 	}
+}
+
+// logAdminAction logs an admin action to the audit log
+func (h *AdminHandler) logAdminAction(adminID, actionType, target, reason string) error {
+	query := `
+		INSERT INTO admin_actions (admin_id, action_type, target, reason)
+		VALUES ($1, $2, $3, $4)
+	`
+	_, err := db.GetDB().Exec(context.Background(), query, adminID, actionType, target, reason)
+	return err
 }
 
 // requireAdmin checks if the current user is an admin
@@ -181,6 +204,10 @@ func (h *AdminHandler) UpdateUserRole(c echo.Context) error {
 		})
 	}
 
+	// Log the role change action
+	adminID := c.Get("user_id").(string)
+	h.logAdminAction(adminID, "role_change", userID, "Role changed to "+req.Role)
+
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "User role updated to " + req.Role,
 	})
@@ -199,12 +226,22 @@ func (h *AdminHandler) SuspendUser(c echo.Context) error {
 		})
 	}
 
+	// Parse optional reason from body
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	c.Bind(&req) // Ignore errors, reason is optional
+
 	err := h.userRepo.SuspendUser(c.Request().Context(), userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to suspend user: " + err.Error(),
 		})
 	}
+
+	// Log the suspend action
+	adminID := c.Get("user_id").(string)
+	h.logAdminAction(adminID, "suspend", userID, req.Reason)
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "User suspended",
@@ -230,6 +267,10 @@ func (h *AdminHandler) UnsuspendUser(c echo.Context) error {
 			"error": "Failed to unsuspend user: " + err.Error(),
 		})
 	}
+
+	// Log the unsuspend action
+	adminID := c.Get("user_id").(string)
+	h.logAdminAction(adminID, "unsuspend", userID, "")
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "User unsuspended",
@@ -279,6 +320,98 @@ func (h *AdminHandler) SearchUsers(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to search users: " + err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"users": users,
+	})
+}
+
+// GetAdminActions returns the admin action audit log
+func (h *AdminHandler) GetAdminActions(c echo.Context) error {
+	if err := h.requireAdmin(c); err != nil {
+		return err
+	}
+
+	limit := 50
+	offset := 0
+
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := c.QueryParam("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	query := `
+		SELECT id, admin_id, action_type, target, reason, created_at
+		FROM admin_actions
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := db.GetDB().Query(c.Request().Context(), query, limit, offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to get admin actions: " + err.Error(),
+		})
+	}
+	defer rows.Close()
+
+	var actions []AdminAction
+	for rows.Next() {
+		var action AdminAction
+		var target, reason *string
+		if err := rows.Scan(&action.ID, &action.AdminID, &action.ActionType, &target, &reason, &action.CreatedAt); err != nil {
+			continue
+		}
+		if target != nil {
+			action.Target = *target
+		}
+		if reason != nil {
+			action.Reason = *reason
+		}
+		actions = append(actions, action)
+	}
+
+	if actions == nil {
+		actions = []AdminAction{}
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"actions": actions,
+	})
+}
+
+// GetSuspendedUsers returns all suspended users
+func (h *AdminHandler) GetSuspendedUsers(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	limit := 50
+	offset := 0
+
+	if l := c.QueryParam("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := c.QueryParam("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	users, err := h.userRepo.GetSuspendedUsers(c.Request().Context(), limit, offset)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to get suspended users: " + err.Error(),
 		})
 	}
 

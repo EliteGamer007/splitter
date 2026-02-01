@@ -56,7 +56,10 @@ func ensureAdminUser() error {
 	// Check if admin already exists
 	existingAdmin, _, _ := userRepo.GetByUsername(ctx, "admin")
 	if existingAdmin != nil {
-		log.Println("Admin user already exists")
+		// Always ensure the admin user has admin role (force update on every startup)
+		updateQuery := `UPDATE users SET role = 'admin' WHERE username = 'admin'`
+		db.GetDB().Exec(ctx, updateQuery)
+		log.Println("Admin user role ensured to be admin")
 		return nil
 	}
 
