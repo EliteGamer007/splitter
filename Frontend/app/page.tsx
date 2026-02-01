@@ -68,7 +68,8 @@ export default function App() {
               postsCount: user.posts_count || 0
             });
             setIsAuthenticated(true);
-            setCurrentPage('home');
+            // Redirect admin users to admin dashboard, regular users to home
+            setCurrentPage(user.role === 'admin' ? 'admin' : 'home');
           } catch (authError) {
             // Token invalid, clear it
             localStorage.removeItem('jwt_token');

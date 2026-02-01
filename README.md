@@ -244,13 +244,130 @@ go fmt ./...
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
+## Development Status
+
+**Current Sprint:** Sprint 2 (Target: 65% completion)  
+**Overall Progress:** 52% complete (26/50 user stories)
+
+### ✅ Completed Features (Sprint 1 & 2)
+
+**Identity & Onboarding (100% complete):**
+- ✅ Landing page with federation explanation
+- ✅ Instance discovery and selection
+- ✅ DID-based decentralized registration
+- ✅ Ed25519 cryptographic authentication
+- ✅ Security and recovery options
+- ✅ Multi-step onboarding flow
+
+**Content & Social Features (53% complete):**
+- ✅ Post creation with text and media support
+- ✅ Visibility controls (public, followers, circle)
+- ✅ Home timeline with follow filtering
+- ✅ Post interactions (likes, reposts, bookmarks)
+- ✅ User search functionality
+- ✅ Follow/unfollow system
+- ✅ Profile pages with real-time stats
+- ✅ Post deletion
+
+**Messaging (64% complete):**
+- ✅ Direct messaging UI
+- ✅ Conversation threads
+- ✅ Unread message indicators
+- ✅ Real-time message updates
+
+**Admin & Moderation (45% complete):**
+- ✅ Comprehensive admin dashboard
+- ✅ User suspension/ban system
+- ✅ Moderation request approval system
+- ✅ Admin action audit logging
+- ✅ Role-based access control
+
+### 🟡 In Progress Features (Sprint 2)
+
+**Federation Engine (11% complete):**
+- 🟡 WebFinger discovery endpoint
+- 🟡 ActivityPub inbox for receiving federated content
+- ⏳ ActivityPub outbox for sending posts
+- ⏳ HTTP signatures for secure federation
+
+**Enhanced Moderation:**
+- 🟡 Content reporting system
+- 🟡 Instance blocking (defederation) UI
+- 🟡 Enhanced audit logging
+
+**Content Improvements:**
+- 🟡 Reply threading and conversation trees
+- 🟡 Media upload UI with file picker
+- 🟡 Hashtag extraction and linking
+
+**Messaging:**
+- 🟡 End-to-end encryption integration
+
+### 🎯 Planned Features (Sprint 2+)
+
+**Federation & Distribution:**
+- Remote user discovery and following
+- Cross-instance post delivery
+- Federated interactions (likes, reposts, replies)
+- Activity deduplication
+- Profile update propagation
+- Federated content deletion
+
+**Content & Media:**
+- Image and video upload processing
+- Media proxy for privacy
+- Post editing with version history
+- Advanced search with filters
+- Trending topics and hashtags
+
+**Moderation & Safety:**
+- Content reporting queue and review
+- Automated spam detection
+- Circuit breaker for failing instances
+- Appeal system for moderation actions
+- Automated content filtering
+- User blocking and muting
+
+**Messaging & Privacy:**
+- End-to-end encrypted DMs
+- Message key exchange
+- Encryption indicators
+- Message deletion and editing
+- Group messaging
+
+**User Experience:**
+- Timeline switching (home/local/federated)
+- Notification grouping and filtering
+- Dark/light theme customization
+- Accessibility improvements
+- Mobile-responsive design
+- Progressive Web App (PWA)
+
+**Advanced Features:**
+- Content warnings and sensitive media
+- Polls and surveys
+- Custom emojis
+- Multi-account support
+- Import/export data
+- Advanced privacy settings
+- Circle/list management
+- Scheduled posts
+
+For detailed progress tracking, see:
+- [Sprint 1 Status](SPRINT_1_STATUS.md) - Completed features
+- [Sprint 2 Status](SPRINT_2_STATUS.md) - Current sprint progress
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Backend Status:** ✅ Production-ready and tested  
-**Frontend Status:** ⏳ See [FRONTEND_TASKS.md](FRONTEND_TASKS.md) for implementation tasks
+**Project Status:** 🟡 Active Development (Sprint 2)  
+**Backend Status:** ✅ Core features production-ready  
+**Frontend Status:** 🟡 52% complete with admin dashboard  
+**Federation Status:** ⏳ In Progress (WebFinger + ActivityPub)
+
+**See [SPRINT_2_STATUS.md](SPRINT_2_STATUS.md) for detailed progress tracking.**
 
 

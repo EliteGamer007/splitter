@@ -163,12 +163,14 @@ func setupRoutes(
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	admin.GET("/users", adminHandler.GetAllUsers)
+	admin.GET("/users/suspended", adminHandler.GetSuspendedUsers)
 	admin.GET("/moderation-requests", adminHandler.GetModerationRequests)
 	admin.POST("/moderation-requests/:id/approve", adminHandler.ApproveModerationRequest)
 	admin.POST("/moderation-requests/:id/reject", adminHandler.RejectModerationRequest)
 	admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
 	admin.POST("/users/:id/suspend", adminHandler.SuspendUser)
 	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)
+	admin.GET("/actions", adminHandler.GetAdminActions)
 }
 
 // Start starts the HTTP server

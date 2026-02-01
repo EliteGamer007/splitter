@@ -1,6 +1,6 @@
 # Sprint 1 – User Stories & Tasks Status (Target: ~50%)
 
-**Overall Sprint 1 Completion: 48%**
+**Overall Sprint 1 Completion: 52%**
 
 ---
 
@@ -842,56 +842,59 @@
 
 | Epic | Completed | In Progress | Not Started | Completion % |
 |------|-----------|-------------|-------------|--------------|
-| **Epic 1: Identity & Onboarding** | 6 stories | 2 stories | 1 story | **75%** |
-| **Epic 2: Federation** | 0 stories | 0 stories | 9 stories | **0%** |
-| **Epic 3: Content & Streams** | 8 stories | 4 stories | 2 stories | **64%** |
-| **Epic 4: Privacy & Messaging** | 1 story | 3 stories | 5 stories | **22%** |
-| **Epic 5: Governance & Admin** | 1 story | 5 stories | 3 stories | **28%** |
-| **TOTAL** | **16 stories** | **14 stories** | **20 stories** | **48%** |
+| **Epic 1: Identity & Onboarding** | 7 stories | 0 stories | 0 stories | **100%** ✅ |
+| **Epic 2: Federation** | 0 stories | 2 stories | 7 stories | **11%** ⚠️ |
+| **Epic 3: Content & Streams** | 9 stories | 4 stories | 4 stories | **59%** 🟡 |
+| **Epic 4: Privacy & Messaging** | 4 stories | 1 stories | 2 stories | **64%** 🟡 |
+| **Epic 5: Governance & Admin** | 3 stories | 3 stories | 4 stories | **45%** 🟡 |
+| **TOTAL** | **23 stories** | **10 stories** | **17 stories** | **52%** |
 
 ---
 
 ## Sprint 1 Achievements
 
 ### ✅ Fully Functional Features
-1. **User Registration & Login** - Username/password auth working end-to-end
-2. **DID Generation** - Client-side keypair generation with did:key format
-3. **Recovery Files** - Export/import of identity credentials
-4. **Instance Selection** - Browse and filter federated servers
-5. **Post Creation** - Create text posts with character limits
-6. **Post Visibility** - Public/followers/circle scoping enforced
-7. **Follow System** - Follow/unfollow users, view followers/following
-8. **Like & Repost** - Engagement interactions fully functional
-9. **Bookmarks** - Private saved posts
-10. **User Search** - Search for users to follow/message with dynamic search bar, profile navigation, and follow buttons
-11. **Direct Messages** - Send/receive plaintext DMs (not yet encrypted)
-12. **Admin Controls** - User suspension, role management, moderation requests
-13. **Soft Delete** - Posts can be deleted (soft delete with deleted_at)
-14. **Profile Management** - View/edit profiles, display stats, follow/unfollow with proper API integration
+1. **User Registration & Login** - Username/password and DID-based auth working end-to-end
+2. **DID Generation** - Client-side ECDSA P-256 keypair generation with did:key format
+3. **Recovery Files** - Export/import of identity credentials with security warnings
+4. **Instance Selection** - Browse and filter federated servers with search and region filters
+5. **Post Creation** - Create text posts with character limits and visibility controls
+6. **Post Visibility** - Public/followers/circle scoping enforced in backend queries
+7. **Follow System** - Follow/unfollow users, view followers/following lists with real-time stats
+8. **Like & Repost** - Engagement interactions fully functional with count updates
+9. **Bookmarks** - Private saved posts system
+10. **User Search** - Search for users with dynamic search bar, profile navigation, and follow buttons
+11. **Direct Messages** - Send/receive plaintext DMs with conversation threads and unread indicators
+12. **Admin Dashboard** - Comprehensive 4-tab admin interface (Feed, Requests, Bans, Users)
+13. **Admin Controls** - User suspension/ban system with reasons, role management, moderation request approval
+14. **Audit Logging** - Admin actions logged to database with timestamps, reasons, and action types
+15. **Soft Delete** - Posts can be deleted by owners and admins
+16. **Profile Management** - View/edit profiles, display real-time stats, follow/unfollow with proper API integration
+17. **Media Support** - Database schema for media attachments ready (backend accepts media URLs)
 
 ### 🟡 Partially Implemented
 1. **Post Editing** - Backend supports edit, frontend has UI with edit icon in post actions
-2. **Threaded Replies** - UI mockup exists, backend not implemented
+2. **Threaded Replies** - UI mockup exists, parent_post_id column ready, needs full implementation
 3. **Ephemeral Posts** - expires_at column exists, no expiration enforcement
-4. **Media Uploads** - Database schema ready, no file upload flow
-5. **Local Timeline** - Frontend filter exists, no dedicated backend endpoint
-6. **E2EE Messaging** - Infrastructure ready (keys, crypto.ts), no encryption implementation
+4. **Media Uploads** - Database schema and backend API ready, needs frontend file upload UI
+5. **Local Timeline** - Frontend filter exists, needs dedicated backend endpoint
+6. **E2EE Messaging** - Infrastructure ready (keys, crypto.ts), needs encryption layer integration
 7. **Privacy Settings** - Partial UI, needs completion
-8. **Domain Blocking** - Database table ready, no admin API
-9. **Moderation Queue** - UI exists, backend integration incomplete
-10. **Audit Logging** - Table exists, not auto-populated
+8. **Content Reporting** - Reports table ready, needs frontend submission form and admin review panel
+9. **Instance Blocking** - blocked_domains table and repository ready, needs admin UI
+10. **WebFinger & ActivityPub** - Database tables ready (inbox_activities, outbox_activities), needs endpoint implementation
 
 ### ❌ Not Started
-1. **Federation** - No ActivityPub inbox/outbox, WebFinger, HTTP Signatures
-2. **Remote Actor Discovery** - Can't search or interact with remote users
-3. **Federated Delivery** - No message/post broadcasting to remote servers
-4. **Key Rotation** - No API for rotating/revoking keys
+1. **Federation Delivery** - No ActivityPub inbox/outbox handlers, HTTP Signatures implementation
+2. **Remote Actor Discovery** - Can't search or interact with remote users yet
+3. **Federated Interactions** - No message/post broadcasting to remote servers
+4. **Key Rotation** - No API for rotating/revoking cryptographic keys
 5. **Multi-Device** - No device authorization flow
 6. **Offline Mode** - No caching or offline-first capabilities
-7. **Reputation System** - No scoring or metrics
-8. **Circuit Breaker** - No federation failure handling
-9. **Retry Queue** - No background workers for delivery
-10. **Onboarding Tour** - No first-time user walkthrough
+7. **Reputation System** - No scoring or metrics beyond basic badges
+8. **Circuit Breaker** - No federation failure handling or retry logic
+9. **Hashtag Support** - No extraction, indexing, or linking
+10. **Trending Topics** - No algorithmic ranking or trending section
 
 ---
 

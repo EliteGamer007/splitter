@@ -457,6 +457,14 @@ export const adminApi = {
     return handleResponse<{ message: string }>(response);
   },
 
+  async getSuspendedUsers(limit = 50, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/admin/users/suspended?limit=${limit}&offset=${offset}`,
+      { headers: getAuthHeaders() }
+    );
+    return handleResponse<{ users: any[] }>(response);
+  },
+
   async requestModeration() {
     const response = await fetch(`${API_BASE}/users/me/request-moderation`, {
       method: 'POST',
@@ -503,6 +511,31 @@ export const adminApi = {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ domain })
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  // Get admin action history (ban/unban log)
+  async getAdminActions(limit = 50, offset = 0) {
+    const response = await fetch(
+      `${API_BASE}/admin/actions?limit=${limit}&offset=${offset}`,
+      { headers: getAuthHeaders() }
+    );
+    // Fallback to empty array if endpoint not implemented yet
+    try {
+      return handleResponse<{ actions: any[] }>(response);
+    } catch (err) {
+      console.log('Admin actions endpoint not yet implemented, returning empty');
+      return { actions: [] };
+    }
+  },
+
+  // Suspend user with reason
+  async suspendUserWithReason(userId: string, reason: string) {
+    const response = await fetch(`${API_BASE}/admin/users/${userId}/suspend`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ reason })
     });
     return handleResponse<{ message: string }>(response);
   }

@@ -63,6 +63,8 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
 
       // Get full user data
       const user = await userApi.getCurrentUser();
+      console.log('Current user data:', user);
+      console.log('User role:', user.role);
 
       updateUserData({
         id: user.id,
@@ -86,7 +88,8 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
       }
 
       setSuccess(true);
-      setTimeout(() => onNavigate('home'), 1500);
+      // Redirect admin users to admin dashboard, regular users to home
+      setTimeout(() => onNavigate(user.role === 'admin' ? 'admin' : 'home'), 1500);
 
     } catch (err) {
       console.error('Login error:', err);
@@ -163,7 +166,8 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
       }
 
       setStep(3);
-      setTimeout(() => onNavigate('home'), 1500);
+      // Redirect admin users to admin dashboard, regular users to home
+      setTimeout(() => onNavigate(user.role === 'admin' ? 'admin' : 'home'), 1500);
 
     } catch (err) {
       setError(err.message || 'Signature verification failed');
