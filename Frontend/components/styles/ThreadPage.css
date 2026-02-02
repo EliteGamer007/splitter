@@ -2,8 +2,8 @@
 
 .thread-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-  color: #e8eaed;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
 }
@@ -12,8 +12,8 @@
   display: flex;
   align-items: center;
   padding: 16px 24px;
-  background: rgba(16, 16, 35, 0.95);
-  border-bottom: 1px solid #2d2d44;
+  background: color-mix(in srgb, var(--bg-primary) 95%, transparent);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -23,7 +23,7 @@
 .thread-navbar .nav-button {
   background: transparent;
   border: none;
-  color: #00d9ff;
+  color: var(--accent-1);
   cursor: pointer;
   font-size: 16px;
   padding: 8px 12px;
@@ -32,8 +32,8 @@
 }
 
 .thread-navbar .nav-button:hover {
-  background: rgba(0, 217, 255, 0.1);
-  text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-1) 50%, transparent);
 }
 
 .thread-content {
@@ -46,12 +46,12 @@
 }
 
 .root-post-card {
-  background: #1a1a2e;
-  border: 2px solid #00d9ff;
+  background: var(--bg-secondary);
+  border: 2px solid var(--accent-1);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 32px;
-  box-shadow: 0 0 20px rgba(0, 217, 255, 0.15);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-1) 15%, transparent);
 }
 
 .post-author-section {
@@ -65,12 +65,12 @@
   font-size: 40px;
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff006e 100%);
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-magenta) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-1) 20%, transparent);
 }
 
 .post-author-info {
@@ -79,26 +79,26 @@
 
 .post-author-name {
   font-weight: 700;
-  color: #00d9ff;
+  color: var(--accent-1);
   font-size: 15px;
 }
 
 .post-timestamp {
   font-size: 13px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .local-badge {
   font-size: 12px;
   padding: 4px 8px;
-  background: rgba(0, 217, 255, 0.1);
-  color: #00d9ff;
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  color: var(--accent-1);
   border-radius: 4px;
   white-space: nowrap;
 }
 
 .post-body {
-  color: #e8eaed;
+  color: var(--text-primary);
   font-size: 16px;
   line-height: 1.8;
   margin-bottom: 20px;
@@ -116,8 +116,8 @@
   display: flex;
   gap: 24px;
   padding-top: 16px;
-  border-top: 1px solid #2d2d44;
-  color: #8a8a99;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -132,12 +132,12 @@
   top: 0;
   width: 2px;
   height: 100%;
-  background: linear-gradient(180deg, #00d9ff 0%, rgba(0, 217, 255, 0.3) 100%);
+  background: linear-gradient(180deg, var(--accent-1) 0%, color-mix(in srgb, var(--accent-1) 30%, transparent) 100%);
 }
 
 .reply-card {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 12px;
@@ -146,8 +146,8 @@
 }
 
 .reply-card:hover {
-  border-color: #00d9ff;
-  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.08);
+  border-color: var(--accent-1);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-1) 8%, transparent);
 }
 
 .thread-connector {
@@ -156,7 +156,7 @@
   top: 24px;
   width: 14px;
   height: 2px;
-  background: rgba(0, 217, 255, 0.3);
+  background: color-mix(in srgb, var(--accent-1) 30%, transparent);
 }
 
 .reply-author-section {
@@ -170,7 +170,7 @@
   font-size: 32px;
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #ff006e 0%, #00d9ff 100%);
+  background: linear-gradient(135deg, var(--accent-magenta) 0%, var(--accent-1) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -187,26 +187,25 @@
 
 .reply-author-name {
   font-weight: 600;
-  color: #00d9ff;
+  color: var(--accent-1);
   font-size: 14px;
 }
 
 .federated-indicator {
   font-size: 12px;
   padding: 2px 4px;
-  background: rgba(0, 217, 255, 0.1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
   border-radius: 3px;
   cursor: help;
-  title: 'Fetched from remote server';
 }
 
 .reply-timestamp {
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .reply-body {
-  color: #c0c0c5;
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.6;
   margin-bottom: 12px;
@@ -216,13 +215,13 @@
   display: flex;
   gap: 16px;
   padding-top: 12px;
-  border-top: 1px solid rgba(45, 45, 68, 0.5);
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
 }
 
 .action-button {
   background: transparent;
   border: none;
-  color: #8a8a99;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 13px;
   padding: 4px 8px;
@@ -231,24 +230,24 @@
 }
 
 .action-button:hover:not(.disabled) {
-  color: #00d9ff;
-  background: rgba(0, 217, 255, 0.1);
+  color: var(--accent-1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
 }
 
 .action-button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  color: #d4af37;
-  background: rgba(212, 175, 55, 0.05);
+  color: var(--disabled-yellow);
+  background: color-mix(in srgb, var(--disabled-yellow) 5%, transparent);
 }
 
 .action-button.disabled:hover {
-  background: rgba(212, 175, 55, 0.1);
+  background: color-mix(in srgb, var(--disabled-yellow) 10%, transparent);
 }
 
 .reply-composer {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 16px;
   margin-top: 24px;
@@ -256,9 +255,9 @@
 
 .reply-textarea {
   width: 100%;
-  background: #0f0f1a;
-  border: 1px solid #2d2d44;
-  color: #e8eaed;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
   padding: 12px;
   border-radius: 6px;
   font-family: inherit;
@@ -271,12 +270,12 @@
 
 .reply-textarea:focus {
   outline: none;
-  border-color: #00d9ff;
-  box-shadow: 0 0 12px rgba(0, 217, 255, 0.2);
+  border-color: var(--accent-1);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-1) 20%, transparent);
 }
 
 .reply-textarea::placeholder {
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .composer-actions {
@@ -287,13 +286,13 @@
 
 .char-count {
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .reply-button {
-  background: linear-gradient(135deg, #00d9ff 0%, #00ff88 100%);
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
   border: none;
-  color: #0f0f1a;
+  color: var(--btn-text);
   padding: 10px 24px;
   border-radius: 6px;
   font-weight: 600;
@@ -304,13 +303,13 @@
 
 .reply-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 217, 255, 0.3);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-1) 30%, transparent);
 }
 
 .reply-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #d4af37;
+  background: var(--disabled-yellow);
 }
 
 /* Depth-based indentation */
@@ -336,12 +335,12 @@
 }
 
 .thread-content::-webkit-scrollbar-thumb {
-  background: #2d2d44;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 .thread-content::-webkit-scrollbar-thumb:hover {
-  background: #3a3a50;
+  background: var(--text-muted);
 }
 
 /* Mobile Responsive */

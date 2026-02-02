@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/InstancePage.css';
 
 const SERVERS = [
@@ -75,7 +76,9 @@ const SERVERS = [
 const REGIONS = ['All', 'Delhi', 'Karnataka', 'Maharashtra', 'West Bengal', 'Telangana', 'Pan-India'];
 const MODERATION_LEVELS = ['All', 'Strict', 'Moderate', 'Lenient'];
 
-export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
+export default function InstancePage({ onNavigate }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('All');
@@ -83,12 +86,12 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
 
   const filteredServers = SERVERS.filter(server => {
     const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         server.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         server.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      server.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      server.description.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesRegion = selectedRegion === 'All' || server.region === selectedRegion;
     const matchesModeration = selectedModeration === 'All' || server.moderation === selectedModeration;
-    
+
     return matchesSearch && matchesRegion && matchesModeration;
   });
 
@@ -97,13 +100,13 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
       {/* Header */}
       <div className="instance-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <button 
+          <button
             className="instance-back-btn"
             onClick={() => onNavigate('landing')}
           >
             ← Back
           </button>
-          <button 
+          <button
             onClick={toggleTheme}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             style={{
@@ -141,7 +144,7 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
         <div className="instance-filters">
           <div className="filter-group">
             <label className="filter-label">Region:</label>
-            <select 
+            <select
               value={selectedRegion}
               onChange={(e) => setSelectedRegion(e.target.value)}
               className="filter-select"
@@ -154,7 +157,7 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
 
           <div className="filter-group">
             <label className="filter-label">Moderation:</label>
-            <select 
+            <select
               value={selectedModeration}
               onChange={(e) => setSelectedModeration(e.target.value)}
               className="filter-select"
@@ -165,7 +168,7 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
             </select>
           </div>
 
-          <button 
+          <button
             className="filter-chip disabled"
             disabled
             title="Reputation filtering - Sprint 3"
@@ -173,7 +176,7 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
             ⭐ Reputation (Sprint 3)
           </button>
 
-          <button 
+          <button
             onClick={toggleTheme}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             style={{
@@ -194,8 +197,8 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
       {/* Servers Grid */}
       <div className="instance-grid">
         {filteredServers.map(server => (
-          <div 
-            key={server.id} 
+          <div
+            key={server.id}
             className={`instance-card ${server.blocked ? 'blocked' : ''}`}
           >
             <div className="instance-card-header">
@@ -238,7 +241,7 @@ export default function InstancePage({ onNavigate, isDarkMode, toggleTheme }) {
               </div>
             )}
 
-            <button 
+            <button
               className={`instance-card-btn ${server.blocked ? 'blocked-btn' : ''}`}
               onClick={() => !server.blocked && onNavigate('signup')}
               disabled={server.blocked}

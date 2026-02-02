@@ -1,20 +1,9 @@
 /* Login Page Styles */
-:root {
-  --bg-dark: #0f0f1a;
-  --bg-card: #1a1a2e;
-  --text-light: #e8eaed;
-  --text-muted: #8a8a99;
-  --primary-cyan: #00d9ff;
-  --accent-magenta: #ff006e;
-  --secondary-navy: #2d2d44;
-  --disabled-yellow: #d4af37;
-  --border-color: #2d2d44;
-  --success-green: #00ff88;
-}
+/* :root block DELETED */
 
 .login-container {
-  background: var(--bg-dark);
-  color: var(--text-light);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
   padding: 2rem 1rem;
   display: flex;
@@ -26,13 +15,13 @@
 }
 
 .login-box {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 1rem;
   padding: 2rem;
   max-width: 500px;
   width: 100%;
-  box-shadow: 0 0 50px rgba(0, 217, 255, 0.1);
+  box-shadow: 0 0 50px color-mix(in srgb, var(--accent-1) 10%, transparent);
 }
 
 .login-header {
@@ -42,7 +31,7 @@
 
 .login-back-btn {
   background: transparent;
-  color: var(--primary-cyan);
+  color: var(--accent-1);
   border: none;
   font-size: 0.95rem;
   cursor: pointer;
@@ -54,8 +43,8 @@
 }
 
 .login-back-btn:hover {
-  background: rgba(0, 217, 255, 0.1);
-  box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-1) 20%, transparent);
 }
 
 .login-title {
@@ -76,8 +65,8 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(0, 217, 255, 0.1);
-  border: 1px solid var(--primary-cyan);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  border: 1px solid var(--accent-1);
   border-radius: 0.5rem;
   margin-bottom: 1.5rem;
 }
@@ -88,7 +77,7 @@
 }
 
 .login-info-banner p {
-  color: var(--text-light);
+  color: var(--text-primary);
   font-size: 0.9rem;
   margin: 0;
   line-height: 1.5;
@@ -110,16 +99,20 @@
 .form-group label {
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--text-light);
+  color: var(--text-primary);
 }
 
 .form-input,
 .form-select {
   padding: 0.75rem 1rem;
-  background: var(--secondary-navy);
+  /* Use color-mix to ensure visibility on both light (on white card) and dark (on dark card) modes.
+     Dark mode: card is #1a1a2e. Input needs to be #2d2d44 (lighter).
+     Light mode: card is white. Input needs to be greyish.
+     Mixing card-bg (which flips) with text-primary (which flips) gives good contrast. */
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text-primary));
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
-  color: var(--text-light);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-family: 'Poppins', 'Nunito', sans-serif;
   transition: all 0.3s ease;
@@ -128,8 +121,8 @@
 .form-input:focus,
 .form-select:focus {
   outline: none;
-  border-color: var(--primary-cyan);
-  box-shadow: 0 0 20px rgba(0, 217, 255, 0.2);
+  border-color: var(--accent-1);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-1) 20%, transparent);
 }
 
 .form-input::placeholder {
@@ -152,12 +145,12 @@
 }
 
 .btn-primary {
-  background: var(--primary-cyan);
-  color: var(--bg-dark);
+  background: var(--accent-1);
+  color: var(--btn-text);
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 0 30px rgba(0, 217, 255, 0.4);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent-1) 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -166,23 +159,25 @@
   background: var(--disabled-yellow);
   opacity: 0.6;
   cursor: not-allowed;
-  color: var(--bg-dark);
+  color: var(--bg-primary);
 }
 
 .btn-secondary {
-  background: var(--secondary-navy);
-  color: var(--text-light);
+  /* Using same logic for button as input but slightly more prominent if needed, 
+     but request was to keep secondary button style. In dark mode #2d2d44. */
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text-primary));
+  color: var(--text-primary);
   border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-  border-color: var(--accent-magenta);
-  color: var(--accent-magenta);
+  border-color: var(--accent-2);
+  color: var(--accent-2);
 }
 
 .btn-sign {
-  background: linear-gradient(135deg, var(--primary-cyan), var(--accent-magenta));
-  color: var(--bg-dark);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: var(--btn-text);
   width: 100%;
   padding: 1rem;
   font-size: 1rem;
@@ -190,7 +185,7 @@
 }
 
 .btn-sign:hover {
-  box-shadow: 0 0 40px rgba(0, 217, 255, 0.4);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--accent-1) 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -226,7 +221,7 @@
 
 .login-divider span {
   position: relative;
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   padding: 0 0.75rem;
 }
 
@@ -238,8 +233,8 @@
 }
 
 .challenge-header {
-  background: rgba(0, 217, 255, 0.05);
-  border: 1px solid var(--primary-cyan);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  border: 1px solid var(--accent-1);
   border-radius: 0.5rem;
   padding: 1rem;
 }
@@ -260,7 +255,7 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: var(--secondary-navy);
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text-primary));
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
 }
@@ -281,7 +276,7 @@
 
 .challenge-value {
   font-size: 0.95rem;
-  color: var(--text-light);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -289,7 +284,7 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: var(--bg-dark);
+  background: var(--bg-primary);
   border-radius: 0.4rem;
   border: 1px solid var(--border-color);
 }
@@ -297,7 +292,7 @@
 .nonce-display code {
   flex: 1;
   font-size: 0.8rem;
-  color: var(--primary-cyan);
+  color: var(--accent-1);
   font-family: 'Courier New', monospace;
   word-break: break-all;
 }
@@ -305,7 +300,7 @@
 .copy-nonce-btn {
   padding: 0.25rem 0.5rem;
   background: transparent;
-  color: var(--primary-cyan);
+  color: var(--accent-1);
   border: none;
   cursor: pointer;
   font-size: 1rem;
@@ -340,8 +335,8 @@
 .spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid rgba(0, 217, 255, 0.2);
-  border-top-color: var(--primary-cyan);
+  border: 3px solid color-mix(in srgb, var(--accent-1) 20%, transparent);
+  border-top-color: var(--accent-1);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -355,7 +350,7 @@
 .signing-progress h3 {
   font-size: 1.25rem;
   margin: 0;
-  color: var(--primary-cyan);
+  color: var(--accent-1);
 }
 
 .signing-progress p {
@@ -376,7 +371,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  background: var(--secondary-navy);
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text-primary));
   border-radius: 0.5rem;
   font-size: 0.9rem;
 }
@@ -389,18 +384,18 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(0, 217, 255, 0.15);
-  color: var(--primary-cyan);
+  background: color-mix(in srgb, var(--accent-1) 15%, transparent);
+  color: var(--accent-1);
   font-weight: 700;
 }
 
 .signing-step.active span:first-child {
-  background: rgba(0, 255, 136, 0.15);
+  background: color-mix(in srgb, var(--success-green) 15%, transparent);
   color: var(--success-green);
 }
 
 .signing-step span:last-child {
-  color: var(--text-light);
+  color: var(--text-primary);
 }
 
 /* Signing Complete */
@@ -419,7 +414,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 255, 136, 0.2);
+  background: color-mix(in srgb, var(--success-green) 20%, transparent);
   border: 2px solid var(--success-green);
   border-radius: 50%;
   font-size: 2rem;
@@ -444,7 +439,7 @@
   gap: 0.75rem;
   width: 100%;
   padding: 1rem;
-  background: var(--secondary-navy);
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text-primary));
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
   text-align: left;
@@ -461,7 +456,7 @@
 
 .signature-box code {
   font-size: 0.8rem;
-  color: var(--primary-cyan);
+  color: var(--accent-1);
   font-family: 'Courier New', monospace;
   word-break: break-all;
   line-height: 1.4;
@@ -471,8 +466,8 @@
   display: flex;
   gap: 0.75rem;
   padding: 1rem;
-  background: rgba(0, 217, 255, 0.05);
-  border-left: 3px solid var(--primary-cyan);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  border-left: 3px solid var(--accent-1);
   border-radius: 0.4rem;
   font-size: 0.9rem;
 }
@@ -483,7 +478,7 @@
 }
 
 .security-note p {
-  color: var(--text-light);
+  color: var(--text-primary);
   margin: 0;
   line-height: 1.5;
 }
@@ -497,7 +492,7 @@
   justify-content: center;
   gap: 1rem;
   padding: 2rem;
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 1rem;
   flex-wrap: wrap;
@@ -517,8 +512,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary-cyan), var(--accent-magenta));
-  color: var(--bg-dark);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: var(--btn-text);
   border-radius: 50%;
   font-weight: 700;
   font-size: 1.25rem;
@@ -539,7 +534,7 @@
 }
 
 .flow-arrow {
-  color: var(--primary-cyan);
+  color: var(--accent-1);
   font-size: 1.5rem;
   flex-shrink: 0;
 }

@@ -2,8 +2,8 @@
 
 .profile-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-  color: #e8eaed;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
 }
@@ -13,8 +13,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
-  background: rgba(16, 16, 35, 0.95);
-  border-bottom: 1px solid #2d2d44;
+  background: color-mix(in srgb, var(--bg-primary) 95%, transparent);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -31,13 +31,13 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .back-button {
   background: transparent;
   border: none;
-  color: #00d9ff;
+  color: var(--accent-1);
   cursor: pointer;
   font-size: 16px;
   padding: 8px 12px;
@@ -46,8 +46,8 @@
 }
 
 .back-button:hover {
-  background: rgba(0, 217, 255, 0.1);
-  text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-1) 50%, transparent);
 }
 
 .navbar-center {
@@ -57,8 +57,8 @@
 
 .nav-badge {
   background: transparent;
-  border: 1px solid #2d2d44;
-  color: #8a8a99;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
   padding: 6px 12px;
   border-radius: 20px;
   cursor: pointer;
@@ -67,8 +67,8 @@
 }
 
 .nav-badge:hover {
-  border-color: #00d9ff;
-  color: #00d9ff;
+  border-color: var(--accent-1);
+  color: var(--accent-1);
 }
 
 .profile-content {
@@ -81,12 +81,12 @@
 }
 
 .profile-header-card {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.1);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-1) 10%, transparent);
 }
 
 .profile-header-top {
@@ -105,12 +105,12 @@
   font-size: 64px;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #00d9ff 0%, #ff006e 100%);
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-magenta) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-1) 30%, transparent);
 }
 
 .profile-info {
@@ -122,7 +122,7 @@
 .profile-username {
   font-size: 18px;
   font-weight: 700;
-  color: #00d9ff;
+  color: var(--accent-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -131,7 +131,7 @@
 .federated-badge {
   font-size: 16px;
   padding: 2px 6px;
-  background: rgba(0, 217, 255, 0.1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
   border-radius: 4px;
 }
 
@@ -156,10 +156,10 @@
 
 .disabled-tooltip {
   font-size: 11px;
-  color: #d4af37;
+  color: var(--disabled-yellow);
   margin-left: 4px;
   padding: 2px 6px;
-  background: rgba(212, 175, 55, 0.1);
+  background: color-mix(in srgb, var(--disabled-yellow) 10%, transparent);
   border-radius: 4px;
 }
 
@@ -169,9 +169,9 @@
 }
 
 .follow-button {
-  background: linear-gradient(135deg, #00d9ff 0%, #00ff88 100%);
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
   border: none;
-  color: #0f0f1a;
+  color: var(--btn-text);
   padding: 10px 20px;
   border-radius: 8px;
   font-weight: 600;
@@ -182,19 +182,19 @@
 
 .follow-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 217, 255, 0.3);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-1) 30%, transparent);
 }
 
 .follow-button.following {
-  background: rgba(0, 217, 255, 0.2);
-  color: #00d9ff;
-  border: 1px solid #00d9ff;
+  background: color-mix(in srgb, var(--accent-1) 20%, transparent);
+  color: var(--accent-1);
+  border: 1px solid var(--accent-1);
 }
 
 .message-button {
-  background: rgba(255, 0, 110, 0.1);
-  border: 1px solid #ff006e;
-  color: #ff006e;
+  background: color-mix(in srgb, var(--accent-magenta) 10%, transparent);
+  border: 1px solid var(--accent-magenta);
+  color: var(--accent-magenta);
   padding: 10px 20px;
   border-radius: 8px;
   font-weight: 600;
@@ -204,21 +204,21 @@
 }
 
 .message-button:hover {
-  background: rgba(255, 0, 110, 0.2);
-  box-shadow: 0 0 15px rgba(255, 0, 110, 0.3);
+  background: color-mix(in srgb, var(--accent-magenta) 20%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--accent-magenta) 30%, transparent);
 }
 
 .profile-did-section {
   padding: 12px;
-  background: rgba(0, 217, 255, 0.05);
-  border-left: 3px solid #00d9ff;
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  border-left: 3px solid var(--accent-1);
   border-radius: 6px;
   margin-bottom: 16px;
 }
 
 .did-label {
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -227,12 +227,12 @@
 .did-value {
   font-family: monospace;
   font-size: 12px;
-  color: #00d9ff;
+  color: var(--accent-1);
   word-break: break-all;
 }
 
 .profile-bio {
-  color: #c0c0c5;
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.6;
   margin: 16px 0;
@@ -242,7 +242,7 @@
   display: flex;
   gap: 24px;
   padding-top: 20px;
-  border-top: 1px solid #2d2d44;
+  border-top: 1px solid var(--border-color);
 }
 
 .stat-item {
@@ -252,26 +252,26 @@
 .stat-number {
   font-size: 24px;
   font-weight: 700;
-  color: #00d9ff;
+  color: var(--accent-1);
 }
 
 .stat-label {
   font-size: 13px;
-  color: #8a8a99;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 .profile-tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid #2d2d44;
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 24px;
 }
 
 .tab-button {
   background: transparent;
   border: none;
-  color: #8a8a99;
+  color: var(--text-muted);
   padding: 12px 20px;
   cursor: pointer;
   font-weight: 600;
@@ -281,12 +281,12 @@
 }
 
 .tab-button:hover {
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .tab-button.active {
-  color: #00d9ff;
-  border-bottom-color: #00d9ff;
+  color: var(--accent-1);
+  border-bottom-color: var(--accent-1);
 }
 
 .profile-posts-list {
@@ -296,16 +296,16 @@
 }
 
 .post-card-profile {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 16px;
   transition: all 0.3s ease;
 }
 
 .post-card-profile:hover {
-  border-color: #00d9ff;
-  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.1);
+  border-color: var(--accent-1);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-1) 10%, transparent);
   transform: translateY(-2px);
 }
 
@@ -319,13 +319,13 @@
 .followers-badge {
   font-size: 12px;
   padding: 4px 8px;
-  background: rgba(0, 217, 255, 0.1);
-  color: #00d9ff;
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  color: var(--accent-1);
   border-radius: 4px;
 }
 
 .post-content {
-  color: #e8eaed;
+  color: var(--text-primary);
   font-size: 15px;
   line-height: 1.6;
   margin-bottom: 12px;
@@ -333,7 +333,7 @@
 
 .post-timestamp {
   font-size: 13px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .profile-list {
@@ -346,10 +346,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #1a1a2e;
+  background: var(--bg-secondary);
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #2d2d44;
+  border: 1px solid var(--border-color);
 }
 
 .follower-avatar {
@@ -364,18 +364,18 @@
 
 .follower-name {
   font-weight: 600;
-  color: #00d9ff;
+  color: var(--accent-1);
 }
 
 .follower-status {
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .unfollow-button {
-  background: rgba(255, 68, 68, 0.1);
-  border: 1px solid #ff4444;
-  color: #ff4444;
+  background: color-mix(in srgb, var(--accent-magenta) 10%, transparent);
+  border: 1px solid var(--accent-magenta);
+  color: var(--accent-magenta);
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -384,8 +384,8 @@
 }
 
 .unfollow-button:hover {
-  background: rgba(255, 68, 68, 0.2);
-  box-shadow: 0 0 10px rgba(255, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--accent-magenta) 20%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-magenta) 20%, transparent);
 }
 
 /* Scrollbar Styling */
@@ -398,12 +398,12 @@
 }
 
 .profile-content::-webkit-scrollbar-thumb {
-  background: #2d2d44;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 .profile-content::-webkit-scrollbar-thumb:hover {
-  background: #3a3a50;
+  background: var(--text-muted);
 }
 
 /* Mobile Responsive */

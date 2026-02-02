@@ -1,3 +1,4 @@
+@import '../styles/theme.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -41,41 +42,6 @@
   --sidebar-ring: #00d9ff;
 }
 
-.dark {
-  --background: #0f0f1a;
-  --foreground: #e8eaed;
-  --card: #1a1a2e;
-  --card-foreground: #e8eaed;
-  --popover: #1a1a2e;
-  --popover-foreground: #e8eaed;
-  --primary: #00d9ff;
-  --primary-foreground: #0f0f1a;
-  --secondary: #2d2d44;
-  --secondary-foreground: #e8eaed;
-  --muted: #3a3a50;
-  --muted-foreground: #8a8a99;
-  --accent: #ff006e;
-  --accent-foreground: #e8eaed;
-  --destructive: #ff4444;
-  --destructive-foreground: #ffffff;
-  --border: #2d2d44;
-  --input: #2d2d44;
-  --ring: #00d9ff;
-  --disabled: #d4af37;
-  --chart-1: #00d9ff;
-  --chart-2: #ff006e;
-  --chart-3: #8a2be2;
-  --chart-4: #00ff88;
-  --chart-5: #ffd700;
-  --sidebar: #16213e;
-  --sidebar-foreground: #e8eaed;
-  --sidebar-primary: #00d9ff;
-  --sidebar-primary-foreground: #0f0f1a;
-  --sidebar-accent: #ff006e;
-  --sidebar-accent-foreground: #e8eaed;
-  --sidebar-border: #2d2d44;
-  --sidebar-ring: #00d9ff;
-}
 
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
@@ -122,6 +88,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }

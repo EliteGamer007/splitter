@@ -2,8 +2,8 @@
 
 .federation-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-  color: #e8eaed;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
 }
@@ -13,8 +13,8 @@
   align-items: center;
   gap: 16px;
   padding: 16px 24px;
-  background: rgba(16, 16, 35, 0.95);
-  border-bottom: 1px solid #2d2d44;
+  background: color-mix(in srgb, var(--bg-primary) 95%, transparent);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -24,7 +24,7 @@
 .federation-navbar .nav-button {
   background: transparent;
   border: none;
-  color: #00d9ff;
+  color: var(--accent-1);
   cursor: pointer;
   font-size: 16px;
   padding: 8px 12px;
@@ -33,15 +33,15 @@
 }
 
 .federation-navbar .nav-button:hover {
-  background: rgba(0, 217, 255, 0.1);
-  text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-1) 50%, transparent);
 }
 
 .federation-navbar .navbar-title {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .federation-content {
@@ -58,7 +58,7 @@
   margin: 0 0 20px 0;
   font-size: 18px;
   font-weight: 700;
-  color: #e8eaed;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -77,8 +77,8 @@
 }
 
 .metric-card {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -88,8 +88,8 @@
 }
 
 .metric-card:hover {
-  border-color: #00d9ff;
-  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.1);
+  border-color: var(--accent-1);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-1) 10%, transparent);
   transform: translateY(-2px);
 }
 
@@ -100,7 +100,7 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: rgba(0, 217, 255, 0.1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
   border-radius: 8px;
   flex-shrink: 0;
 }
@@ -113,7 +113,7 @@
 
 .metric-label {
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -121,13 +121,13 @@
 .metric-value {
   font-size: 20px;
   font-weight: 700;
-  color: #00d9ff;
+  color: var(--accent-1);
 }
 
 /* Activity Chart */
 .activity-chart {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 40px;
@@ -137,7 +137,7 @@
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .chart-placeholder {
@@ -148,13 +148,13 @@
   height: 150px;
   margin-bottom: 12px;
   padding: 12px;
-  background: rgba(0, 217, 255, 0.05);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
   border-radius: 8px;
 }
 
 .chart-bar {
   flex: 1;
-  background: linear-gradient(180deg, #00d9ff 0%, #ff006e 100%);
+  background: linear-gradient(180deg, var(--accent-1) 0%, var(--accent-magenta) 100%);
   border-radius: 4px 4px 0 0;
   min-height: 20px;
   transition: all 0.3s ease;
@@ -168,7 +168,7 @@
 .chart-labels {
   text-align: center;
   font-size: 12px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 /* Servers Section */
@@ -177,8 +177,8 @@
 }
 
 .servers-table {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -188,11 +188,11 @@
   grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr;
   gap: 16px;
   padding: 16px;
-  background: rgba(0, 217, 255, 0.05);
-  border-bottom: 2px solid #2d2d44;
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  border-bottom: 2px solid var(--border-color);
   font-weight: 700;
   font-size: 12px;
-  color: #00d9ff;
+  color: var(--accent-1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -202,13 +202,13 @@
   grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 1.2fr;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid #2d2d44;
+  border-bottom: 1px solid var(--border-color);
   align-items: center;
   transition: all 0.3s ease;
 }
 
 .table-row:hover {
-  background: rgba(0, 217, 255, 0.05);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
 }
 
 .table-row:last-child {
@@ -217,7 +217,7 @@
 
 .col-domain {
   font-size: 14px;
-  color: #e8eaed;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -244,18 +244,18 @@
 }
 
 .status-badge.healthy {
-  border-color: #00ff88;
-  color: #00ff88;
+  border-color: var(--success-green);
+  color: var(--success-green);
 }
 
 .status-badge.degraded {
-  border-color: #d4af37;
-  color: #d4af37;
+  border-color: var(--disabled-yellow);
+  color: var(--disabled-yellow);
 }
 
 .status-badge.blocked {
-  border-color: #ff4444;
-  color: #ff4444;
+  border-color: var(--accent-magenta);
+  color: var(--accent-magenta);
 }
 
 .col-reputation {
@@ -273,35 +273,35 @@
 }
 
 .reputation-tag.trusted {
-  background: rgba(0, 255, 136, 0.2);
-  color: #00ff88;
+  background: color-mix(in srgb, var(--success-green) 20%, transparent);
+  color: var(--success-green);
 }
 
 .reputation-tag.moderate {
-  background: rgba(212, 175, 55, 0.2);
-  color: #d4af37;
+  background: color-mix(in srgb, var(--disabled-yellow) 20%, transparent);
+  color: var(--disabled-yellow);
 }
 
 .reputation-tag.blocked {
-  background: rgba(255, 68, 68, 0.2);
-  color: #ff4444;
+  background: color-mix(in srgb, var(--accent-magenta) 20%, transparent);
+  color: var(--accent-magenta);
 }
 
 .col-lastseen {
   font-size: 13px;
-  color: #8a8a99;
+  color: var(--text-muted);
 }
 
 .col-activities {
   font-size: 13px;
-  color: #00d9ff;
+  color: var(--accent-1);
   font-weight: 600;
 }
 
 /* Legend */
 .legend-section {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 32px;
@@ -311,7 +311,7 @@
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .legend-items {
@@ -325,7 +325,7 @@
   align-items: center;
   gap: 12px;
   font-size: 14px;
-  color: #c0c0c5;
+  color: var(--text-muted);
 }
 
 .legend-color {
@@ -340,21 +340,21 @@
 }
 
 .legend-color.healthy {
-  background: rgba(0, 255, 136, 0.3);
+  background: color-mix(in srgb, var(--success-green) 30%, transparent);
 }
 
 .legend-color.degraded {
-  background: rgba(212, 175, 55, 0.3);
+  background: color-mix(in srgb, var(--disabled-yellow) 30%, transparent);
 }
 
 .legend-color.blocked {
-  background: rgba(255, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--accent-magenta) 30%, transparent);
 }
 
 /* Advanced Section */
 .advanced-section {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 24px;
 }
@@ -363,7 +363,7 @@
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #e8eaed;
+  color: var(--text-primary);
 }
 
 .advanced-buttons {
@@ -374,8 +374,8 @@
 
 .advanced-btn {
   background: transparent;
-  border: 1px dashed #d4af37;
-  color: #d4af37;
+  border: 1px dashed var(--disabled-yellow);
+  color: var(--disabled-yellow);
   padding: 12px 16px;
   border-radius: 8px;
   cursor: not-allowed;
@@ -393,12 +393,12 @@
 
 .advanced-btn:hover {
   opacity: 0.8;
-  background: rgba(212, 175, 55, 0.05);
+  background: color-mix(in srgb, var(--disabled-yellow) 5%, transparent);
 }
 
 .advanced-btn .disabled-label {
   font-size: 10px;
-  background: rgba(212, 175, 55, 0.2);
+  background: color-mix(in srgb, var(--disabled-yellow) 20%, transparent);
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
@@ -415,12 +415,12 @@
 }
 
 .federation-content::-webkit-scrollbar-thumb {
-  background: #2d2d44;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 .federation-content::-webkit-scrollbar-thumb:hover {
-  background: #3a3a50;
+  background: var(--text-muted);
 }
 
 /* Responsive */
@@ -458,8 +458,8 @@
     gap: 12px;
   }
 
-  .table-header > div,
-  .table-row > div {
+  .table-header>div,
+  .table-row>div {
     padding: 8px 0;
   }
 

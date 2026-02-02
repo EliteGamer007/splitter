@@ -50,7 +50,14 @@ const SAMPLE_POSTS = [
   }
 ];
 
-export default function HomePage({ onNavigate, userData, updateUserData, isDarkMode, toggleTheme, handleLogout }) {
+import { useTheme } from '@/components/ui/theme-provider';
+
+export default function HomePage({ onNavigate, userData, updateUserData, handleLogout }) {
+  const { theme, toggleTheme } = useTheme();
+
+
+
+  const isDarkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState('home');
   const [newPostText, setNewPostText] = useState('');
   const [newPostVisibility, setNewPostVisibility] = useState('public');
@@ -604,7 +611,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, isDarkM
               cursor: 'pointer'
             }}
           >
-            {isDarkMode ? '🌙' : '☀️'}
+            {theme === "dark" ? "🌞" : "🌙"}
           </button>
           {handleLogout && (
             <button

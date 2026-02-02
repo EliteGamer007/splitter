@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/ProfilePage.css';
 import { followApi, userApi, postApi } from '@/lib/api';
 
-export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTheme, viewingUserId = null }) {
+export default function ProfilePage({ onNavigate, userData, viewingUserId = null }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [activeTab, setActiveTab] = useState('posts');
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -37,7 +40,7 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
             email: profile.email,
             did: profile.did,
           });
-          
+
           // Check if current user is following this user
           if (userData?.id) {
             try {
@@ -94,7 +97,7 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
   // Handle follow/unfollow
   const handleFollowToggle = async () => {
     if (!viewingUserId) return; // Can't follow yourself
-    
+
     setIsFollowLoading(true);
     try {
       if (isFollowing) {
@@ -138,7 +141,7 @@ export default function ProfilePage({ onNavigate, userData, isDarkMode, toggleTh
     const date = new Date(timestamp);
     const now = new Date();
     const diff = Math.floor((now - date) / 1000);
-    
+
     if (diff < 60) return 'just now';
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

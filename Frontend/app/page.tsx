@@ -17,7 +17,7 @@ import { userApi, healthApi } from '@/lib/api';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('landing');
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Theme is handled by ThemeProvider
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [backendConnected, setBackendConnected] = useState(false);
@@ -46,7 +46,7 @@ export default function App() {
         // Check backend health
         const health = await healthApi.check();
         setBackendConnected(health.status === 'ok');
-        
+
         // Check if user has valid token
         const token = localStorage.getItem('jwt_token');
         if (token) {
@@ -87,15 +87,6 @@ export default function App() {
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    // Apply theme to document
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
   const navigateTo = (page: string, params?: any) => {
     // Redirect to login if trying to access protected pages without auth
     const protectedPages = ['home', 'profile', 'dm', 'security', 'moderation', 'federation', 'thread', 'admin'];
@@ -103,7 +94,7 @@ export default function App() {
       setCurrentPage('login');
       return;
     }
-    
+
     // Handle DM navigation with selected user
     if (page === 'dm' && params?.selectedUser) {
       setSelectedDMUser(params.selectedUser);
@@ -116,7 +107,7 @@ export default function App() {
       setSelectedDMUser(null);
       setViewingUserId(null);
     }
-    
+
     setCurrentPage(page);
   };
 
@@ -152,16 +143,10 @@ export default function App() {
     setCurrentPage('landing');
   };
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
   const sharedProps = {
     onNavigate: navigateTo,
     userData,
     updateUserData,
-    isDarkMode,
-    toggleTheme,
     isAuthenticated,
     setIsAuthenticated,
     handleLogout,
@@ -170,7 +155,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground ${isDarkMode ? 'dark' : ''}`}>
+      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
         <div className="text-center">
           <div className="text-4xl mb-4">🌐</div>
           <p>Loading Splitter...</p>
@@ -180,12 +165,12 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-background text-foreground ${isDarkMode ? 'dark' : ''}`}>
+    <div className={`min-h-screen bg-background text-foreground`}>
       {!backendConnected && currentPage !== 'landing' && (
-        <div style={{ 
-          background: '#ff4444', 
-          color: 'white', 
-          padding: '8px 16px', 
+        <div style={{
+          background: '#ff4444',
+          color: 'white',
+          padding: '8px 16px',
           textAlign: 'center',
           fontSize: '14px'
         }}>

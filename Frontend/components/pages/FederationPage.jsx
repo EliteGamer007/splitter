@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/FederationPage.css';
 
-export default function FederationPage({ onNavigate, isDarkMode, toggleTheme }) {
+export default function FederationPage({ onNavigate }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [connectedServers] = useState([
     {
       id: 1,
