@@ -100,7 +100,7 @@ export default function ThreadPage({ onNavigate }) {
           ← Back to Timeline
         </button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-          <button onClick={() => onNavigate('profile')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>👤 Profile</button>
+          <button onClick={() => onNavigate('profile')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>Profile</button>
           <button onClick={() => onNavigate('dm')} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>💬 Messages</button>
           <button onClick={toggleTheme} style={{ padding: '8px 12px', background: 'rgba(0,217,255,0.1)', border: '1px solid #00d9ff', color: '#00d9ff', borderRadius: '6px', cursor: 'pointer' }}>{isDarkMode ? '🌙' : '☀️'}</button>
         </div>
@@ -115,7 +115,7 @@ export default function ThreadPage({ onNavigate }) {
               <div className="post-author-name">@alice@social.example.net</div>
               <div className="post-timestamp">2 hours ago</div>
             </div>
-            <span className="local-badge">🏠 Local</span>
+            <span className="local-badge">Local</span>
           </div>
 
           <div className="post-body">

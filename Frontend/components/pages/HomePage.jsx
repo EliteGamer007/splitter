@@ -595,7 +595,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
             className="nav-btn-profile"
             onClick={() => onNavigate('profile')}
           >
-            👤 {userData.username || 'User'}
+            Profile
           </button>
           <button
             className="nav-btn-profile"
@@ -628,7 +628,9 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 cursor: 'pointer'
               }}
             >
-              🚪
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" height="16" width="16">
+                <path d="M1.728 8c0 0.20793333333333333 0.08259999999999999 0.4074 0.22959999999999997 0.5544 0.14706666666666665 0.147 0.3464666666666667 0.22959999999999997 0.5544 0.22959999999999997h5.9505333333333335L6.6593333333333335 10.579333333333333c-0.07339999999999999 0.07293333333333332 -0.1317333333333333 0.15966666666666665 -0.1716 0.2551333333333333 -0.0398 0.09559999999999999 -0.06026666666666666 0.19806666666666664 -0.06026666666666666 0.3015333333333333s0.020466666666666668 0.20593333333333333 0.06026666666666666 0.3015333333333333c0.03986666666666666 0.09546666666666666 0.09819999999999998 0.18219999999999997 0.1716 0.2551333333333333 0.07293333333333332 0.07346666666666667 0.15966666666666665 0.13179999999999997 0.2551333333333333 0.1716 0.09559999999999999 0.0398 0.19806666666666664 0.06026666666666666 0.3015333333333333 0.06026666666666666s0.20593333333333333 -0.020466666666666668 0.3015333333333333 -0.06026666666666666c0.09546666666666666 -0.0398 0.18219999999999997 -0.09813333333333332 0.2551333333333333 -0.1716l3.1359999999999997 -3.1359999999999997c0.07133333333333333 -0.0746 0.12726666666666664 -0.16246666666666665 0.1646 -0.2587333333333333 0.0784 -0.19093333333333332 0.0784 -0.40493333333333337 0 -0.5958666666666667 -0.03733333333333333 -0.09626666666666667 -0.09326666666666666 -0.18413333333333332 -0.1646 -0.2587333333333333l-3.1359999999999997 -3.1359999999999997c-0.07306666666666667 -0.07306666666666667 -0.15986666666666666 -0.13106666666666666 -0.2554666666666666 -0.1706 -0.09546666666666666 -0.039599999999999996 -0.1978 -0.059933333333333325 -0.30119999999999997 -0.059933333333333325 -0.10339999999999999 0 -0.20573333333333332 0.02033333333333333 -0.30119999999999997 0.059933333333333325 -0.09559999999999999 0.03953333333333333 -0.1824 0.09753333333333333 -0.2554666666666666 0.1706 -0.07306666666666667 0.07313333333333333 -0.13106666666666666 0.15993333333333332 -0.17066666666666666 0.25539999999999996 -0.039466666666666664 0.09553333333333333 -0.059866666666666665 0.19786666666666666 -0.059866666666666665 0.3012666666666667 0 0.10339999999999999 0.020399999999999998 0.20573333333333332 0.059866666666666665 0.3012666666666667 0.039599999999999996 0.09546666666666666 0.09759999999999999 0.18226666666666663 0.17066666666666666 0.25539999999999996l1.8032 1.7953333333333332H2.5119999999999996c-0.20793333333333333 0 -0.4073333333333333 0.08266666666666667 -0.5544 0.22966666666666663 -0.147 0.147 -0.22959999999999997 0.34639999999999993 -0.22959999999999997 0.5543333333333333ZM11.919999999999998 0.15999999999999998H4.08c-0.6237999999999999 0 -1.222 0.24779999999999996 -1.6631333333333331 0.6888666666666667 -0.4410666666666666 0.44113333333333327 -0.6888666666666667 1.0393333333333332 -0.6888666666666667 1.6631333333333331v2.352c0 0.20793333333333333 0.08259999999999999 0.4073333333333333 0.22959999999999997 0.5544 0.14706666666666665 0.147 0.3464666666666667 0.22959999999999997 0.5544 0.22959999999999997s0.4073333333333333 -0.08259999999999999 0.5544 -0.22959999999999997c0.147 -0.14706666666666665 0.22959999999999997 -0.3464666666666667 0.22959999999999997 -0.5544V2.5119999999999996c0 -0.20793333333333333 0.08259999999999999 -0.4073333333333333 0.22959999999999997 -0.5544 0.14706666666666665 -0.147 0.3464666666666667 -0.22959999999999997 0.5544 -0.22959999999999997h7.84c0.20793333333333333 0 0.4074 0.08259999999999999 0.5544 0.22959999999999997 0.147 0.14706666666666665 0.22959999999999997 0.3464666666666667 0.22959999999999997 0.5544v10.975999999999999c0 0.20793333333333333 -0.08259999999999999 0.4073333333333333 -0.22959999999999997 0.5544s-0.3464666666666667 0.22959999999999997 -0.5544 0.22959999999999997H4.08c-0.20793333333333333 0 -0.4073333333333333 -0.08259999999999999 -0.5544 -0.22959999999999997 -0.147 -0.147 -0.22959999999999997 -0.3464666666666667 -0.22959999999999997 -0.5544v-2.352c0 -0.20793333333333333 -0.08259999999999999 -0.4073333333333333 -0.22959999999999997 -0.5543333333333333 -0.14706666666666665 -0.147 -0.3464666666666667 -0.22966666666666663 -0.5544 -0.22966666666666663s-0.4073333333333333 0.08266666666666667 -0.5544 0.22966666666666663c-0.147 0.147 -0.22959999999999997 0.34639999999999993 -0.22959999999999997 0.5543333333333333v2.352c0 0.6237333333333333 0.24779999999999996 1.222 0.6888666666666667 1.6631333333333331 0.44113333333333327 0.4410666666666666 1.0393333333333332 0.6888666666666667 1.6631333333333331 0.6888666666666667h7.84c0.6237333333333333 0 1.222 -0.24779999999999996 1.6631333333333331 -0.6888666666666667 0.4410666666666666 -0.44113333333333327 0.6888666666666667 -1.0393999999999999 0.6888666666666667 -1.6631333333333331V2.5119999999999996c0 -0.6237999999999999 -0.24779999999999996 -1.222 -0.6888666666666667 -1.6631333333333331C13.142 0.4078 12.543733333333332 0.15999999999999998 11.919999999999998 0.15999999999999998Z" fill={isDarkMode ? '#ff4444' : '#ff4444'} strokeWidth="0.6667"></path>
+              </svg>
             </button>
           )}
         </div>
@@ -646,7 +648,6 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 onClick={() => setActiveTab('home')}
                 style={{ textAlign: 'left', width: '100%' }}
               >
-                <span className="icon">🏠</span>
                 <span>Home</span>
               </button>
               <button
@@ -654,7 +655,6 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 onClick={() => onNavigate('dm')}
                 style={{ textAlign: 'left', width: '100%' }}
               >
-                <span className="icon">💬</span>
                 <span>Messages 🔒</span>
               </button>
               <button
@@ -662,7 +662,6 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 onClick={() => onNavigate('security')}
                 style={{ textAlign: 'left', width: '100%' }}
               >
-                <span className="icon">🔐</span>
                 <span>Security</span>
               </button>
             </div>
@@ -683,7 +682,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 className="sidebar-btn"
                 onClick={() => onNavigate('security')}
               >
-                Settings ⚙️
+                Settings
               </button>
             </div>
           </div>
@@ -701,8 +700,8 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                   color: userData.role === 'admin' ? '#ff4444' :
                     userData.role === 'moderator' ? '#00d9ff' : '#00ff88'
                 }}>
-                  {userData.role === 'admin' ? '👑 Admin' :
-                    userData.role === 'moderator' ? '🛡️ Moderator' : '👤 User'}
+                  {userData.role === 'admin' ? 'Admin' :
+                    userData.role === 'moderator' ? 'Moderator' : 'User'}
                 </span>
               </div>
               <div className="info-item">
@@ -856,7 +855,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                     onClick={handlePostCreate}
                     disabled={(!newPostText.trim() && !selectedFile) || isPosting}
                   >
-                    {isPosting ? 'Posting...' : 'Post 🚀'}
+                    {isPosting ? 'Posting...' : 'Post'}
                   </button>
                 </div>
               </div>
@@ -884,7 +883,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                       <div className="post-name-line">
                         <strong>{post.displayName}</strong>
                         <span className="post-handle">{post.handle}</span>
-                        {post.local && <span className="post-badge local">🏠 Local</span>}
+                        {post.local && <span className="post-badge local">Local</span>}
                         {!post.local && <span className="post-badge remote">🌐 Remote</span>}
                         {/* Edited Badge */}
                         {isEdited(post) && (
@@ -1086,7 +1085,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
         {/* Right Sidebar */}
         <aside className="home-trends">
           <div className="trends-section">
-            <h3 className="trends-title">🔥 Trending Topics</h3>
+            <h3 className="trends-title">Trending Topics</h3>
             <div className="trends-list">
               <a href="#" className="trend-item">
                 <div className="trend-name">#Decentralization</div>
@@ -1117,7 +1116,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
           {/* Admin Panel - Only for admins/moderators */}
           {(userData.role === 'admin' || userData.role === 'moderator') && (
             <div className="trends-section">
-              <h3 className="trends-title">⚙️ Admin Panel</h3>
+              <h3 className="trends-title">Admin Panel</h3>
               <button
                 onClick={() => onNavigate('moderation')}
                 style={{
@@ -1134,7 +1133,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 }}
                 className="trend-item"
               >
-                📋 Moderation Queue
+                Moderation Queue
               </button>
               <button
                 onClick={() => onNavigate('federation')}
@@ -1151,7 +1150,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                 }}
                 className="trend-item"
               >
-                🌐 Federation Inspector
+                Federation Inspector
               </button>
               {userData.role === 'admin' && (
                 <button
@@ -1179,7 +1178,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
           {/* Request Moderation - Only for regular users */}
           {userData.role === 'user' && (
             <div className="trends-section">
-              <h3 className="trends-title">🛡️ Moderation</h3>
+              <h3 className="trends-title">Moderation</h3>
               {userData.moderation_requested ? (
                 <div style={{
                   padding: '12px',
@@ -1218,7 +1217,7 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
                   }}
                   className="trend-item"
                 >
-                  🙋 Request Moderation Access
+                  Request Moderation Access
                 </button>
               )}
               <p style={{
@@ -1235,16 +1234,16 @@ export default function HomePage({ onNavigate, userData, updateUserData, handleL
           <div className="trends-section">
             <h3 className="trends-title">Coming Soon</h3>
             <ul className="features-list">
-              <li>🌐 WebFinger Discovery - Sprint 2</li>
-              <li>📡 ActivityPub Federation - Sprint 2</li>
-              <li>🔒 Instance Blocking - Sprint 2</li>
-              <li>💬 Reply Threading - Sprint 2</li>
-              <li>🔐 E2E Encrypted DMs - Sprint 2</li>
-              <li>📁 Media Upload UI - Sprint 2</li>
-              <li>🚨 Content Reporting - Sprint 2</li>
-              <li>#️⃣ Hashtag Support - Sprint 3</li>
-              <li>📊 Trending Topics - Sprint 3</li>
-              <li>📱 Mobile PWA - Sprint 3</li>
+              <li>WebFinger Discovery - Sprint 2</li>
+              <li>ActivityPub Federation - Sprint 2</li>
+              <li>Instance Blocking - Sprint 2</li>
+              <li>Reply Threading - Sprint 2</li>
+              <li>E2E Encrypted DMs - Sprint 2</li>
+              <li>Media Upload UI - Sprint 2</li>
+              <li>Content Reporting - Sprint 2</li>
+              <li>Hashtag Support - Sprint 3</li>
+              <li>Trending Topics - Sprint 3</li>
+              <li>Mobile PWA - Sprint 3</li>
             </ul>
           </div>
         </aside>
