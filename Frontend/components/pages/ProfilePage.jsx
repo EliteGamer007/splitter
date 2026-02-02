@@ -302,7 +302,7 @@ export default function ProfilePage({ onNavigate, userData, viewingUserId = null
                     {post.is_remote ? (
                       <span className="federated-badge">🌐 Remote</span>
                     ) : (
-                      <span className="local-badge">🏠 Local</span>
+                      <span className="local-badge">Local</span>
                     )}
                     {post.visibility === 'followers' && (
                       <span className="followers-badge">👥 Followers Only</span>

@@ -18,7 +18,7 @@ const SERVERS = [
     reputation: 'trusted',
     description: 'Community hub for Delhi region - culture, tech, and local news',
     region: 'Delhi',
-    location: '🇮🇳 Delhi, India',
+    location: 'Delhi, India',
     uptime: '99.9%',
     ping: '12ms'
   },
@@ -32,7 +32,7 @@ const SERVERS = [
     reputation: 'trusted',
     description: 'Tech hub for Bangalore - startups, developers, and innovation',
     region: 'Karnataka',
-    location: '🇮🇳 Bangalore, India',
+    location: 'Bangalore, India',
     uptime: '99.8%',
     ping: '15ms'
   },
@@ -46,7 +46,7 @@ const SERVERS = [
     reputation: 'trusted',
     description: 'Creative hub for Mumbai - artists, filmmakers, and creators',
     region: 'Maharashtra',
-    location: '🇮🇳 Mumbai, India',
+    location: 'Mumbai, India',
     uptime: '99.7%',
     ping: '18ms'
   },
@@ -60,7 +60,7 @@ const SERVERS = [
     reputation: 'trusted',
     description: 'Academic community for Eastern India - research and education',
     region: 'West Bengal',
-    location: '🇮🇳 Kolkata, India',
+    location: 'Kolkata, India',
     uptime: '99.5%',
     ping: '22ms'
   },
@@ -74,7 +74,7 @@ const SERVERS = [
     reputation: 'trusted',
     description: 'Tech community for Hyderabad - AI, ML, and software development',
     region: 'Telangana',
-    location: '🇮🇳 Hyderabad, India',
+    location: 'Hyderabad, India',
     uptime: '99.6%',
     ping: '16ms'
   },
@@ -88,7 +88,7 @@ const SERVERS = [
     reputation: 'dev',
     description: 'Local development server for testing',
     region: 'Local',
-    location: '💻 Local Machine',
+    location: 'Local Machine',
     uptime: '100%',
     ping: '1ms'
   }
@@ -296,7 +296,7 @@ export default function SignupPage({ onNavigate, updateUserData, setIsAuthentica
               {isDarkMode ? '🌙' : '☀️'}
             </button>
           </div>
-          <h1 className="signup-title">🔐 Create Your Identity</h1>
+          <h1 className="signup-title">Create Your Identity</h1>
           <p className="signup-subtitle">Set up your decentralized account</p>
         </div>
 
@@ -639,8 +639,7 @@ export default function SignupPage({ onNavigate, updateUserData, setIsAuthentica
         {/* Step 3: Generate DID (Optional) */}
         {step === 3 && (
           <div className="signup-form">
-            <h2 className="step-title">Decentralized Identity 🔐</h2>
-
+            <h2 className="step-title">Decentralized Identity</h2>
             <div className="security-banner" style={{
               background: 'rgba(0, 217, 255, 0.1)',
               border: '1px solid #00d9ff',
@@ -792,8 +791,7 @@ export default function SignupPage({ onNavigate, updateUserData, setIsAuthentica
         {/* Step 4: Profile Setup */}
         {step === 4 && (
           <div className="signup-form">
-            <h2 className="step-title">Complete Your Profile 👤</h2>
-
+            <h2 className="step-title">Complete Your Profile</h2>
             <div className="form-group">
               <label htmlFor="displayName">Display Name:</label>
               <input

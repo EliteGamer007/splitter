@@ -221,7 +221,7 @@ export default function LoginPage({ onNavigate, updateUserData, setIsAuthenticat
               {isDarkMode ? '🌙' : '☀️'}
             </button>
           </div>
-          <h1 className="login-title">🔑 Welcome Back</h1>
+          <h1 className="login-title">Welcome Back</h1>
           <p className="login-subtitle">Sign in to your account</p>
         </div>
 
@@ -572,7 +572,6 @@ export default function LoginPage({ onNavigate, updateUserData, setIsAuthenticat
           <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>Connect anywhere</p>
         </div>
         <div className="feature-item" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
           <h4 style={{ color: '#00d9ff', margin: '0 0 4px 0', fontSize: '14px' }}>Open</h4>
           <p style={{ color: '#666', fontSize: '12px', margin: 0 }}>You own your identity</p>
         </div>
