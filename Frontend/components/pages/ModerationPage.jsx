@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/ModerationPage.css';
 import { adminApi } from '@/lib/api';
 
-export default function ModerationPage({ onNavigate, isDarkMode, toggleTheme, userData }) {
+export default function ModerationPage({ onNavigate, userData }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [filterType, setFilterType] = useState('all');
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -1,15 +1,5 @@
 /* Landing Page Styles - Dark Mode First */
-:root {
-  --bg-dark: #0f0f1a;
-  --bg-card: #1a1a2e;
-  --text-light: #e8eaed;
-  --text-muted: #8a8a99;
-  --primary-cyan: #00d9ff;
-  --accent-magenta: #ff006e;
-  --secondary-navy: #2d2d44;
-  --disabled-yellow: #d4af37;
-  --border-color: #2d2d44;
-}
+/* :root block DELETED */
 
 .landing-container {
   background: var(--bg-dark);
@@ -25,7 +15,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 2rem;
-  background: rgba(16, 16, 34, 0.95);
+  background: color-mix(in srgb, var(--bg-dark) 95%, transparent);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
@@ -87,7 +77,7 @@
 .landing-hero {
   padding: 6rem 2rem;
   text-align: center;
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.05) 0%, rgba(255, 0, 110, 0.05) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-cyan) 5%, transparent) 0%, color-mix(in srgb, var(--accent-magenta) 5%, transparent) 100%);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -129,7 +119,7 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: rgba(0, 217, 255, 0.1);
+  background: color-mix(in srgb, var(--primary-cyan) 10%, transparent);
   border: 1px solid var(--primary-cyan);
   border-radius: 0.75rem;
   padding: 1.5rem 2rem;
@@ -183,7 +173,7 @@
 
 .landing-feature-card:hover {
   border-color: var(--primary-cyan);
-  box-shadow: 0 0 30px rgba(0, 217, 255, 0.2);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--primary-cyan) 20%, transparent);
   transform: translateY(-5px);
 }
 
@@ -209,7 +199,7 @@
 /* Federation Section */
 .landing-federation {
   padding: 6rem 2rem;
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.02) 0%, rgba(255, 0, 110, 0.02) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-cyan) 2%, transparent) 0%, color-mix(in srgb, var(--accent-magenta) 2%, transparent) 100%);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -322,7 +312,7 @@
 /* Footer */
 .landing-footer {
   padding: 3rem 2rem;
-  background: rgba(16, 16, 34, 0.95);
+  background: color-mix(in srgb, var(--bg-dark) 95%, transparent);
   border-top: 1px solid var(--border-color);
   text-align: center;
   color: var(--text-muted);

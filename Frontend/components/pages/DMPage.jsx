@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/DMPage.css';
 import { messageApi, searchApi } from '@/lib/api';
 
-export default function DMPage({ onNavigate, isDarkMode, toggleTheme, userData, selectedUser }) {
+export default function DMPage({ onNavigate, userData, selectedUser }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -39,7 +42,7 @@ export default function DMPage({ onNavigate, isDarkMode, toggleTheme, userData, 
     try {
       const result = await messageApi.getThreads();
       setThreads(result.threads || []);
-      
+
       // If we have threads and none selected, select the first one
       if (result.threads?.length > 0 && !selectedThread) {
         selectThread(result.threads[0]);
@@ -68,12 +71,12 @@ export default function DMPage({ onNavigate, isDarkMode, toggleTheme, userData, 
     setIsSending(true);
     try {
       // Determine recipient ID
-      const recipientId = selectedThread.participant_a_id === userData?.id 
-        ? selectedThread.participant_b_id 
+      const recipientId = selectedThread.participant_a_id === userData?.id
+        ? selectedThread.participant_b_id
         : selectedThread.participant_a_id;
 
       const result = await messageApi.sendMessage(recipientId, messageText);
-      
+
       // Add message to local state
       setMessages(prev => [...prev, result.message]);
       setMessageText('');
@@ -91,7 +94,7 @@ export default function DMPage({ onNavigate, isDarkMode, toggleTheme, userData, 
   // Search for users to start new conversation
   const handleSearch = async () => {
     if (searchQuery.length < 2) return;
-    
+
     setIsSearching(true);
     try {
       const result = await searchApi.searchUsers(searchQuery);
@@ -121,7 +124,7 @@ export default function DMPage({ onNavigate, isDarkMode, toggleTheme, userData, 
       setShowNewChat(false);
       setSearchQuery('');
       setSearchResults([]);
-      
+
       // Refresh threads and select the new one
       await fetchThreads();
       selectThread(result.thread);

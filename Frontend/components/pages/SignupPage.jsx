@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/SignupPage.css';
 import { authApi } from '@/lib/api';
 import { generateKeyPair, storeKeyPair, exportRecoveryFile } from '@/lib/crypto';
@@ -95,7 +96,9 @@ const SERVERS = [
 
 const REGIONS = ['All', 'Delhi', 'Karnataka', 'Maharashtra', 'West Bengal', 'Telangana', 'Local'];
 
-export default function SignupPage({ onNavigate, updateUserData, isDarkMode, toggleTheme, setIsAuthenticated }) {
+export default function SignupPage({ onNavigate, updateUserData, setIsAuthenticated }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     server: '',
@@ -117,8 +120,8 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
   // Filter servers based on search and region
   const filteredServers = SERVERS.filter(server => {
     const matchesSearch = server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         server.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         server.description.toLowerCase().includes(searchTerm.toLowerCase());
+      server.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      server.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRegion = selectedRegion === 'All' || server.region === selectedRegion;
     return matchesSearch && matchesRegion;
   });
@@ -126,7 +129,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    
+
     // Check password strength
     if (name === 'password') {
       let strength = 0;
@@ -146,7 +149,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
   const handleGenerateDID = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const newKeyPair = await generateKeyPair();
       setKeyPair(newKeyPair);
@@ -162,7 +165,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
 
   const handleDownloadRecovery = () => {
     if (!keyPair || !formData.username) return;
-    
+
     try {
       exportRecoveryFile(keyPair, formData.username, formData.server);
     } catch (err) {
@@ -271,13 +274,13 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
       <div className="signup-box">
         <div className="signup-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <button 
+            <button
               className="signup-back-btn"
               onClick={() => onNavigate('landing')}
             >
               ← Back
             </button>
-            <button 
+            <button
               onClick={toggleTheme}
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               style={{
@@ -298,9 +301,9 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         </div>
 
         {error && (
-          <div style={{ 
-            background: 'rgba(255, 68, 68, 0.1)', 
-            border: '1px solid #ff4444', 
+          <div style={{
+            background: 'rgba(255, 68, 68, 0.1)',
+            border: '1px solid #ff4444',
             color: '#ff4444',
             padding: '12px',
             borderRadius: '8px',
@@ -313,8 +316,8 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         {/* Progress Bar */}
         <div className="signup-progress">
           <div className="progress-bar">
-            <div 
-              className="progress-fill" 
+            <div
+              className="progress-fill"
               style={{ width: `${(step / 4) * 100}%` }}
             />
           </div>
@@ -387,10 +390,10 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                   key={server.id}
                   onClick={() => setFormData({ ...formData, server: server.name })}
                   style={{
-                    background: formData.server === server.name 
+                    background: formData.server === server.name
                       ? 'linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(0, 255, 136, 0.1))'
                       : 'rgba(255,255,255,0.03)',
-                    border: formData.server === server.name 
+                    border: formData.server === server.name
                       ? '2px solid #00d9ff'
                       : '1px solid #333',
                     borderRadius: '12px',
@@ -485,15 +488,15 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                     marginTop: '12px',
                     padding: '6px 10px',
                     background: server.moderation === 'Strict' ? 'rgba(255, 68, 68, 0.1)' :
-                               server.moderation === 'Moderate' ? 'rgba(255, 170, 0, 0.1)' :
-                               'rgba(0, 255, 136, 0.1)',
+                      server.moderation === 'Moderate' ? 'rgba(255, 170, 0, 0.1)' :
+                        'rgba(0, 255, 136, 0.1)',
                     border: `1px solid ${server.moderation === 'Strict' ? 'rgba(255, 68, 68, 0.3)' :
-                                         server.moderation === 'Moderate' ? 'rgba(255, 170, 0, 0.3)' :
-                                         'rgba(0, 255, 136, 0.3)'}`,
+                      server.moderation === 'Moderate' ? 'rgba(255, 170, 0, 0.3)' :
+                        'rgba(0, 255, 136, 0.3)'}`,
                     borderRadius: '6px',
                     fontSize: '11px',
                     color: server.moderation === 'Strict' ? '#ff4444' :
-                           server.moderation === 'Moderate' ? '#ffaa00' : '#00ff88',
+                      server.moderation === 'Moderate' ? '#ffaa00' : '#00ff88',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px'
@@ -512,7 +515,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
             )}
 
             <div className="form-buttons" style={{ marginTop: '20px' }}>
-              <button 
+              <button
                 className={`btn-primary ${!formData.server ? 'disabled' : ''}`}
                 onClick={nextStep}
                 disabled={!formData.server}
@@ -531,7 +534,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         {step === 2 && (
           <div className="signup-form">
             <h2 className="step-title">Account Credentials 🔑</h2>
-            
+
             <div className="form-group">
               <label htmlFor="username">Username:</label>
               <input
@@ -617,13 +620,13 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
             </div>
 
             <div className="form-buttons">
-              <button 
+              <button
                 className="btn-secondary"
                 onClick={prevStep}
               >
                 ← Back
               </button>
-              <button 
+              <button
                 className="btn-primary"
                 onClick={nextStep}
               >
@@ -637,7 +640,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         {step === 3 && (
           <div className="signup-form">
             <h2 className="step-title">Decentralized Identity 🔐</h2>
-            
+
             <div className="security-banner" style={{
               background: 'rgba(0, 217, 255, 0.1)',
               border: '1px solid #00d9ff',
@@ -647,7 +650,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
             }}>
               <span>ℹ️</span>
               <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>
-                Generate a DID for enhanced security with cryptographic authentication. 
+                Generate a DID for enhanced security with cryptographic authentication.
                 This is <strong>optional</strong> - you can still use password login.
               </p>
             </div>
@@ -657,7 +660,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                 <p className="form-description">
                   Your decentralized identifier (DID) will be generated using WebCrypto and stored securely on your device.
                 </p>
-                <button 
+                <button
                   className="btn-generate"
                   onClick={handleGenerateDID}
                   disabled={isLoading}
@@ -675,7 +678,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                 >
                   {isLoading ? 'Generating...' : '🔑 Generate Decentralized Identity'}
                 </button>
-                <button 
+                <button
                   className="btn-secondary"
                   onClick={nextStep}
                   style={{ width: '100%' }}
@@ -698,7 +701,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                     alignItems: 'center'
                   }}>
                     <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{keyPair.did}</code>
-                    <button 
+                    <button
                       className="copy-btn"
                       onClick={() => navigator.clipboard.writeText(keyPair.did)}
                       style={{
@@ -746,7 +749,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
                   </p>
                 </div>
 
-                <button 
+                <button
                   className="btn-recovery"
                   onClick={handleDownloadRecovery}
                   disabled={!formData.username}
@@ -768,14 +771,14 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
             )}
 
             <div className="form-buttons">
-              <button 
+              <button
                 className="btn-secondary"
                 onClick={prevStep}
               >
                 ← Back
               </button>
               {keyPair && (
-                <button 
+                <button
                   className="btn-primary"
                   onClick={nextStep}
                 >
@@ -790,7 +793,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         {step === 4 && (
           <div className="signup-form">
             <h2 className="step-title">Complete Your Profile 👤</h2>
-            
+
             <div className="form-group">
               <label htmlFor="displayName">Display Name:</label>
               <input
@@ -862,13 +865,13 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
             </div>
 
             <div className="form-buttons">
-              <button 
+              <button
                 className="btn-secondary"
                 onClick={prevStep}
               >
                 ← Back
               </button>
-              <button 
+              <button
                 className={`btn-primary ${!formData.displayName || isLoading ? 'disabled' : ''}`}
                 onClick={submitSignup}
                 disabled={!formData.displayName || isLoading}
@@ -908,7 +911,7 @@ export default function SignupPage({ onNavigate, updateUserData, isDarkMode, tog
         {step < 5 && (
           <div style={{ textAlign: 'center', marginTop: '16px' }}>
             Already have an account?{' '}
-            <button 
+            <button
               onClick={() => onNavigate('login')}
               style={{
                 background: 'none',

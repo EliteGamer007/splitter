@@ -1,0 +1,89 @@
+/* ======================================================
+   GLOBAL THEME TOKENS
+   COLORS ONLY — NO LAYOUT
+   ====================================================== */
+
+:root {
+  /* ========= LIGHT MODE (Smooth Peach - High Contrast Text) ========= */
+
+  /* Page background (Peach) */
+  --bg-primary: #fff0e6;
+
+  /* Cards (Off-White/Pale Peach) */
+  --bg-secondary: #fffaf5;
+
+  /* Inputs / hover */
+  --bg-tertiary: #fcf2ec;
+
+  --card-bg: #fffaf5;
+  --card-border: rgba(0, 0, 0, 0.05);
+
+  /* Text — HIGH CONTRAST for light backgrounds */
+  --text-primary: #0b3d3b;
+  /* main content */
+  --text-secondary: #245f5d;
+  /* handles/subtitles */
+  --text-muted: #4c7f7d;
+  /* metadata/time */
+
+  /* Accents */
+  --primary-cyan: #0f7c7b;
+  --accent-magenta: #ff9a8b;
+  --success-green: #22c55e;
+  --disabled-yellow: #d4af37;
+
+  /* Gradients */
+  --accent-gradient: linear-gradient(135deg, #0f7c7b, #ff9a8b);
+  --btn-bg: linear-gradient(135deg, #0f7c7b, #ff9a8b);
+  --btn-text: #ffffff;
+
+  --border-light: rgba(30, 41, 59, 0.08);
+  --border-color: rgba(30, 41, 59, 0.08);
+
+  --secondary-navy: #fcf2ec;
+
+  /* COMPATIBILITY MATCHING */
+  --bg-dark: var(--bg-primary);
+  --text-light: var(--text-primary);
+  --cyan-glow: color-mix(in srgb, var(--primary-cyan) 15%, transparent);
+
+  /* VARIABLES MAP */
+  --accent-1: #0f7c7b;
+  --accent-2: #ff9a8b;
+  --accent-3: #22c55e;
+}
+
+
+
+[data-theme="dark"] {
+
+  /* DARK MODE (EXACT current UI colors — DO NOT MODIFY) */
+
+  --bg-dark: #0f0f1a;
+  --bg-card: #1a1a2e;
+  --secondary-navy: #2d2d44;
+
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --card-bg: #1a1a2e;
+  --btn-bg: #00d9ff;
+  --btn-text: #0f0f1a;
+  --accent-1: #00d9ff;
+  --accent-2: #00ff88;
+
+  --text-light: #e8eaed;
+  --text-primary: #e8eaed;
+  --text-secondary: #8a8a99;
+  --text-muted: #8a8a99;
+
+  --primary-cyan: #00d9ff;
+  --accent-magenta: #ff006e;
+  --success-green: #00ff88;
+  --disabled-yellow: #d4af37;
+
+  --border-color: #2d2d44;
+
+  --accent-gradient: linear-gradient(135deg, #00d9ff, #00ff88);
+
+  --cyan-glow: rgba(0, 217, 255, 0.25);
+}

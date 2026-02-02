@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/ThreadPage.css';
 
-export default function ThreadPage({ onNavigate, isDarkMode, toggleTheme }) {
+export default function ThreadPage({ onNavigate }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [replies, setReplies] = useState([
     {
       id: 1,

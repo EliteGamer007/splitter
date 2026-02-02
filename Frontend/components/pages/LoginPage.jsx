@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/LoginPage.css';
 import { authApi, userApi } from '@/lib/api';
 import { getStoredKeyPair, signChallenge, importRecoveryFile } from '@/lib/crypto';
 
-export default function LoginPage({ onNavigate, updateUserData, isDarkMode, toggleTheme, setIsAuthenticated }) {
+export default function LoginPage({ onNavigate, updateUserData, setIsAuthenticated }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'did'
   const [formData, setFormData] = useState({
     server: 'localhost',
@@ -44,7 +47,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
   // Password Login
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.username || !formData.password) {
       setError('Please enter username and password');
       return;
@@ -132,7 +135,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
 
     try {
       const signature = await signChallenge(keyPair.privateKey, challenge);
-      
+
       const result = await authApi.verifyChallenge({
         did: formData.did,
         challenge: challenge,
@@ -196,13 +199,13 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
       <div className="login-box">
         <div className="login-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <button 
+            <button
               className="login-back-btn"
               onClick={() => onNavigate('landing')}
             >
               ← Back
             </button>
-            <button 
+            <button
               onClick={toggleTheme}
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               style={{
@@ -226,7 +229,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
         {!success && step === 1 && (
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label htmlFor="server">Server:</label>
-            <select 
+            <select
               id="server"
               value={formData.server}
               onChange={handleInputChange}
@@ -284,9 +287,9 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
         )}
 
         {error && (
-          <div style={{ 
-            background: 'rgba(255, 68, 68, 0.1)', 
-            border: '1px solid #ff4444', 
+          <div style={{
+            background: 'rgba(255, 68, 68, 0.1)',
+            border: '1px solid #ff4444',
             color: '#ff4444',
             padding: '12px',
             borderRadius: '8px',
@@ -328,7 +331,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               className={`btn-primary full-width ${isLoading ? 'disabled' : ''}`}
               disabled={isLoading}
@@ -337,7 +340,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '12px' }}>
-              <button 
+              <button
                 type="button"
                 onClick={() => setError('Password reset coming soon!')}
                 style={{
@@ -416,7 +419,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
               </div>
             )}
 
-            <button 
+            <button
               className={`btn-primary full-width ${!formData.did || isLoading ? 'disabled' : ''}`}
               onClick={requestChallenge}
               disabled={!formData.did || isLoading}
@@ -453,7 +456,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
                   marginTop: '4px'
                 }}>
                   <code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{challenge}</code>
-                  <button 
+                  <button
                     onClick={() => navigator.clipboard.writeText(challenge)}
                     style={{
                       background: 'none',
@@ -472,7 +475,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
 
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ color: '#666', fontSize: '12px' }}>Private Key Status:</label>
-                <p style={{ 
+                <p style={{
                   margin: '4px 0 0 0',
                   color: keyPair ? '#00ff88' : '#ff4444'
                 }}>
@@ -481,7 +484,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
               </div>
             </div>
 
-            <button 
+            <button
               className={`btn-primary full-width ${!keyPair || isLoading ? 'disabled' : ''}`}
               onClick={signAndVerify}
               disabled={!keyPair || isLoading}
@@ -492,7 +495,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
               {isLoading ? '🔐 Signing...' : '🔐 Sign Challenge with Private Key'}
             </button>
 
-            <button 
+            <button
               className="btn-secondary full-width"
               onClick={() => { setStep(1); setChallenge(null); setError(null); }}
               style={{ marginTop: '12px' }}
@@ -540,7 +543,7 @@ export default function LoginPage({ onNavigate, updateUserData, isDarkMode, togg
               <div style={{ flex: 1, height: '1px', background: '#333' }} />
             </div>
 
-            <button 
+            <button
               className="btn-secondary full-width"
               onClick={() => onNavigate('signup')}
             >

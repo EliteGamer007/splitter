@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/SecurityPage.css';
 import { userApi } from '@/lib/api';
 
-export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, userData, updateUserData }) {
+export default function SecurityPage({ onNavigate, userData, updateUserData }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Privacy settings state
   const [defaultVisibility, setDefaultVisibility] = useState(userData?.default_visibility || 'public');
   const [messagePrivacy, setMessagePrivacy] = useState(userData?.message_privacy || 'everyone');
@@ -83,7 +86,7 @@ export default function SecurityPage({ onNavigate, isDarkMode, toggleTheme, user
         <div className="status-card" style={{ marginBottom: '24px' }}>
           <h3 className="card-title">🔒 Privacy Settings</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
-            
+
             {/* Default Post Visibility */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>

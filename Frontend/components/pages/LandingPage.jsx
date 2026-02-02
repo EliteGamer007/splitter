@@ -1,9 +1,12 @@
 'use client';
 
 import React from 'react';
+import { useTheme } from '@/components/ui/theme-provider';
 import '../styles/LandingPage.css';
 
-export default function LandingPage({ onNavigate, isDarkMode, toggleTheme }) {
+export default function LandingPage({ onNavigate }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
   return (
     <div className="landing-container">
       {/* Navigation Bar */}
@@ -12,19 +15,19 @@ export default function LandingPage({ onNavigate, isDarkMode, toggleTheme }) {
           <span className="landing-logo">🌐 SPLITTER</span>
         </div>
         <div className="landing-nav-right">
-          <button 
+          <button
             className="landing-nav-btn"
             onClick={() => onNavigate('instances')}
           >
             Explore Network
           </button>
-          <button 
+          <button
             className="landing-nav-btn"
             onClick={() => onNavigate('login')}
           >
             Login
           </button>
-          <button 
+          <button
             onClick={toggleTheme}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             style={{
@@ -40,7 +43,7 @@ export default function LandingPage({ onNavigate, isDarkMode, toggleTheme }) {
           >
             {isDarkMode ? '🌙' : '☀️'}
           </button>
-          <button 
+          <button
             className="landing-nav-btn landing-nav-btn-primary"
             onClick={() => onNavigate('signup')}
           >
@@ -57,7 +60,7 @@ export default function LandingPage({ onNavigate, isDarkMode, toggleTheme }) {
             Your Identity. Your Server. Your Network.
           </p>
           <p className="landing-hero-description">
-            A decentralized social platform where you own your identity, 
+            A decentralized social platform where you own your identity,
             choose your server, and connect across a federated network.
           </p>
         </div>
@@ -124,13 +127,13 @@ export default function LandingPage({ onNavigate, isDarkMode, toggleTheme }) {
       <section className="landing-cta">
         <h2>Ready to join the federated network?</h2>
         <div className="landing-cta-buttons">
-          <button 
+          <button
             className="landing-btn-primary"
             onClick={() => onNavigate('instances')}
           >
             Explore Public Network →
           </button>
-          <button 
+          <button
             className="landing-btn-secondary"
             onClick={() => onNavigate('signup')}
           >
