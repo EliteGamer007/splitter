@@ -826,7 +826,6 @@ export default function AdminPage({ onNavigate, userData, handleLogout }) {
                 <span style={{ color: '#ff4444', fontWeight: '600' }}>{suspendedUsers.length}</span>
               </div>
             </div>
-            </div>
           </div>
 
           <div className="sidebar-card">

@@ -91,8 +91,10 @@ export default function LoginPage({ onNavigate, updateUserData, setIsAuthenticat
       }
 
       setSuccess(true);
-      // Redirect admin users to admin dashboard, regular users to home
-      setTimeout(() => onNavigate(user.role === 'admin' ? 'admin' : 'home'), 1500);
+      // Use requestAnimationFrame to ensure state updates complete before navigation
+      requestAnimationFrame(() => {
+        onNavigate(user.role === 'admin' ? 'admin' : 'home');
+      });
 
     } catch (err) {
       console.error('Login error:', err);
@@ -169,8 +171,10 @@ export default function LoginPage({ onNavigate, updateUserData, setIsAuthenticat
       }
 
       setStep(3);
-      // Redirect admin users to admin dashboard, regular users to home
-      setTimeout(() => onNavigate(user.role === 'admin' ? 'admin' : 'home'), 1500);
+      // Use requestAnimationFrame to ensure state updates complete before navigation
+      requestAnimationFrame(() => {
+        onNavigate(user.role === 'admin' ? 'admin' : 'home');
+      });
 
     } catch (err) {
       setError(err.message || 'Signature verification failed');
