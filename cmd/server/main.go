@@ -23,16 +23,14 @@ func main() {
 	}
 	defer db.Close()
 
-	// Run migrations
-	if err := db.RunMigrations("migrations"); err != nil {
-		log.Printf("Warning: Failed to run migrations: %v", err)
-		// Don't fail fatal here, maybe migrations are already applied or dir missing in prod
-	}
+	// Migrations are already applied manually to Neon
+	// Skip automatic migrations to avoid "relation already exists" errors
+	// if err := db.RunMigrations("migrations"); err != nil {
+	// 	log.Printf("Warning: Failed to run migrations: %v", err)
+	// }
 
 	// Ensure admin user exists
-	if err := ensureAdminUser(); err != nil {
-		log.Printf("Warning: Failed to ensure admin user: %v", err)
-	}
+	ensureAdminUser() // Silent check, no logging needed
 
 	// Initialize and start server
 	srv := server.NewServer(cfg)
@@ -56,10 +54,9 @@ func ensureAdminUser() error {
 	// Check if admin already exists
 	existingAdmin, _, _ := userRepo.GetByUsername(ctx, "admin")
 	if existingAdmin != nil {
-		// Always ensure the admin user has admin role (force update on every startup)
+		// Silently ensure admin role is set
 		updateQuery := `UPDATE users SET role = 'admin' WHERE username = 'admin'`
 		db.GetDB().Exec(ctx, updateQuery)
-		log.Println("Admin user role ensured to be admin")
 		return nil
 	}
 
@@ -72,7 +69,7 @@ func ensureAdminUser() error {
 	query := `
 		INSERT INTO users (username, email, password_hash, instance_domain, display_name, role, did, public_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (username) DO UPDATE SET role = 'admin'
+		ON CONFLICT (email) DO UPDATE SET role = 'admin'
 	`
 
 	_, err = db.GetDB().Exec(ctx, query,
