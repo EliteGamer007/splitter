@@ -1,124 +1,59 @@
 # Docker Setup for Splitter
 
-## Quick Start
+> **Note:** The primary database is now **Neon Cloud PostgreSQL**. Docker is used only for pgAdmin and running psql commands. See [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) for the main setup guide.
 
-### 1. Clone and Setup
+## Docker Usage
+
+Docker Compose provides:
+- **pgAdmin** — Database management UI at http://localhost:5050
+- **psql** — Run migrations and queries against Neon
+
+### Start pgAdmin
 ```bash
-git clone <repository-url>
+docker-compose up -d pgadmin
+```
+
+### Run Migrations via Docker
+```bash
+docker run --rm postgres:15 psql \
+  'postgresql://user:password@host.neon.tech/dbname?sslmode=require' \
+  -f migrations/000_master_schema.sql
+```
+
+### Query Database via Docker
+```bash
+docker run --rm postgres:15 psql \
+  'YOUR_NEON_CONNECTION_STRING' \
+  -c "SELECT username, role FROM users;"
+```
+
+### pgAdmin Access
+- **URL:** http://localhost:5050
+- **Email:** Value from `PGADMIN_DEFAULT_EMAIL` in `.env`
+- **Password:** Value from `PGADMIN_DEFAULT_PASSWORD` in `.env`
+
+## Running the Application (No Docker Required)
+
+```bash
+# Backend
 cd splitter
+go run ./cmd/server       # http://localhost:8000
+
+# Frontend
+cd Splitter-frontend
+npm run dev               # http://localhost:3000
+```
+
+## Environment Setup
+
+```bash
 cp .env.example .env
+# Edit .env with your Neon credentials — see .env.example for all required variables
 ```
 
-### 2. Edit `.env` file
-Update the following values:
-- `POSTGRES_PASSWORD` - Set a strong password
-- `JWT_SECRET` - Generate a secure random string
-- `PGADMIN_PASSWORD` - Set pgAdmin admin password
+## Production Notes
 
-### 3. Start Services
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Check status
-docker-compose ps
-```
-
-### 4. Access Services
-- **Backend API**: http://localhost:8000
-- **pgAdmin**: http://localhost:5050
-  - Email: Value from `PGADMIN_EMAIL` in `.env`
-  - Password: Value from `PGADMIN_PASSWORD` in `.env`
-- **PostgreSQL**: localhost:5432
-  - Database: Value from `POSTGRES_DB`
-  - User: Value from `POSTGRES_USER`
-  - Password: Value from `POSTGRES_PASSWORD`
-
-### 5. Database Migrations
-Migrations in `migrations/` folder will run automatically on first startup.
-
-## Managing Services
-
-### Stop Services
-```bash
-docker-compose down
-```
-
-### Stop and Remove Data (DESTRUCTIVE)
-```bash
-docker-compose down -v
-```
-
-### Restart Single Service
-```bash
-docker-compose restart postgres
-docker-compose restart backend
-```
-
-### View Logs
-```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f postgres
-docker-compose logs -f backend
-```
-
-## Connecting to Database
-
-### From Host Machine
-```bash
-psql -h localhost -p 5432 -U splitter_user -d splitter_db
-```
-
-### From Backend Container
-```bash
-docker-compose exec backend psql -h postgres -U splitter_user -d splitter_db
-```
-
-### Using pgAdmin
-1. Open http://localhost:5050
-2. Login with credentials from `.env`
-3. Server "Splitter PostgreSQL" should be auto-configured
-4. Right-click > Connect (enter password from `.env`)
-
-## Troubleshooting
-
-### Backend can't connect to database
-```bash
-# Check if postgres is healthy
-docker-compose ps
-
-# Check postgres logs
-docker-compose logs postgres
-
-# Verify environment variables
-docker-compose exec backend env | grep DB_
-```
-
-### Reset Everything
-```bash
-docker-compose down -v
-docker-compose up -d
-```
-
-### Access PostgreSQL Shell
-```bash
-docker-compose exec postgres psql -U splitter_user -d splitter_db
-```
-
-## Production Considerations
-
-1. **Change all default passwords** in `.env`
-2. **Never commit `.env`** file to git
-3. **Use Docker secrets** for sensitive data in production
-4. **Setup automated backups**:
-   ```bash
-   docker-compose exec postgres pg_dump -U splitter_user splitter_db > backup.sql
-   ```
-5. **Configure firewall** to restrict database access
-6. **Use SSL/TLS** for database connections in production
+1. **Change all default passwords** — admin account, JWT secret
+2. **Never commit `.env`** to git
+3. **Neon handles backups** automatically
+4. **SSL is required** for all Neon connections (`sslmode=require`)

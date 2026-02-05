@@ -120,8 +120,8 @@ CREATE TABLE bookmarks (
 -- Message conversation threads
 CREATE TABLE message_threads (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    participant_a TEXT NOT NULL,
-    participant_b TEXT NOT NULL,
+    participant_a TEXT,
+    participant_b TEXT,
     participant_a_id UUID REFERENCES users(id),
     participant_b_id UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -132,8 +132,8 @@ CREATE TABLE message_threads (
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     thread_id UUID REFERENCES message_threads(id) ON DELETE CASCADE,
-    sender_did TEXT NOT NULL,
-    recipient_did TEXT NOT NULL,
+    sender_did TEXT,
+    recipient_did TEXT,
     sender_id UUID REFERENCES users(id),
     recipient_id UUID REFERENCES users(id),
     ciphertext BYTEA,

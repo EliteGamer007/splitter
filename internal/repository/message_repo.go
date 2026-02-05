@@ -138,7 +138,7 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) ([]*models.MessageThread, error) {
 	query := `
 		SELECT t.id, t.participant_a_id, t.participant_b_id, t.created_at, t.updated_at,
-		       u.id, u.username, u.display_name, u.avatar_url, u.instance_domain
+		       u.id, u.username, COALESCE(u.display_name, ''), COALESCE(u.avatar_url, ''), u.instance_domain
 		FROM message_threads t
 		JOIN users u ON (
 			CASE WHEN t.participant_a_id = $1 THEN t.participant_b_id ELSE t.participant_a_id END = u.id

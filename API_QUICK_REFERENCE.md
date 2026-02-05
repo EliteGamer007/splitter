@@ -1,6 +1,6 @@
 # API Quick Reference
 
-Base URL: `http://localhost:8080/api/v1`
+Base URL: `http://localhost:8000/api/v1`
 
 ## Authentication
 
@@ -277,7 +277,7 @@ All endpoints return standard error format:
 
 ```typescript
 // lib/api.ts
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = 'http://localhost:8000/api/v1';
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('jwt_token');
@@ -518,14 +518,20 @@ export default function HomePage() {
 
 ### Backend (.env)
 ```
-PORT=8080
-DATABASE_URL=postgresql://user:pass@localhost:5432/splitter
+DB_HOST=ep-your-endpoint.region.aws.neon.tech
+DB_PORT=5432
+DB_USER=your_neon_username
+DB_PASSWORD=your_neon_password
+DB_NAME=neondb
+PORT=8000
+ENV=development
+BASE_URL=http://localhost:8000
 JWT_SECRET=your_secret_key_here
 ```
 
 ### Frontend (.env.local)
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ```
 
 ---
@@ -534,47 +540,45 @@ NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 
 ### Register
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
-    "instance_domain": "localhost",
-    "did": "did:key:test123",
-    "display_name": "Test User",
-    "public_key": "test_public_key"
+    "email": "test@example.com",
+    "password": "password123",
+    "display_name": "Test User"
   }'
 ```
 
-### Get Challenge
+### Login
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/challenge \
+curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"did": "did:key:test123"}'
+  -d '{"username": "admin", "password": "splitteradmin"}'
 ```
 
 ### Create Post (Protected)
 ```bash
-curl -X POST http://localhost:8080/api/v1/posts \
-  -H "Content-Type: application/json" \
+curl -X POST http://localhost:8000/api/v1/posts \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{"content": "Hello world!"}'
+  -F "content=Hello world!"
 ```
 
 ### Get Feed
 ```bash
-curl http://localhost:8080/api/v1/posts/feed \
+curl http://localhost:8000/api/v1/posts/feed \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Follow User
 ```bash
-curl -X POST http://localhost:8080/api/v1/users/USER_ID/follow \
+curl -X POST http://localhost:8000/api/v1/users/USER_ID/follow \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Like Post
 ```bash
-curl -X POST http://localhost:8080/api/v1/posts/POST_ID/like \
+curl -X POST http://localhost:8000/api/v1/posts/POST_ID/like \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -608,14 +612,17 @@ curl -X POST http://localhost:8080/api/v1/posts/POST_ID/like \
 ## Migration Commands
 
 ```bash
-# Run migrations
-psql -U user -d splitter -f migrations/001_initial_schema.sql
+# Run master schema (for fresh database)
+docker run --rm postgres:15 psql 'YOUR_NEON_CONNECTION_STRING' \
+  -f migrations/000_master_schema.sql
+
+# Verify migration
+docker run --rm postgres:15 psql 'YOUR_NEON_CONNECTION_STRING' \
+  -f migrations/verify_migration.sql
 
 # Check table structure
-psql -U user -d splitter -c "\d users"
-psql -U user -d splitter -c "\d posts"
-psql -U user -d splitter -c "\d follows"
-psql -U user -d splitter -c "\d interactions"
+docker run --rm postgres:15 psql 'YOUR_NEON_CONNECTION_STRING' \
+  -c "\d users"
 ```
 
 ---
@@ -625,13 +632,13 @@ psql -U user -d splitter -c "\d interactions"
 ### Backend
 ```bash
 cd splitter
-go run cmd/server/main.go
-# Server starts on http://localhost:8080
+go run ./cmd/server
+# Server starts on http://localhost:8000
 ```
 
 ### Frontend
 ```bash
-cd splitter/Frontend
+cd Splitter-frontend
 npm install
 npm run dev
 # Frontend starts on http://localhost:3000
@@ -639,21 +646,9 @@ npm run dev
 
 ---
 
-## Next Steps
-
-1. Create `Frontend/lib/api.ts` with the service layer above
-2. Create `Frontend/hooks/useAuth.ts` for authentication
-3. Update `HomePage.jsx` to use `api.getFeed()` instead of mock data
-4. Update `SignupPage.jsx` to call `api.register()`
-5. Update `LoginPage.jsx` to call challenge/verify flow
-6. Test full flow: Register → Login → Post → Follow → Like
-
----
-
 ## Need Help?
 
 - **API Issues**: Check `internal/server/router.go` for route definitions
-- **Database Issues**: See `migrations/001_initial_schema.sql`
+- **Database Issues**: See `migrations/000_master_schema.sql`
 - **Authentication**: Review `internal/handlers/auth_handler.go`
-- **Full Analysis**: Read `INTEGRATION_ANALYSIS.md`
-- **Missing Features**: Read `BACKEND_FEATURES_NOT_IN_FRONTEND.md`
+- **Setup Guide**: See `NEON_SETUP_GUIDE.md`

@@ -1,23 +1,6 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: splitter-postgres
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - splitter-net
-
   pgadmin:
     image: dpage/pgadmin4
     container_name: splitter-pgadmin
@@ -33,13 +16,10 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin-servers.json:/pgadmin4/servers.json
-    depends_on:
-      - postgres
     networks:
       - splitter-net
 
 volumes:
-  postgres_data:
   pgadmin_data:
 
 networks:

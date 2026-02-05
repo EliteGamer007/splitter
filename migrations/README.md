@@ -4,42 +4,38 @@ This directory contains SQL migration files for the Splitter application databas
 
 ## Current Migrations
 
-- **001_initial_schema.sql**: Creates all tables for users, posts, federation, messaging, and moderation
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| `000_master_schema.sql` | Complete schema (19 tables) | **Fresh database setup** |
+| `001_initial_schema.sql` | Original base schema | Historical reference |
+| `004_consolidated_fixes.sql` | Safe upgrade script | Upgrade existing database |
+| `verify_migration.sql` | Verification checks | After any migration |
 
 ## Running Migrations
 
-### Initial Setup
-
-Run the migration after creating the database:
+### Fresh Database (Neon Cloud)
 
 ```bash
-psql -U postgres -d splitter -f migrations/001_initial_schema.sql
+docker run --rm postgres:15 psql \
+  'postgresql://user:password@host.neon.tech/dbname?sslmode=require' \
+  -f migrations/000_master_schema.sql
 ```
 
-### Using Migration Tools (Optional)
+### Verify Migration
 
-For production environments, consider using migration management tools:
-
-**golang-migrate:**
 ```bash
-# Install
-go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-# Run migrations
-migrate -path ./migrations \
-  -database "postgres://user:password@localhost:5432/splitter?sslmode=disable" \
-  up
-
-# Rollback
-migrate -path ./migrations \
-  -database "postgres://user:password@localhost:5432/splitter?sslmode=disable" \
-  down 1
+docker run --rm postgres:15 psql \
+  'postgresql://user:password@host.neon.tech/dbname?sslmode=require' \
+  -f migrations/verify_migration.sql
 ```
 
-**Other tools:**
-- [goose](https://github.com/pressly/goose)
-- [Atlas](https://atlasgo.io/)
-- [dbmate](https://github.com/amacneil/dbmate)
+### Upgrade Existing Database
+
+```bash
+docker run --rm postgres:15 psql \
+  'YOUR_CONNECTION_STRING' \
+  -f migrations/004_consolidated_fixes.sql
+```
 
 ## Schema Overview
 
@@ -52,38 +48,15 @@ The database includes tables for:
 - **Federation**: ActivityPub inbox/outbox activities and deduplication
 - **Moderation**: Blocked domains, content reports, admin actions, reputation tracking
 
-## Migration Naming Convention
-
-Migrations follow the pattern: `{version}_{description}.sql`
-
-Examples:
-- `001_initial_schema.sql`
-- `002_add_notifications.sql`
-- `003_add_search_indexes.sql`
-
-## Verifying Migration Success
-
-After running migrations, verify everything is set up correctly:
-
-```bash
-psql "your-connection-string" -f migrations/verify_migration.sql
-```
-
-Expected output:
-- ✓ 15+ tables created
-- ✓ All critical columns exist (email, password_hash, role, etc.)
-- ✓ 20+ indexes for performance
-- ✓ Triggers for timestamp updates
-
 ## Important Notes
 
 - ✅ Always backup your database before running migrations
-- ✅ Test migrations in development environment first
-- ✅ For new databases, use `000_master_schema.sql` (single file, no conflicts)
-- ✅ For existing databases, use `004_consolidated_fixes.sql` (safe to run multiple times)
-- ❌ Never modify existing migration files after they've been applied
-- ❌ Skip deprecated files (002, 003) - they have conflicts
+- ✅ For new databases, use `000_master_schema.sql` (single file, complete schema)
+- ✅ For existing databases, use `004_consolidated_fixes.sql` (safe with IF NOT EXISTS)
+- ✅ Neon requires `sslmode=require` in connection strings
+- ❌ Do not use deprecated files (002_*.sql, 003_*.sql) — they have conflicts
+- ❌ Auto-migrations are disabled in the app (manual only)
 
-## 📖 Need Help?
+## Need Help?
 
-See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for detailed instructions, troubleshooting, and connection examples.
+See [NEON_SETUP_GUIDE.md](../NEON_SETUP_GUIDE.md) for complete setup instructions.

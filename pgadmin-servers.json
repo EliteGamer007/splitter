@@ -1,13 +1,14 @@
 {
   "Servers": {
     "1": {
-      "Name": "Splitter Docker Postgres",
-      "Group": "Servers",
-      "Host": "postgres",
+      "Name": "Splitter Neon Cloud",
+      "Group": "Production",
+      "Host": "ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech",
       "Port": 5432,
-      "MaintenanceDB": "splitter",
-      "Username": "postgres",
-      "SSLMode": "prefer"
+      "MaintenanceDB": "neondb",
+      "Username": "neondb_owner",
+      "SSLMode": "require",
+      "Comment": "Neon PostgreSQL Cloud Database"
     }
   }
 }
