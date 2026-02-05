@@ -1,80 +1,47 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: splitter-postgres
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-splitter_db}
-      POSTGRES_USER: ${POSTGRES_USER:-splitter_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-splitter_password}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5433:5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
     networks:
-      - splitter-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-splitter_user} -d ${POSTGRES_DB:-splitter_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - splitter-net
 
-  # pgAdmin - Database Management UI
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4
     container_name: splitter-pgadmin
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@splitter.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
-      PGADMIN_LISTEN_PORT: 80
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-      - ./pgadmin-servers.json:/pgadmin4/servers.json:ro
-    networks:
-      - splitter-network
+      - ./pgadmin-servers.json:/pgadmin4/servers.json
     depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Backend Service (optional - for full stack setup)
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: splitter-backend
-    restart: unless-stopped
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${POSTGRES_USER:-splitter_user}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-splitter_password}
-      DB_NAME: ${POSTGRES_DB:-splitter_db}
-      DB_SSLMODE: disable
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
-      PORT: 8000
-    ports:
-      - "8000:8000"
+      - postgres
     networks:
-      - splitter-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: ["./server"]
+      - splitter-net
 
 volumes:
   postgres_data:
-    driver: local
   pgadmin_data:
-    driver: local
 
 networks:
-  splitter-network:
+  splitter-net:
     driver: bridge

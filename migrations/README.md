@@ -61,9 +61,29 @@ Examples:
 - `002_add_notifications.sql`
 - `003_add_search_indexes.sql`
 
+## Verifying Migration Success
+
+After running migrations, verify everything is set up correctly:
+
+```bash
+psql "your-connection-string" -f migrations/verify_migration.sql
+```
+
+Expected output:
+- ✓ 15+ tables created
+- ✓ All critical columns exist (email, password_hash, role, etc.)
+- ✓ 20+ indexes for performance
+- ✓ Triggers for timestamp updates
+
 ## Important Notes
 
-- Always backup your database before running migrations
-- Test migrations in development environment first
-- Migrations are run in numerical order
-- Never modify existing migration files after they've been applied
+- ✅ Always backup your database before running migrations
+- ✅ Test migrations in development environment first
+- ✅ For new databases, use `000_master_schema.sql` (single file, no conflicts)
+- ✅ For existing databases, use `004_consolidated_fixes.sql` (safe to run multiple times)
+- ❌ Never modify existing migration files after they've been applied
+- ❌ Skip deprecated files (002, 003) - they have conflicts
+
+## 📖 Need Help?
+
+See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for detailed instructions, troubleshooting, and connection examples.
