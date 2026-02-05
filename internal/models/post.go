@@ -6,19 +6,19 @@ import (
 
 // Post represents a post/content created by a user
 type Post struct {
-	ID         string     `json:"id"`
-	AuthorDID  string     `json:"author_did"`
-	Username   string     `json:"username,omitempty"`
+	ID          string     `json:"id"`
+	AuthorDID   string     `json:"author_did"`
+	Username    string     `json:"username,omitempty"`
 	Content     string     `json:"content"`
 	Visibility  string     `json:"visibility,omitempty"`
 	IsRemote    bool       `json:"is_remote"`
 	LikeCount   int        `json:"like_count"`
-	Liked       bool       `json:"liked"`             // Whether current user has liked this post
+	Liked       bool       `json:"liked"` // Whether current user has liked this post
 	RepostCount int        `json:"repost_count"`
-	Reposted    bool       `json:"reposted"`          // Whether current user has reposted this post
-	Media       []Media    `json:"media,omitempty"`   // Attached media
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
+	Reposted    bool       `json:"reposted"`        // Whether current user has reposted this post
+	Media       []Media    `json:"media,omitempty"` // Attached media
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 }
 
 // Media represents a media attachment

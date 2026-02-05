@@ -250,7 +250,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
 	var query string
 	var args []interface{}
-	
+
 	if userDID != "" {
 		// Authenticated user - include liked and reposted status
 		query = `
