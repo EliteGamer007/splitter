@@ -20,6 +20,7 @@ splitter/
 │   ├── repository/     # Data access layer
 │   └── server/         # Router setup
 ├── migrations/         # Database migrations
+├── Frontend/           # Next.js Frontend application
 ├── .env.example        # Environment variables template
 └── FRONTEND_TASKS.md  # Frontend implementation guide
 ```
@@ -72,7 +73,7 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 DB_NAME=splitter
 
-PORT=3000
+PORT=8000
 ENV=development
 
 JWT_SECRET=your-secret-key-change-this
@@ -80,17 +81,32 @@ JWT_SECRET=your-secret-key-change-this
 
 ### 5. Install Dependencies
 
+**Backend:**
 ```bash
 go mod download
 ```
 
-### 6. Run Server
+**Frontend:**
+```bash
+cd Frontend
+npm install
+cd ..
+```
 
+### 6. Run Application
+
+**Terminal 1 (Backend):**
 ```bash
 go run cmd/server/main.go
 ```
+Server starts on `http://localhost:8000`
 
-Server starts on `http://localhost:3000`
+**Terminal 2 (Frontend):**
+```bash
+cd Frontend
+npm run dev
+```
+Frontend starts on `http://localhost:3000`
 
 ## API Endpoints
 

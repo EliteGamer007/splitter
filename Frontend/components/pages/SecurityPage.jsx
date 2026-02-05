@@ -52,7 +52,7 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
   };
 
   return (
-    <div className="security-container">
+    <div className="security-container" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: '100vh' }}>
       {/* Navigation */}
       <div className="security-navbar">
         <button
@@ -71,11 +71,11 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
 
       <div className="security-content">
         {/* Intro Banner */}
-        <div className="security-banner">
+        <div className="security-banner" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
           <div className="banner-icon">🔐</div>
           <div className="banner-text">
-            <h2>Client-Side Key Custody</h2>
-            <p>
+            <h2 style={{ color: 'var(--text-primary)' }}>Client-Side Key Custody</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>
               This device controls your identity. Your private key is stored
               only on this device. Losing access means losing your account.
             </p>
@@ -83,24 +83,24 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
         </div>
 
         {/* Privacy Settings Card - NEW */}
-        <div className="status-card" style={{ marginBottom: '24px' }}>
-          <h3 className="card-title">🔒 Privacy Settings</h3>
+        <div className="status-card" style={{ marginBottom: '24px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
+          <h3 className="card-title" style={{ color: 'var(--text-primary)' }}>🔒 Privacy Settings</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
 
             {/* Default Post Visibility */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Default Post Visibility</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Who can see your new posts by default</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Default Post Visibility</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Who can see your new posts by default</div>
               </div>
               <select
                 value={defaultVisibility}
                 onChange={(e) => setDefaultVisibility(e.target.value)}
                 style={{
                   padding: '8px 12px',
-                  background: '#1a1a2e',
-                  border: '1px solid #333',
-                  color: '#fff',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   minWidth: '150px'
@@ -115,17 +115,17 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
             {/* Message Privacy */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Who Can Message You</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Control who can send you direct messages</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Who Can Message You</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Control who can send you direct messages</div>
               </div>
               <select
                 value={messagePrivacy}
                 onChange={(e) => setMessagePrivacy(e.target.value)}
                 style={{
                   padding: '8px 12px',
-                  background: '#1a1a2e',
-                  border: '1px solid #333',
-                  color: '#fff',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   minWidth: '150px'
@@ -140,8 +140,8 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
             {/* Account Lock Toggle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Lock Account</div>
-                <div style={{ fontSize: '12px', color: '#888' }}>Require approval for new followers</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--text-primary)' }}>Lock Account</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Require approval for new followers</div>
               </div>
               <button
                 onClick={() => setAccountLocked(!accountLocked)}
@@ -183,48 +183,49 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
         </div>
 
         {/* Identity Status Card */}
-        <div className="status-card">
-          <h3 className="card-title">Identity Status</h3>
+        <div className="status-card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+          <h3 className="card-title" style={{ color: 'var(--text-primary)' }}>Identity Status</h3>
           <div className="status-items">
             <div className="status-item">
-              <div className="status-check">✔</div>
+              <div className="status-check" style={{ color: 'var(--success-green)' }}>✔</div>
               <div className="status-text">
-                <div className="status-label">Private Key Present</div>
-                <div className="status-sublabel">Stored in IndexedDB</div>
+                <div className="status-label" style={{ color: 'var(--text-primary)' }}>Private Key Present</div>
+                <div className="status-sublabel" style={{ color: 'var(--text-secondary)' }}>Stored in IndexedDB</div>
               </div>
             </div>
 
             <div className="status-item">
-              <div className="status-check">✔</div>
+              <div className="status-check" style={{ color: 'var(--success-green)' }}>✔</div>
               <div className="status-text">
-                <div className="status-label">Public Key Registered</div>
-                <div className="status-sublabel">On your home instance</div>
+                <div className="status-label" style={{ color: 'var(--text-primary)' }}>Public Key Registered</div>
+                <div className="status-sublabel" style={{ color: 'var(--text-secondary)' }}>On your home instance</div>
               </div>
             </div>
 
             <div className="status-item">
-              <div className="status-check">✔</div>
+              <div className="status-check" style={{ color: 'var(--success-green)' }}>✔</div>
               <div className="status-text">
-                <div className="status-label">Recovery File Exported</div>
-                <div className="status-sublabel">Download available below</div>
+                <div className="status-label" style={{ color: 'var(--text-primary)' }}>Recovery File Exported</div>
+                <div className="status-sublabel" style={{ color: 'var(--text-secondary)' }}>Download available below</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Key Information Card */}
-        <div className="key-info-card">
-          <h3 className="card-title">Key Information</h3>
+        <div className="key-info-card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+          <h3 className="card-title" style={{ color: 'var(--text-primary)' }}>Key Information</h3>
 
           {/* DID */}
           <div className="key-field">
-            <label className="key-label">Decentralized Identifier (DID)</label>
-            <div className="key-value-container">
-              <code className="key-value">{did}</code>
+            <label className="key-label" style={{ color: 'var(--text-secondary)' }}>Decentralized Identifier (DID)</label>
+            <div className="key-value-container" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <code className="key-value" style={{ color: 'var(--text-primary)' }}>{did}</code>
               <button
                 className={`copy-button ${copiedField === 'did' ? 'copied' : ''}`}
                 onClick={() => handleCopyToClipboard(did, 'did')}
                 title="Copy to clipboard"
+                style={{ background: 'var(--primary-cyan)', color: isDarkMode ? '#000' : '#fff' }}
               >
                 {copiedField === 'did' ? '✓ Copied' : 'Copy'}
               </button>
@@ -233,15 +234,16 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
 
           {/* Public Key Fingerprint */}
           <div className="key-field">
-            <label className="key-label">Public Key Fingerprint (SHA-256)</label>
-            <div className="key-value-container">
-              <code className="key-value">{publicKeyFingerprint}</code>
+            <label className="key-label" style={{ color: 'var(--text-secondary)' }}>Public Key Fingerprint (SHA-256)</label>
+            <div className="key-value-container" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <code className="key-value" style={{ color: 'var(--text-primary)' }}>{publicKeyFingerprint}</code>
               <button
                 className={`copy-button ${copiedField === 'fingerprint' ? 'copied' : ''}`}
                 onClick={() =>
                   handleCopyToClipboard(publicKeyFingerprint, 'fingerprint')
                 }
                 title="Copy to clipboard"
+                style={{ background: 'var(--primary-cyan)', color: isDarkMode ? '#000' : '#fff' }}
               >
                 {copiedField === 'fingerprint' ? '✓ Copied' : 'Copy'}
               </button>
@@ -250,11 +252,11 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
 
           {/* Recovery Code */}
           <div className="key-field">
-            <label className="key-label">Recovery Code</label>
+            <label className="key-label" style={{ color: 'var(--text-secondary)' }}>Recovery Code</label>
             <div className="recovery-code-section">
               {showRecoveryCode ? (
-                <div className="key-value-container">
-                  <code className="key-value recovery-code">
+                <div className="key-value-container" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+                  <code className="key-value recovery-code" style={{ color: 'var(--text-primary)' }}>
                     {recoveryCode}
                   </code>
                   <button
@@ -262,6 +264,7 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
                     onClick={() =>
                       handleCopyToClipboard(recoveryCode, 'recovery')
                     }
+                    style={{ background: 'var(--primary-cyan)', color: isDarkMode ? '#000' : '#fff' }}
                   >
                     {copiedField === 'recovery' ? '✓ Copied' : 'Copy'}
                   </button>
@@ -270,6 +273,7 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
                 <button
                   className="reveal-button"
                   onClick={() => setShowRecoveryCode(true)}
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                 >
                   👁 Reveal Code
                 </button>
@@ -279,13 +283,14 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
         </div>
 
         {/* Actions Card */}
-        <div className="actions-card">
-          <h3 className="card-title">Key Actions</h3>
+        <div className="actions-card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+          <h3 className="card-title" style={{ color: 'var(--text-primary)' }}>Key Actions</h3>
 
           <div className="actions-grid">
             <button
               className="action-btn primary"
               onClick={() => alert('Recovery file would download: recovery_' + Date.now() + '.json')}
+              style={{ background: 'var(--accent-gradient)', color: isDarkMode ? '#000' : '#fff' }}
             >
               📥 Export Recovery File
             </button>
@@ -294,26 +299,28 @@ export default function SecurityPage({ onNavigate, userData, updateUserData }) {
               className="action-btn disabled"
               disabled
               title="Rotate Key - Sprint 2 feature"
+              style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
             >
               🔄 Rotate Key
-              <span className="disabled-label">Sprint 2</span>
+              <span className="disabled-label" style={{ color: 'var(--disabled-yellow)' }}>Sprint 2</span>
             </button>
 
             <button
               className="action-btn disabled"
               disabled
               title="Revoke Key - Sprint 2 feature"
+              style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
             >
               ✕ Revoke Key
-              <span className="disabled-label">Sprint 2</span>
+              <span className="disabled-label" style={{ color: 'var(--disabled-yellow)' }}>Sprint 2</span>
             </button>
           </div>
         </div>
 
         {/* Security Tips Card */}
-        <div className="security-tips-card">
-          <h3 className="card-title">Security Tips</h3>
-          <ul className="tips-list">
+        <div className="security-tips-card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+          <h3 className="card-title" style={{ color: 'var(--text-primary)' }}>Security Tips</h3>
+          <ul className="tips-list" style={{ color: 'var(--text-secondary)' }}>
             <li>Never share your recovery code with anyone</li>
             <li>Save your recovery file in a secure location</li>
             <li>Clear browser cache if using a shared device</li>

@@ -47,7 +47,7 @@ func NewServer(cfg *config.Config) *Server {
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.BodyLimit("6M")) // Limit body size to 6MB (allow overhead for 5MB file)
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"},
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
 		AllowCredentials: true,
