@@ -177,7 +177,7 @@ func (h *PostHandler) GetFeed(c echo.Context) error {
 	return c.JSON(http.StatusOK, posts)
 }
 
-// GetPublicFeed retrieves public posts for unauthenticated users
+// GetPublicFeed retrieves public posts for unauthenticated users or authenticated users viewing public timeline
 func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 	// Parse pagination parameters
 	limit := 20
@@ -193,7 +193,10 @@ func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 		}
 	}
 
-	posts, err := h.postRepo.GetPublicFeed(c.Request().Context(), limit, offset)
+	// Check if user is authenticated to include liked status
+	userDID, _ := c.Get("did").(string)
+
+	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve public feed",
