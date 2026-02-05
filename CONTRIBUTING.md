@@ -13,17 +13,18 @@ cd splitter
 
 # Copy environment file
 cp .env.example .env
+# Update .env with your Neon PostgreSQL credentials (see NEON_SETUP_GUIDE.md)
 
-# Update .env with your PostgreSQL credentials
+# Run database migration (requires Docker for psql)
+docker run --rm postgres:15 psql \
+  'YOUR_NEON_CONNECTION_STRING' \
+  -f migrations/000_master_schema.sql
 
-# Install dependencies
+# Install backend dependencies
 go mod download
 
-# Run migrations
-psql -U postgres -d splitter -f migrations/001_initial_schema.sql
-
-# Run the application
-make run
+# Run the backend
+go run ./cmd/server
 ```
 
 ### 2. Creating a New Feature
