@@ -185,6 +185,9 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
+		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'repost'), false) as reposted_by_user,
 		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
@@ -218,6 +221,99 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 			&post.UpdatedAt,
 			&post.Username,
 			&post.LikeCount,
+			&post.Liked,
+			&post.RepostCount,
+			&post.Reposted,
+			&mediaID,
+			&mediaURL,
+			&mediaType,
+			&mediaCreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan post: %w", err)
+		}
+		if mediaID != nil {
+			post.Media = []models.Media{{
+				ID:        *mediaID,
+				PostID:    post.ID,
+				MediaURL:  *mediaURL,
+				MediaType: *mediaType,
+				CreatedAt: *mediaCreatedAt,
+			}}
+		}
+		posts = append(posts, &post)
+	}
+
+	return posts, nil
+}
+
+// GetPublicFeed retrieves public posts for unauthenticated users or with optional user context
+func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
+	var query string
+	var args []interface{}
+	
+	if userDID != "" {
+		// Authenticated user - include liked and reposted status
+		query = `
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+			       p.created_at, p.updated_at, u.username,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
+			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'repost'), false) as reposted_by_user,
+			       m.id, m.media_url, m.media_type, m.created_at
+			FROM posts p
+			LEFT JOIN users u ON p.author_did = u.did
+			LEFT JOIN media m ON p.id = m.post_id
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			ORDER BY p.created_at DESC
+			LIMIT $2 OFFSET $3
+		`
+		args = []interface{}{userDID, limit, offset}
+	} else {
+		// Unauthenticated user - liked and reposted are always false
+		query = `
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+			       p.created_at, p.updated_at, u.username,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+			       false as liked_by_user,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
+			       false as reposted_by_user,
+			       m.id, m.media_url, m.media_type, m.created_at
+			FROM posts p
+			LEFT JOIN users u ON p.author_did = u.did
+			LEFT JOIN media m ON p.id = m.post_id
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			ORDER BY p.created_at DESC
+			LIMIT $1 OFFSET $2
+		`
+		args = []interface{}{limit, offset}
+	}
+
+	rows, err := db.GetDB().Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public feed: %w", err)
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		var post models.Post
+		var mediaID, mediaURL, mediaType *string
+		var mediaCreatedAt *time.Time
+
+		if err := rows.Scan(
+			&post.ID,
+			&post.AuthorDID,
+			&post.Content,
+			&post.Visibility,
+			&post.IsRemote,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&post.Username,
+			&post.LikeCount,
+			&post.Liked,
+			&post.RepostCount,
+			&post.Reposted,
 			&mediaID,
 			&mediaURL,
 			&mediaType,
@@ -242,61 +338,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 
 // GetPublicFeed retrieves public posts for unauthenticated users
 func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) ([]*models.Post, error) {
-	query := `
-		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
-		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
-		       m.id, m.media_url, m.media_type, m.created_at
-		FROM posts p
-		LEFT JOIN users u ON p.author_did = u.did
-		LEFT JOIN media m ON p.id = m.post_id
-		WHERE p.visibility = 'public' AND p.deleted_at IS NULL
-		ORDER BY p.created_at DESC
-		LIMIT $1 OFFSET $2
-	`
-
-	rows, err := db.GetDB().Query(ctx, query, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get public feed: %w", err)
-	}
-	defer rows.Close()
-
-	var posts []*models.Post
-	for rows.Next() {
-		var post models.Post
-		var mediaID, mediaURL, mediaType *string
-		var mediaCreatedAt *time.Time
-
-		if err := rows.Scan(
-			&post.ID,
-			&post.AuthorDID,
-			&post.Content,
-			&post.Visibility,
-			&post.IsRemote,
-			&post.CreatedAt,
-			&post.UpdatedAt,
-			&post.Username,
-			&post.LikeCount,
-			&mediaID,
-			&mediaURL,
-			&mediaType,
-			&mediaCreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan post: %w", err)
-		}
-		if mediaID != nil {
-			post.Media = []models.Media{{
-				ID:        *mediaID,
-				PostID:    post.ID,
-				MediaURL:  *mediaURL,
-				MediaType: *mediaType,
-				CreatedAt: *mediaCreatedAt,
-			}}
-		}
-		posts = append(posts, &post)
-	}
-
-	return posts, nil
+	return r.GetPublicFeedWithUser(ctx, "", limit, offset)
 }
 
 // Update updates a post's content
