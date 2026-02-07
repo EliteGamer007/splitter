@@ -7,6 +7,7 @@ import (
 	"splitter/internal/repository"
 	"splitter/internal/service"
 
+	govalidator "github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
@@ -20,6 +21,7 @@ type Server struct {
 // NewServer creates a new server instance
 func NewServer(cfg *config.Config) *Server {
 	e := echo.New()
+	e.Validator = &CustomValidator{validator: govalidator.New()}
 
 	// Initialize services
 	// Use current working directory + uploads for local storage
@@ -110,6 +112,7 @@ func setupRoutes(
 
 	// Post routes
 	posts := api.Group("/posts")
+	posts.Use(middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 	posts.GET("/:id", postHandler.GetPost)            // Public - view any post
 	posts.GET("/user/:did", postHandler.GetUserPosts) // Public - view user's posts by DID
 	posts.GET("/public", postHandler.GetPublicFeed)   // Public - get public feed
@@ -121,6 +124,8 @@ func setupRoutes(
 	postsAuth.GET("/feed", postHandler.GetFeed)
 	postsAuth.PUT("/:id", postHandler.UpdatePost)
 	postsAuth.DELETE("/:id", postHandler.DeletePost)
+	// Replies (Authenticated)
+	postsAuth.POST("/:id/replies", replyHandler.CreateReply)
 
 	// Follow routes (require authentication)
 	followAuth := api.Group("/users")
@@ -148,7 +153,6 @@ func setupRoutes(
 
 	// Replies
 	posts.GET("/:id/replies", replyHandler.GetReplies)
-	posts.POST("/:id/replies", replyHandler.CreateReply)
 
 	// Search users (authenticated)
 	usersAuth.GET("/search", adminHandler.SearchUsers)
