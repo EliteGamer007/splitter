@@ -99,8 +99,8 @@ func OptionalAuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 
 			if err == nil {
 				if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-					// Set DID (subject) in context
-					if did, ok := claims["sub"].(string); ok {
+					// Set DID in context
+					if did, ok := claims["did"].(string); ok {
 						c.Set("did", did)
 					}
 					if username, ok := claims["username"].(string); ok {
