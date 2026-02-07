@@ -167,6 +167,7 @@ func setupRoutes(
 	admin.GET("/moderation-requests", adminHandler.GetModerationRequests)
 	admin.POST("/moderation-requests/:id/approve", adminHandler.ApproveModerationRequest)
 	admin.POST("/moderation-requests/:id/reject", adminHandler.RejectModerationRequest)
+	admin.GET("/moderation-queue", adminHandler.GetModerationQueue) // Stub for Sprint 2+
 	admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
 	admin.POST("/users/:id/suspend", adminHandler.SuspendUser)
 	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)
