@@ -257,7 +257,11 @@ func (h *PostHandler) DeletePost(c echo.Context) error {
 		})
 	}
 
-	if err := h.postRepo.Delete(c.Request().Context(), postID, did); err != nil {
+	// Check if user is admin or moderator - they can delete any post
+	role, _ := c.Get("role").(string)
+	isAdmin := role == "admin" || role == "moderator"
+
+	if err := h.postRepo.Delete(c.Request().Context(), postID, did, isAdmin); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete post",
 		})

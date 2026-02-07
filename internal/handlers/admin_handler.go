@@ -349,9 +349,17 @@ func (h *AdminHandler) GetAdminActions(c echo.Context) error {
 	}
 
 	query := `
-		SELECT id, admin_id, action_type, target, reason, created_at
-		FROM admin_actions
-		ORDER BY created_at DESC
+		SELECT 
+			a.id, 
+			a.admin_id, 
+			a.action_type, 
+			a.target, 
+			a.reason, 
+			a.created_at,
+			u.username as target_username
+		FROM admin_actions a
+		LEFT JOIN users u ON a.target = u.id::text
+		ORDER BY a.created_at DESC
 		LIMIT $1 OFFSET $2
 	`
 
@@ -366,11 +374,14 @@ func (h *AdminHandler) GetAdminActions(c echo.Context) error {
 	var actions []AdminAction
 	for rows.Next() {
 		var action AdminAction
-		var target, reason *string
-		if err := rows.Scan(&action.ID, &action.AdminID, &action.ActionType, &target, &reason, &action.CreatedAt); err != nil {
+		var target, reason, targetUsername *string
+		if err := rows.Scan(&action.ID, &action.AdminID, &action.ActionType, &target, &reason, &action.CreatedAt, &targetUsername); err != nil {
 			continue
 		}
-		if target != nil {
+		// Use username if available, otherwise fall back to UUID
+		if targetUsername != nil && *targetUsername != "" {
+			action.Target = "@" + *targetUsername
+		} else if target != nil {
 			action.Target = *target
 		}
 		if reason != nil {
@@ -417,5 +428,20 @@ func (h *AdminHandler) GetSuspendedUsers(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"users": users,
+	})
+}
+
+// GetModerationQueue returns content moderation queue (stub/placeholder for Sprint 2+)
+// TODO: Implement actual content moderation queue with reports, flagged content, etc.
+func (h *AdminHandler) GetModerationQueue(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	// Placeholder response - content moderation queue not yet implemented
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"items": []interface{}{},
+		"total": 0,
+		"note":  "Content moderation queue is a placeholder feature for Sprint 2+",
 	})
 }

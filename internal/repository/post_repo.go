@@ -380,16 +380,29 @@ func (r *PostRepository) Update(ctx context.Context, postID, authorDID string, u
 }
 
 // Delete soft-deletes a post
-func (r *PostRepository) Delete(ctx context.Context, postID, authorDID string) error {
-	query := `UPDATE posts SET deleted_at = NOW() WHERE id = $1 AND author_did = $2 AND deleted_at IS NULL`
+func (r *PostRepository) Delete(ctx context.Context, postID, authorDID string, isAdmin bool) error {
+	var query string
 
-	result, err := db.GetDB().Exec(ctx, query, postID, authorDID)
-	if err != nil {
-		return fmt.Errorf("failed to delete post: %w", err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return fmt.Errorf("post not found or unauthorized")
+	if isAdmin {
+		// Admins can delete any post
+		query = `UPDATE posts SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+		result, err := db.GetDB().Exec(ctx, query, postID)
+		if err != nil {
+			return fmt.Errorf("failed to delete post: %w", err)
+		}
+		if result.RowsAffected() == 0 {
+			return fmt.Errorf("post not found")
+		}
+	} else {
+		// Regular users can only delete their own posts
+		query = `UPDATE posts SET deleted_at = NOW() WHERE id = $1 AND author_did = $2 AND deleted_at IS NULL`
+		result, err := db.GetDB().Exec(ctx, query, postID, authorDID)
+		if err != nil {
+			return fmt.Errorf("failed to delete post: %w", err)
+		}
+		if result.RowsAffected() == 0 {
+			return fmt.Errorf("post not found or unauthorized")
+		}
 	}
 
 	return nil
