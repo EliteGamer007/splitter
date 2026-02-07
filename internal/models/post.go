@@ -6,19 +6,21 @@ import (
 
 // Post represents a post/content created by a user
 type Post struct {
-	ID          string     `json:"id"`
-	AuthorDID   string     `json:"author_did"`
-	Username    string     `json:"username,omitempty"`
-	Content     string     `json:"content"`
-	Visibility  string     `json:"visibility,omitempty"`
-	IsRemote    bool       `json:"is_remote"`
-	LikeCount   int        `json:"like_count"`
-	Liked       bool       `json:"liked"` // Whether current user has liked this post
-	RepostCount int        `json:"repost_count"`
-	Reposted    bool       `json:"reposted"`        // Whether current user has reposted this post
-	Media       []Media    `json:"media,omitempty"` // Attached media
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
+	ID               string     `json:"id"`
+	AuthorDID        string     `json:"author_did"`
+	Username         string     `json:"username,omitempty"`
+	Content          string     `json:"content"`
+	Visibility       string     `json:"visibility,omitempty"`
+	IsRemote         bool       `json:"is_remote"`
+	LikeCount        int        `json:"like_count"`
+	Liked            bool       `json:"liked"` // Whether current user has liked this post
+	RepostCount      int        `json:"repost_count"`
+	Reposted         bool       `json:"reposted"` // Whether current user has reposted this post
+	DirectReplyCount int        `json:"direct_reply_count"`
+	TotalReplyCount  int        `json:"total_reply_count"`
+	Media            []Media    `json:"media,omitempty"` // Attached media
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        *time.Time `json:"updated_at,omitempty"`
 }
 
 // Media represents a media attachment
