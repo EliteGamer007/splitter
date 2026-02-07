@@ -41,6 +41,7 @@ func NewServer(cfg *config.Config) *Server {
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo)
+	replyHandler := handlers.NewReplyHandler()
 
 	// Global middleware
 	e.Use(echomiddleware.Logger())
@@ -57,7 +58,7 @@ func NewServer(cfg *config.Config) *Server {
 	e.Static("/uploads", "uploads")
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler)
 
 	return &Server{
 		echo: e,
@@ -76,6 +77,7 @@ func setupRoutes(
 	interactionHandler *handlers.InteractionHandler,
 	adminHandler *handlers.AdminHandler,
 	messageHandler *handlers.MessageHandler,
+	replyHandler *handlers.ReplyHandler,
 ) {
 	// API v1 group
 	api := e.Group("/api/v1")
@@ -143,6 +145,10 @@ func setupRoutes(
 
 	// Bookmarks
 	usersAuth.GET("/me/bookmarks", interactionHandler.GetBookmarks)
+
+	// Replies
+	posts.GET("/:id/replies", replyHandler.GetReplies)
+	posts.POST("/:id/replies", replyHandler.CreateReply)
 
 	// Search users (authenticated)
 	usersAuth.GET("/search", adminHandler.SearchUsers)
