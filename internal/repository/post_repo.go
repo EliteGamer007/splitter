@@ -91,6 +91,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
@@ -112,6 +113,8 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		&post.UpdatedAt,
 		&post.Username,
 		&post.LikeCount,
+		&post.DirectReplyCount,
+		&post.TotalReplyCount,
 		&mediaID,
 		&mediaURL,
 		&mediaType,
@@ -143,7 +146,8 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
 		       p.created_at, p.updated_at, u.username,
-		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       p.direct_reply_count, p.total_reply_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
 		WHERE p.author_did = $1 AND p.deleted_at IS NULL
@@ -170,6 +174,8 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 			&post.UpdatedAt,
 			&post.Username,
 			&post.LikeCount,
+			&post.DirectReplyCount,
+			&post.TotalReplyCount,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan post: %w", err)
 		}
@@ -188,6 +194,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
 		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'repost'), false) as reposted_by_user,
+		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
@@ -224,6 +231,8 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 			&post.Liked,
 			&post.RepostCount,
 			&post.Reposted,
+			&post.DirectReplyCount,
+			&post.TotalReplyCount,
 			&mediaID,
 			&mediaURL,
 			&mediaType,
@@ -260,6 +269,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'repost'), false) as reposted_by_user,
+			       p.direct_reply_count, p.total_reply_count,
 			       m.id, m.media_url, m.media_type, m.created_at
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
@@ -278,6 +288,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			       false as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
 			       false as reposted_by_user,
+			       p.direct_reply_count, p.total_reply_count,
 			       m.id, m.media_url, m.media_type, m.created_at
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
@@ -314,6 +325,8 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			&post.Liked,
 			&post.RepostCount,
 			&post.Reposted,
+			&post.DirectReplyCount,
+			&post.TotalReplyCount,
 			&mediaID,
 			&mediaURL,
 			&mediaType,
@@ -350,7 +363,7 @@ func (r *PostRepository) Update(ctx context.Context, postID, authorDID string, u
 			visibility = COALESCE($2, visibility),
 			updated_at = NOW()
 		WHERE id = $3 AND author_did = $4 AND deleted_at IS NULL
-		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at
+		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at, direct_reply_count, total_reply_count
 	`
 
 	var post models.Post
@@ -367,6 +380,8 @@ func (r *PostRepository) Update(ctx context.Context, postID, authorDID string, u
 		&post.IsRemote,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&post.DirectReplyCount,
+		&post.TotalReplyCount,
 	)
 
 	if err == pgx.ErrNoRows {

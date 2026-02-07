@@ -6,7 +6,6 @@ import (
 	"splitter/internal/models"
 	"splitter/internal/repository"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -24,9 +23,12 @@ func NewReplyHandler() *ReplyHandler {
 
 // CreateReply handles the creation of a new reply
 func (h *ReplyHandler) CreateReply(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	claims := user.Claims.(jwt.MapClaims)
-	authorDID := claims["did"].(string)
+	authorDID, ok := c.Get("did").(string)
+	if !ok || authorDID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
+	}
 
 	var req models.ReplyCreate
 	if err := c.Bind(&req); err != nil {
@@ -80,11 +82,8 @@ func (h *ReplyHandler) GetReplies(c echo.Context) error {
 
 	// Get optional user context for liked status
 	var userDID string
-	user := c.Get("user")
-	if user != nil {
-		token := user.(*jwt.Token)
-		claims := token.Claims.(jwt.MapClaims)
-		userDID = claims["did"].(string)
+	if did, ok := c.Get("did").(string); ok {
+		userDID = did
 	}
 
 	replies, err := h.Repo.GetByPostID(c.Request().Context(), postID, userDID)
