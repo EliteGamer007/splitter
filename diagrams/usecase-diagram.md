@@ -6,10 +6,10 @@ This diagram shows all the use cases in the Splitter federated social media plat
 flowchart LR
     subgraph Actors ["Actors"]
         direction TB
-        U["<<Human>> Local User"]
-        RI["<<System>> Remote Instance"]
-        A["<<Human>> Instance Admin"]
-        SE["Security Engineer"]
+        U["(Human) Local User"]
+        RI["(System) Remote Instance"]
+        A["(Human) Instance Admin"]
+        SE["(Human) Security Engineer"]
     end
 
     subgraph Splitter ["Splitter Platform"]
