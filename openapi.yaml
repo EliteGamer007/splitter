@@ -1,0 +1,1004 @@
+openapi: 3.0.0
+info:
+  title: Splitter API
+  description: API documentation for the Splitter decentralized social media platform.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Development Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        did:
+          type: string
+        display_name:
+          type: string
+        bio:
+          type: string
+        avatar_url:
+          type: string
+        role:
+          type: string
+          enum: [user, moderator, admin]
+        created_at:
+          type: string
+          format: date-time
+    
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author_did:
+          type: string
+        content:
+          type: string
+        visibility:
+          type: string
+          enum: [public, followers, private]
+        media_url:
+          type: string
+        media_type:
+          type: string
+        like_count:
+          type: integer
+        repost_count:
+          type: integer
+        reply_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    
+    Reply:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        post_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+        author_did:
+          type: string
+        content:
+          type: string
+        depth:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        recipient_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Authentication
+  /auth/register:
+    post:
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                display_name:
+                  type: string
+                bio:
+                  type: string
+      responses:
+        '201':
+          description: User created
+        '400':
+          description: Invalid input
+        '409':
+          description: Username or email already exists
+
+  /auth/login:
+    post:
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: specific JWT token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+
+  /auth/challenge:
+    post:
+      summary: Get DID auth challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did]
+              properties:
+                did:
+                  type: string
+      responses:
+        '200':
+          description: Challenge nonce returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                  expires_at:
+                    type: integer
+
+  /auth/verify:
+    post:
+      summary: Verify DID challenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did, challenge, signature]
+              properties:
+                did:
+                  type: string
+                challenge:
+                  type: string
+                signature:
+                  type: string
+      responses:
+        '200':
+          description: Auth successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  # Users
+  /users/me:
+    get:
+      summary: Get current authenticated user
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      summary: Update user profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                bio:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    delete:
+      summary: Delete account
+      responses:
+        '200':
+          description: Account deleted
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      security: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: User UUID
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+
+  /users/did:
+    get:
+      summary: Get user by DID
+      security: []
+      parameters:
+        - in: query
+          name: did
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/search:
+    get:
+      summary: Search users
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /users/me/request-moderation:
+    post:
+      summary: Request moderation privileges
+      responses:
+        '200':
+          description: Request submitted
+
+  # Posts
+  /posts:
+    post:
+      summary: Create a new post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [public, followers, private]
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+  /posts/{id}:
+    get:
+      summary: Get post by ID
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+    put:
+      summary: Update post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                visibility:
+                  type: string
+      responses:
+        '200':
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+    delete:
+      summary: Delete post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post deleted
+
+  /posts/user/{did}:
+    get:
+      summary: Get posts by user DID
+      security: []
+      parameters:
+        - in: path
+          name: did
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /posts/feed:
+    get:
+      summary: Get user feed
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Feed posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /posts/public:
+    get:
+      summary: Get public feed
+      security: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Public posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  # Replies
+  /posts/{id}/replies:
+    get:
+      summary: Get replies for a post
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of replies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reply'
+    post:
+      summary: Create a reply
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id, content]
+              properties:
+                post_id:
+                  type: string
+                parent_id:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Reply created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reply'
+
+  # Follows
+  /users/{id}/follow:
+    post:
+      summary: Follow a user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Followed successfully
+    delete:
+      summary: Unfollow a user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Unfollowed successfully
+
+  /users/{id}/followers:
+    get:
+      summary: Get followers
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of followers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+  /users/{id}/following:
+    get:
+      summary: Get following
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of following
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+  /users/{id}/stats:
+    get:
+      summary: Get follow stats
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  followers:
+                    type: integer
+                  following:
+                    type: integer
+
+  # Interactions
+  /posts/{id}/like:
+    post:
+      summary: Like a post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liked successfully
+    delete:
+      summary: Unlike a post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Unliked successfully
+
+  /posts/{id}/repost:
+    post:
+      summary: Repost a post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reposted successfully
+    delete:
+      summary: Remove repost
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Repost removed successfully
+
+  /posts/{id}/bookmark:
+    post:
+      summary: Bookmark a post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bookmarked successfully
+    delete:
+      summary: Remove bookmark
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bookmark removed successfully
+
+  /users/me/bookmarks:
+    get:
+      summary: Get my bookmarks
+      responses:
+        '200':
+          description: List of bookmarked posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  # Messages
+  /messages/threads:
+    get:
+      summary: Get message threads
+      responses:
+        '200':
+          description: List of threads
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  threads:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        participant_a:
+                          type: string
+                        participant_b:
+                          type: string
+
+  /messages/threads/{threadId}:
+    get:
+      summary: Get messages in a thread
+      parameters:
+        - in: path
+          name: threadId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+
+  /messages/conversation/{userId}:
+    post:
+      summary: Start conversation
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation started/retrieved
+
+  /messages/send:
+    post:
+      summary: Send a message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient_id, content]
+              properties:
+                recipient_id:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Message sent
+
+  /messages/threads/{threadId}/read:
+    post:
+      summary: Mark thread as read
+      parameters:
+        - in: path
+          name: threadId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Marked as read
+
+  # Admin
+  /admin/users:
+    get:
+      summary: Get all users (Admin)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /admin/users/suspended:
+    get:
+      summary: Get suspended users
+      responses:
+        '200':
+          description: List of suspended users
+
+  /admin/users/{id}/suspend:
+    post:
+      summary: Suspend user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: User suspended
+
+  /admin/users/{id}/unsuspend:
+    post:
+      summary: Unsuspend user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User unsuspended
+
+  /admin/users/{id}/role:
+    put:
+      summary: Update user role
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [user, moderator, admin]
+      responses:
+        '200':
+          description: Role updated
+
+  /admin/moderation-requests:
+    get:
+      summary: Get pending moderation requests
+      responses:
+        '200':
+          description: List of requests
+
+  /admin/moderation-requests/{id}/approve:
+    post:
+      summary: Approve moderation request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Approved
+
+  /admin/moderation-requests/{id}/reject:
+    post:
+      summary: Reject moderation request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rejected
+
+  /admin/actions:
+    get:
+      summary: Get admin audit log
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of actions
+
+  # System
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
