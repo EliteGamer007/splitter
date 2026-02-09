@@ -263,6 +263,9 @@ docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
 
 | Document | Description |
 |----------|-------------|
+| [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Complete database schema reference |
+| [CODING_STANDARDS.md](CODING_STANDARDS.md) | Code style and conventions guide |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
 | [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) | Complete cloud database setup |
 | [API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md) | Full API reference with examples |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
