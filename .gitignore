@@ -72,3 +72,7 @@ temp/
 
 # Local uploads
 uploads/
+
+# Test output / logs
+*_test_output*.txt
+*.log
