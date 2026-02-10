@@ -2,7 +2,7 @@
 
 This activity diagram shows the complete user journey and system workflows in the Splitter federated social media platform, from initial signup through all major features including posting, federation, messaging, and moderation.
 
-```mermaid
+```
 flowchart TD
 
   %% ENTRY / ONBOARDING
