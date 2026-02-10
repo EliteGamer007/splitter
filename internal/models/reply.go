@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -23,7 +24,21 @@ type Reply struct {
 
 // ReplyCreate represents the data needed to create a new reply
 type ReplyCreate struct {
-	PostID   string  `json:"post_id" validate:"required"`
-	ParentID *string `json:"parent_id,omitempty"`
-	Content  string  `json:"content" validate:"required,max=500"`
+	PostID   string  `json:"post_id" form:"post_id" validate:"required"`
+	ParentID *string `json:"parent_id,omitempty" form:"parent_id"`
+	Content  string  `json:"content" form:"content" validate:"required,max=500"`
+}
+
+// Validate checks if the ReplyCreate struct is valid
+func (r *ReplyCreate) Validate() error {
+	if r.PostID == "" {
+		return fmt.Errorf("post_id is required")
+	}
+	if len(r.Content) == 0 {
+		return fmt.Errorf("content cannot be empty")
+	}
+	if len(r.Content) > 500 {
+		return fmt.Errorf("content too long (max 500 characters)")
+	}
+	return nil
 }

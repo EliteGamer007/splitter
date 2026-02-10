@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -36,6 +37,20 @@ type Media struct {
 type PostCreate struct {
 	Content    string `json:"content" validate:"required,max=500"`
 	Visibility string `json:"visibility,omitempty"` // defaults to "public"
+}
+
+// Validate checks if the PostCreate struct is valid
+func (p *PostCreate) Validate(hasMedia bool) error {
+	if len(p.Content) > 500 {
+		return fmt.Errorf("content too long (max 500 characters)")
+	}
+	if p.Content == "" && !hasMedia {
+		return fmt.Errorf("either content or media is required")
+	}
+	if p.Visibility != "" && p.Visibility != "public" && p.Visibility != "followers" && p.Visibility != "private" {
+		return fmt.Errorf("invalid visibility setting")
+	}
+	return nil
 }
 
 // PostUpdate represents the data that can be updated for a post

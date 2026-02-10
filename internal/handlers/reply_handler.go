@@ -35,7 +35,13 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 	}
 
-	if err := c.Validate(&req); err != nil {
+	// Get post ID from URL and override/set in request
+	postID := c.Param("id")
+	if postID != "" {
+		req.PostID = postID
+	}
+
+	if err := req.Validate(); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 

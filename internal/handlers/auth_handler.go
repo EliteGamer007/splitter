@@ -3,18 +3,16 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	"splitter/internal/auth"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // AuthHandler handles authentication-related requests
@@ -48,17 +46,10 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		})
 	}
 
-	// Validate required fields
-	if req.Username == "" || req.Email == "" || req.Password == "" {
+	// Validate using model method
+	if err := req.Validate(); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Username, email, and password are required",
-		})
-	}
-
-	// Check password length
-	if len(req.Password) < 8 {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Password must be at least 8 characters",
+			"error": err.Error(),
 		})
 	}
 
@@ -91,7 +82,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Hash password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	passwordHash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to hash password",
@@ -100,7 +91,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 
 	// Auto-generate DID if not provided (optional for basic users)
 	if req.DID == "" {
-		req.DID = generateSimpleDID(req.Username)
+		req.DID = auth.GenerateSimpleDID(req.Username)
 	}
 
 	// Set display name to username if not provided
@@ -109,7 +100,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Create user
-	user, err := h.userRepo.Create(c.Request().Context(), &req, string(passwordHash))
+	user, err := h.userRepo.Create(c.Request().Context(), &req, passwordHash)
 	if err != nil {
 		log.Printf("Create User DB error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -118,7 +109,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Generate JWT token
-	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -163,14 +154,14 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+	if !auth.CheckPasswordHash(req.Password, passwordHash) {
 		return c.JSON(http.StatusUnauthorized, map[string]string{
 			"error": "Invalid username or password",
 		})
 	}
 
 	// Generate JWT token
-	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -277,7 +268,7 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 	h.mu.Unlock()
 
 	// Generate JWT token
-	token, err := h.generateToken(user.ID, user.DID, user.Username, user.Role)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -288,31 +279,6 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 		"user":  user,
 		"token": token,
 	})
-}
-
-// generateToken generates a JWT token
-func (h *AuthHandler) generateToken(userID, did, username, role string) (string, error) {
-	if role == "" {
-		role = "user"
-	}
-	claims := jwt.MapClaims{
-		"sub":      userID,
-		"did":      did,
-		"username": username,
-		"role":     role,
-		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 days
-		"iat":      time.Now().Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(h.jwtSecret))
-}
-
-// generateSimpleDID creates a simple DID from username
-func generateSimpleDID(username string) string {
-	randBytes := make([]byte, 8)
-	rand.Read(randBytes)
-	return fmt.Sprintf("did:splitter:%s-%x", username, randBytes)
 }
 
 // cleanupExpiredChallenges removes expired challenges periodically

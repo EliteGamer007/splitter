@@ -193,3 +193,8 @@ func (s *Server) Start(address string) error {
 func (s *Server) Shutdown() error {
 	return s.echo.Close()
 }
+
+// Echo returns the underlying Echo instance (for testing)
+func (s *Server) Echo() *echo.Echo {
+	return s.echo
+}

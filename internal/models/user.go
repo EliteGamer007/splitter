@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -74,6 +76,21 @@ type UserCreate struct {
 	PublicKey      string `json:"public_key"`
 	Bio            string `json:"bio,omitempty"`
 	AvatarURL      string `json:"avatar_url,omitempty"`
+}
+
+// Validate checks if the UserCreate struct is valid
+func (u *UserCreate) Validate() error {
+	if len(u.Username) < 3 || len(u.Username) > 50 {
+		return fmt.Errorf("username must be between 3 and 50 characters")
+	}
+	// Basic email regex (can be improved)
+	if !strings.Contains(u.Email, "@") || !strings.Contains(u.Email, ".") {
+		return fmt.Errorf("invalid email format")
+	}
+	if len(u.Password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	return nil
 }
 
 // LoginRequest represents a login request with username/email and password
