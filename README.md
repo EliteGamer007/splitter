@@ -2,6 +2,24 @@
 
 A federated social media application with **password-based** and **DID (Decentralized Identity)** authentication, built with Go, Echo framework, and PostgreSQL (Neon Cloud).
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [API Endpoints](#api-endpoints)
+- [API Examples](#api-examples)
+- [Database](#database)
+- [Security Features](#security-features)
+- [Development](#development)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ## Overview
 
 Splitter supports two authentication methods:
@@ -264,13 +282,13 @@ docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
 | Document | Description |
 |----------|-------------|
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Complete database schema reference |
+| [API_ENDPOINTS.md](API_ENDPOINTS.md) | Full API reference with examples |
 | [CODING_STANDARDS.md](CODING_STANDARDS.md) | Code style and conventions guide |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
 | [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) | Complete cloud database setup |
-| [API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md) | Full API reference with examples |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [diagrams/architecture-diagram.md](diagrams/architecture-diagram.md) | System architecture diagram |
 | [SPRINT_1_STATUS.md](SPRINT_1_STATUS.md) | Sprint 1 completion details |
-| [SPRINT_2_STATUS.md](SPRINT_2_STATUS.md) | Sprint 2 progress tracking |
 
 ## Contributing
 
