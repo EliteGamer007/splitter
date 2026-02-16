@@ -39,6 +39,8 @@ type Message struct {
 	IsRead      bool       `json:"is_read"`
 	CreatedAt   time.Time  `json:"created_at"`
 	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
+	DeletedAt   *time.Time `json:"deleted_at,omitempty"` // WhatsApp-style soft delete
+	EditedAt    *time.Time `json:"edited_at,omitempty"`  // Message edit timestamp
 }
 
 // MessageThread represents a conversation between two users

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"splitter/internal/db"
 	"splitter/internal/models"
@@ -101,7 +102,7 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 // GetThreadMessages gets all messages in a thread
 func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID string, limit, offset int) ([]*models.Message, error) {
 	query := `
-		SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at
+		SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at, deleted_at, edited_at
 		FROM messages
 		WHERE thread_id = $1
 		ORDER BY created_at ASC
@@ -126,6 +127,8 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 			&msg.Ciphertext,
 			&msg.IsRead,
 			&msg.CreatedAt,
+			&msg.DeletedAt,
+			&msg.EditedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
@@ -183,9 +186,9 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 
 		// Get last message
 		lastMsgQuery := `
-			SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at
+			SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at, deleted_at, edited_at
 			FROM messages
-			WHERE thread_id = $1
+			WHERE thread_id = $1 AND deleted_at IS NULL
 			ORDER BY created_at DESC
 			LIMIT 1
 		`
@@ -199,6 +202,8 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 			&lastMsg.Ciphertext,
 			&lastMsg.IsRead,
 			&lastMsg.CreatedAt,
+			&lastMsg.DeletedAt,
+			&lastMsg.EditedAt,
 		)
 		if err == nil {
 			thread.LastMessage = &lastMsg
@@ -208,6 +213,92 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 	}
 
 	return threads, nil
+}
+
+// DeleteMessage soft-deletes a message (WhatsApp-style)
+// Only allows deletion within 3 hours of sending
+func (r *MessageRepository) DeleteMessage(ctx context.Context, messageID, userID string) error {
+	// Check if message exists, user owns it, and it's within 3 hour window
+	var senderID string
+	var createdAt time.Time
+	var alreadyDeleted bool
+
+	checkQuery := `
+		SELECT sender_id, created_at, deleted_at IS NOT NULL
+		FROM messages
+		WHERE id = $1
+	`
+	err := db.GetDB().QueryRow(ctx, checkQuery, messageID).Scan(&senderID, &createdAt, &alreadyDeleted)
+	if err != nil {
+		return fmt.Errorf("message not found: %w", err)
+	}
+
+	if senderID != userID {
+		return fmt.Errorf("unauthorized: you can only delete your own messages")
+	}
+
+	if alreadyDeleted {
+		return fmt.Errorf("message already deleted")
+	}
+
+	// Check 3-hour window
+	if time.Since(createdAt) > 3*time.Hour {
+		return fmt.Errorf("cannot delete messages older than 3 hours")
+	}
+
+	// Soft delete by setting deleted_at timestamp
+	deleteQuery := `UPDATE messages SET deleted_at = NOW() WHERE id = $1`
+	_, err = db.GetDB().Exec(ctx, deleteQuery, messageID)
+	if err != nil {
+		return fmt.Errorf("failed to delete message: %w", err)
+	}
+
+	return nil
+}
+
+// EditMessage updates message content (encrypted or plain)
+// Only allows editing within 3 hours of sending
+func (r *MessageRepository) EditMessage(ctx context.Context, messageID, userID, newContent, newCiphertext string) error {
+	// Check if message exists, user owns it, and it's within 3 hour window
+	var senderID string
+	var createdAt time.Time
+	var deletedAt *time.Time
+
+	checkQuery := `
+		SELECT sender_id, created_at, deleted_at
+		FROM messages
+		WHERE id = $1
+	`
+	err := db.GetDB().QueryRow(ctx, checkQuery, messageID).Scan(&senderID, &createdAt, &deletedAt)
+	if err != nil {
+		return fmt.Errorf("message not found: %w", err)
+	}
+
+	if senderID != userID {
+		return fmt.Errorf("unauthorized: you can only edit your own messages")
+	}
+
+	if deletedAt != nil {
+		return fmt.Errorf("cannot edit deleted message")
+	}
+
+	// Check 3-hour window
+	if time.Since(createdAt) > 3*time.Hour {
+		return fmt.Errorf("cannot edit messages older than 3 hours")
+	}
+
+	// Update message content and set edited_at timestamp
+	updateQuery := `
+		UPDATE messages 
+		SET content = $1, ciphertext = $2, edited_at = NOW() 
+		WHERE id = $3
+	`
+	_, err = db.GetDB().Exec(ctx, updateQuery, newContent, newCiphertext, messageID)
+	if err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	return nil
 }
 
 // MarkMessagesAsRead marks all messages in a thread as read for a user

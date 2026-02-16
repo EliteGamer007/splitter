@@ -220,3 +220,47 @@ func (h *MessageHandler) MarkAsRead(c echo.Context) error {
 		"message": "Messages marked as read",
 	})
 }
+// DeleteMessage soft-deletes a message (WhatsApp-style)
+func (h *MessageHandler) DeleteMessage(c echo.Context) error {
+	userID := c.Get("user_id").(string)
+	messageID := c.Param("messageId")
+
+	err := h.msgRepo.DeleteMessage(c.Request().Context(), messageID, userID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Message deleted",
+	})
+}
+
+// EditMessage edits a message
+func (h *MessageHandler) EditMessage(c echo.Context) error {
+	userID := c.Get("user_id").(string)
+	messageID := c.Param("messageId")
+
+	var req struct {
+		Content    string `json:"content"`
+		Ciphertext string `json:"ciphertext"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	err := h.msgRepo.EditMessage(c.Request().Context(), messageID, userID, req.Content, req.Ciphertext)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Message edited",
+	})
+}

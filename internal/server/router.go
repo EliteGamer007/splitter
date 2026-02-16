@@ -165,6 +165,8 @@ func setupRoutes(
 	messagesAuth.POST("/send", messageHandler.SendMessage)
 	messagesAuth.POST("/conversation/:userId", messageHandler.StartConversation)
 	messagesAuth.POST("/threads/:threadId/read", messageHandler.MarkAsRead)
+	messagesAuth.DELETE("/:messageId", messageHandler.DeleteMessage) // Delete message (3-hour window)
+	messagesAuth.PUT("/:messageId", messageHandler.EditMessage)      // Edit message (3-hour window)
 
 	// Moderation request (authenticated users)
 	usersAuth.POST("/me/request-moderation", adminHandler.RequestModeration)
