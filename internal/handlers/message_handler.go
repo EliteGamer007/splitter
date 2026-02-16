@@ -104,6 +104,7 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	var req struct {
 		RecipientID string `json:"recipient_id"`
 		Content     string `json:"content"`
+		Ciphertext  string `json:"ciphertext"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -112,9 +113,9 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		})
 	}
 
-	if req.RecipientID == "" || req.Content == "" {
+	if req.RecipientID == "" || (req.Content == "" && req.Ciphertext == "") {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Recipient ID and content are required",
+			"error": "Recipient ID and message content (or ciphertext) are required",
 		})
 	}
 
@@ -141,7 +142,7 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	}
 
 	// Send message
-	msg, err := h.msgRepo.SendMessage(c.Request().Context(), thread.ID, userID, req.RecipientID, req.Content)
+	msg, err := h.msgRepo.SendMessage(c.Request().Context(), thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to send message: " + err.Error(),

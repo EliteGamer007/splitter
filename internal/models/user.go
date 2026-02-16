@@ -17,8 +17,9 @@ type User struct {
 	DisplayName           string     `json:"display_name"`
 	Bio                   string     `json:"bio,omitempty"`
 	AvatarURL             string     `json:"avatar_url,omitempty"`
-	PublicKey             string     `json:"public_key"` // Base64 encoded public key
-	Role                  string     `json:"role"`       // user, moderator, admin
+	PublicKey             string     `json:"public_key"`            // Base64 encoded signing public key
+	EncryptionPublicKey   string     `json:"encryption_public_key"` // Base64 encoded encryption public key
+	Role                  string     `json:"role"`                  // user, moderator, admin
 	ModerationRequested   bool       `json:"moderation_requested"`
 	ModerationRequestedAt *time.Time `json:"moderation_requested_at,omitempty"`
 	IsLocked              bool       `json:"is_locked"`
@@ -34,6 +35,7 @@ type Message struct {
 	SenderID    string     `json:"sender_id"`
 	RecipientID string     `json:"recipient_id"`
 	Content     string     `json:"content"`
+	Ciphertext  string     `json:"ciphertext,omitempty"` // Base64 encoded encrypted content
 	IsRead      bool       `json:"is_read"`
 	CreatedAt   time.Time  `json:"created_at"`
 	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
@@ -67,15 +69,16 @@ type ModerationRequest struct {
 
 // UserCreate represents the data needed to create a new user
 type UserCreate struct {
-	Username       string `json:"username" validate:"required,min=3,max=50"`
-	Email          string `json:"email" validate:"required,email"`
-	Password       string `json:"password" validate:"required,min=8"`
-	DisplayName    string `json:"display_name"`
-	InstanceDomain string `json:"instance_domain"`
-	DID            string `json:"did"`
-	PublicKey      string `json:"public_key"`
-	Bio            string `json:"bio,omitempty"`
-	AvatarURL      string `json:"avatar_url,omitempty"`
+	Username            string `json:"username" validate:"required,min=3,max=50"`
+	Email               string `json:"email" validate:"required,email"`
+	Password            string `json:"password" validate:"required,min=8"`
+	DisplayName         string `json:"display_name"`
+	InstanceDomain      string `json:"instance_domain"`
+	DID                 string `json:"did"`
+	PublicKey           string `json:"public_key"`
+	EncryptionPublicKey string `json:"encryption_public_key"`
+	Bio                 string `json:"bio,omitempty"`
+	AvatarURL           string `json:"avatar_url,omitempty"`
 }
 
 // Validate checks if the UserCreate struct is valid

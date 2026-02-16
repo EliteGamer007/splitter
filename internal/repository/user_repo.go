@@ -21,9 +21,9 @@ func NewUserRepository() *UserRepository {
 // Create creates a new user in the database with password
 func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, passwordHash string) (*models.User, error) {
 	query := `
-		INSERT INTO users (username, email, password_hash, instance_domain, did, display_name, bio, avatar_url, public_key, role)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'user')
-		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		INSERT INTO users (username, email, password_hash, instance_domain, did, display_name, bio, avatar_url, public_key, encryption_public_key, role)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'user')
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 	`
 
 	instanceDomain := user.InstanceDomain
@@ -42,6 +42,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, pa
 		user.Bio,
 		user.AvatarURL,
 		user.PublicKey,
+		user.EncryptionPublicKey,
 	).Scan(
 		&newUser.ID,
 		&newUser.Username,
@@ -52,6 +53,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, pa
 		&newUser.Bio,
 		&newUser.AvatarURL,
 		&newUser.PublicKey,
+		&newUser.EncryptionPublicKey,
 		&newUser.Role,
 		&newUser.ModerationRequested,
 		&newUser.IsLocked,
@@ -70,7 +72,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, pa
 // GetByID retrieves a user by UUID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -86,6 +88,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.EncryptionPublicKey,
 		&user.Role,
 		&user.ModerationRequested,
 		&user.IsLocked,
@@ -107,7 +110,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 // GetByUsername retrieves a user by username (for login)
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, string, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), COALESCE(password_hash, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), COALESCE(password_hash, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE username = $1 OR email = $1
 	`
@@ -125,6 +128,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.EncryptionPublicKey,
 		&user.Role,
 		&user.ModerationRequested,
 		&user.IsLocked,
@@ -146,7 +150,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -162,6 +166,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.EncryptionPublicKey,
 		&user.Role,
 		&user.ModerationRequested,
 		&user.IsLocked,
@@ -183,7 +188,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // GetByDID retrieves a user by DID (Decentralized Identifier)
 func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE did = $1
 	`
@@ -199,6 +204,7 @@ func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.EncryptionPublicKey,
 		&user.Role,
 		&user.ModerationRequested,
 		&user.IsLocked,
@@ -227,7 +233,7 @@ func (r *UserRepository) Update(ctx context.Context, id string, update *models.U
 			avatar_url = COALESCE($3, avatar_url),
 			updated_at = NOW()
 		WHERE id = $4
-		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), is_locked, is_suspended, created_at, updated_at
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), is_locked, is_suspended, created_at, updated_at
 	`
 
 	var user models.User
@@ -246,6 +252,7 @@ func (r *UserRepository) Update(ctx context.Context, id string, update *models.U
 		&user.Bio,
 		&user.AvatarURL,
 		&user.PublicKey,
+		&user.EncryptionPublicKey,
 		&user.IsLocked,
 		&user.IsSuspended,
 		&user.CreatedAt,
@@ -303,7 +310,7 @@ func (r *UserRepository) EmailExists(ctx context.Context, email string) (bool, e
 // SearchUsers searches for users by username or display name
 func (r *UserRepository) SearchUsers(ctx context.Context, searchTerm string, limit, offset int) ([]*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE (username ILIKE $1 OR display_name ILIKE $1 OR instance_domain ILIKE $1)
 		AND is_suspended = false
@@ -331,6 +338,7 @@ func (r *UserRepository) SearchUsers(ctx context.Context, searchTerm string, lim
 			&user.Bio,
 			&user.AvatarURL,
 			&user.PublicKey,
+			&user.EncryptionPublicKey,
 			&user.Role,
 			&user.ModerationRequested,
 			&user.IsLocked,
@@ -358,7 +366,7 @@ func (r *UserRepository) GetAllUsers(ctx context.Context, limit, offset int) ([]
 	}
 
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -383,6 +391,7 @@ func (r *UserRepository) GetAllUsers(ctx context.Context, limit, offset int) ([]
 			&user.Bio,
 			&user.AvatarURL,
 			&user.PublicKey,
+			&user.EncryptionPublicKey,
 			&user.Role,
 			&user.ModerationRequested,
 			&user.IsLocked,
@@ -428,7 +437,7 @@ func (r *UserRepository) RequestModeration(ctx context.Context, userID string) e
 // GetModerationRequests gets all pending moderation requests (admin only)
 func (r *UserRepository) GetModerationRequests(ctx context.Context) ([]*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE moderation_requested = true AND role = 'user'
 		ORDER BY moderation_requested_at ASC
@@ -453,6 +462,7 @@ func (r *UserRepository) GetModerationRequests(ctx context.Context) ([]*models.U
 			&user.Bio,
 			&user.AvatarURL,
 			&user.PublicKey,
+			&user.EncryptionPublicKey,
 			&user.Role,
 			&user.ModerationRequested,
 			&user.IsLocked,
@@ -525,7 +535,7 @@ func (r *UserRepository) UnsuspendUser(ctx context.Context, userID string) error
 func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset int) ([]*models.User, error) {
 	query := `
 		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), 
-		       COALESCE(public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), 
+		       COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), 
 		       is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE is_suspended = true
@@ -552,6 +562,7 @@ func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset in
 			&user.Bio,
 			&user.AvatarURL,
 			&user.PublicKey,
+			&user.EncryptionPublicKey,
 			&user.Role,
 			&user.ModerationRequested,
 			&user.IsLocked,

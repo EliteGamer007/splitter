@@ -68,20 +68,21 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 }
 
 // SendMessage sends a message in a thread
-func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID, recipientID, content string) (*models.Message, error) {
+func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID, recipientID, content, ciphertext string) (*models.Message, error) {
 	query := `
-		INSERT INTO messages (thread_id, sender_id, recipient_id, content)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, thread_id, sender_id, recipient_id, content, is_read, created_at
+		INSERT INTO messages (thread_id, sender_id, recipient_id, content, ciphertext)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, thread_id, sender_id, recipient_id, content, ciphertext, is_read, created_at
 	`
 
 	var msg models.Message
-	err := db.GetDB().QueryRow(ctx, query, threadID, senderID, recipientID, content).Scan(
+	err := db.GetDB().QueryRow(ctx, query, threadID, senderID, recipientID, content, ciphertext).Scan(
 		&msg.ID,
 		&msg.ThreadID,
 		&msg.SenderID,
 		&msg.RecipientID,
 		&msg.Content,
+		&msg.Ciphertext,
 		&msg.IsRead,
 		&msg.CreatedAt,
 	)
@@ -100,7 +101,7 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 // GetThreadMessages gets all messages in a thread
 func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID string, limit, offset int) ([]*models.Message, error) {
 	query := `
-		SELECT id, thread_id, sender_id, recipient_id, content, is_read, created_at
+		SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at
 		FROM messages
 		WHERE thread_id = $1
 		ORDER BY created_at ASC
@@ -122,6 +123,7 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 			&msg.SenderID,
 			&msg.RecipientID,
 			&msg.Content,
+			&msg.Ciphertext,
 			&msg.IsRead,
 			&msg.CreatedAt,
 		)
@@ -138,7 +140,7 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) ([]*models.MessageThread, error) {
 	query := `
 		SELECT t.id, t.participant_a_id, t.participant_b_id, t.created_at, t.updated_at,
-		       u.id, u.username, COALESCE(u.display_name, ''), COALESCE(u.avatar_url, ''), u.instance_domain
+		       u.id, u.username, COALESCE(u.display_name, ''), COALESCE(u.avatar_url, ''), u.instance_domain, COALESCE(u.encryption_public_key, '')
 		FROM message_threads t
 		JOIN users u ON (
 			CASE WHEN t.participant_a_id = $1 THEN t.participant_b_id ELSE t.participant_a_id END = u.id
@@ -168,6 +170,7 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 			&otherUser.DisplayName,
 			&otherUser.AvatarURL,
 			&otherUser.InstanceDomain,
+			&otherUser.EncryptionPublicKey,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan thread: %w", err)
@@ -180,7 +183,7 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 
 		// Get last message
 		lastMsgQuery := `
-			SELECT id, thread_id, sender_id, recipient_id, content, is_read, created_at
+			SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at
 			FROM messages
 			WHERE thread_id = $1
 			ORDER BY created_at DESC
@@ -193,6 +196,7 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 			&lastMsg.SenderID,
 			&lastMsg.RecipientID,
 			&lastMsg.Content,
+			&lastMsg.Ciphertext,
 			&lastMsg.IsRead,
 			&lastMsg.CreatedAt,
 		)
