@@ -63,6 +63,7 @@ func main() {
 
 		log.Printf("✅ Created %s (%s) - Token acquired", username, role)
 		users = append(users, user)
+		time.Sleep(500 * time.Millisecond) // Slight delay to be safe
 	}
 
 	log.Println("✨ All users created successfully!")
@@ -159,12 +160,23 @@ func main() {
 			temp = next
 			log.Printf("⚠️ Unquoted ciphertext layer %d", i+1)
 		} else {
-			log.Fatalf("❌ Failed to unmarshal ciphertext at layer %d: %v. Content: %s", i, err, temp)
+			// Try manual unquote if standard unmarshal fails (sometimes quotes are weird)
+			if len(temp) > 2 && temp[0] == '"' && temp[len(temp)-1] == '"' {
+				temp = temp[1 : len(temp)-1]
+				log.Printf("⚠️ Manually unquoted layer %d", i+1)
+			} else {
+				log.Printf("❌ Failed to unmarshal ciphertext at layer %d: %v. Content: %s", i, err, temp)
+			}
 		}
 	}
 
 	if !decoded {
-		log.Fatalf("❌ Failed to decode ciphertext after 3 attempts")
+		// one last hail mary - maybe it IS the map already but stringified weirdly?
+		if err := json.Unmarshal([]byte(temp), &receivedPayload); err == nil {
+			decoded = true
+		} else {
+			log.Fatalf("❌ Failed to decode ciphertext after 3 attempts. Final content: %s", temp)
+		}
 	}
 
 	recIV, _ := base64.StdEncoding.DecodeString(receivedPayload["iv"])
@@ -245,12 +257,21 @@ func registerUser(username, password string) (*User, error) {
 	}
 
 	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &res); err != nil {
+		return nil, fmt.Errorf("failed to decode register response: %v. Body: %s", err, string(body))
+	}
 
 	// Extract ID (assuming backend returns user object)
 	// Response format: { "user": { "id": "...", ... }, "token": "..." }
-	userMap := res["user"].(map[string]interface{})
-	id := userMap["id"].(string)
+	userMap, ok := res["user"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("register response missing user field. Body: %s", string(body))
+	}
+	id, ok := userMap["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("user ID not found or not string. Body: %s", string(body))
+	}
 
 	return &User{
 		ID:                   id,
@@ -279,8 +300,16 @@ func loginUser(username, password string) (string, error) {
 	}
 
 	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
-	return res["token"].(string), nil
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("failed to decode login response: %v. Body: %s", err, string(body))
+	}
+
+	token, ok := res["token"].(string)
+	if !ok {
+		return "", fmt.Errorf("login response missing token. Body: %s", string(body))
+	}
+	return token, nil
 }
 
 func sendMessage(sender *User, recipientID, content, ciphertext string) error {
