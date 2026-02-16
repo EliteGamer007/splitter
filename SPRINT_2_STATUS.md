@@ -1,9 +1,9 @@
 # Sprint 1 – User Stories & Tasks Status (Target: ~50%)
 
-**Overall Sprint 1 Completion: 51.5%**  
-**Last Updated:** February 9, 2026
+**Overall Sprint 1 Completion: 53.0%**  
+**Last Updated:** February 17, 2026
 
-**Summary:** 102 of 198 tasks completed across 50 user stories in 5 epics.
+**Summary:** 105 of 198 tasks completed across 50 user stories in 5 epics.
 
 ---
 
@@ -490,18 +490,18 @@
 ## Epic 4: Privacy & Secure Messaging
 
 ### Story 4.1: End-to-End Encrypted Direct Messages
-**Status:** 🟡 **IN PROGRESS** | **Priority: HIGH**  
+**Status:** ✅ **COMPLETED** | **Priority: HIGH**  
 **As a registered account holder, I want my direct messages to be encrypted on my device before transmission so that only the intended recipient can read them.**
 
 **Tasks:**
-- 🔄 **DEFERRED TO SPRINT 2** - Client-side encryption using recipient public keys
-  - *Reason:* E2EE implementation requires careful security review; infrastructure ready in crypto.ts
-- 🔄 **DEFERRED TO SPRINT 2** - Store only encrypted message blobs on server
-  - *Reason:* Requires encryption wire-up completion
-- 🔄 **DEFERRED TO SPRINT 2** - Prevent server-side logging of messages
-  - *Reason:* Server-side logging policy bundled with Sprint 2
+- ✅ **COMPLETED** - Client-side encryption using recipient public keys
+  - *Evidence:* `crypto.ts` implements ECDH P-256 key derivation (lines 136-151), AES-GCM encryption (lines 153-172), and decryption (lines 174-195); `SignupPage.jsx` auto-generates encryption keypair during signup (lines 222-238); `DMPage.jsx` derives shared secret from recipient's public key (lines 80-83) and encrypts messages before sending (lines 198-200)
+- ✅ **COMPLETED** - Store only encrypted message blobs on server
+  - *Evidence:* Messages table has `ciphertext TEXT` column (migration 006); Backend `message_repo.go` stores ciphertext as JSON string (lines 89-92); Server NEVER receives plaintext message content
+- ✅ **COMPLETED** - Prevent server-side logging of messages
+  - *Evidence:* Message handlers only log metadata (thread_id, sender_id), never content; ciphertext stored as opaque blob
 - ✅ **COMPLETED** - Display encryption status indicator in messaging UI
-  - *Evidence:* DMPage navbar shows "Messages 🔒" with lock icon; security indicators throughout messaging interface
+  - *Evidence:* `DMPage.jsx` shows encryption status with 5 states: 'ready' (🔒 Encrypted), 'loading' (🔄 Verifying Keys), 'recipient_missing_keys' (⚠️ Recipient has no keys), 'missing_keys' (⚠️ You have no keys), 'error' (❌); Banner displays "Messages are end-to-end encrypted" when ready (lines 505-512)
 
 ---
 
@@ -744,9 +744,9 @@
 | **Epic 1: Identity & Onboarding** | 9 | 36 | 34 | 0 | 2 | 0 | 77.8% (7/9) | 94.4% (34/36) |
 | **Epic 2: Federation** | 9 | 36 | 0 | 0 | 0 | 36 | 0% (0/9) | 0% (0/36) |
 | **Epic 3: Content & Systems** | 14 | 56 | 43 | 1 | 4 | 8 | 71.4% (10/14) | 76.8% (43/56) |
-| **Epic 4: Privacy & Messaging** | 9 | 36 | 8 | 0 | 4 | 24 | 22.2% (2/9) | 22.2% (8/36) |
+| **Epic 4: Privacy & Messaging** | 9 | 36 | 11 | 0 | 3 | 22 | 33.3% (3/9) | 30.6% (11/36) |
 | **Epic 5: Governance & Admin** | 9 | 34 | 17 | 0 | 3 | 14 | 44.4% (4/9) | 50.0% (17/34) |
-| **TOTAL** | **50** | **198** | **102** | **1** | **13** | **82** | **46%** | **51.5%** |
+| **TOTAL** | **50** | **198** | **105** | **0** | **12** | **81** | **48%** | **53.0%** |
 
 *Note: Story completion counts only fully completed stories. Task completion percentage is based on completed tasks / total tasks.*
 
@@ -765,10 +765,10 @@
 
 **Critical Gaps:**
 - **Zero federation** (0% Epic 2): Core differentiator not started - cannot connect to other ActivityPub servers
-- **Limited privacy** (22.2% Epic 4): E2EE infrastructure ready but not wired to messaging system
+- **Working privacy features** (30.6% Epic 4): Client-side E2EE with ECDH+AES-GCM, auto-key generation, secure localStorage, encryption status indicators all operational
 - **Missing backend implementations**: Some UI features need API endpoints (federation blocking, media processing)
 
-**Status:** Exceeded target at 51.5% - successfully implemented guided walkthrough system, media upload UI, threaded replies, edited indicators, federation tooltips, and admin dashboard features
+**Status:** Exceeded target at 53.0% - successfully implemented E2EE for direct messages, guided walkthrough system, media upload UI, threaded replies, edited indicators, federation tooltips, and admin dashboard features
 
 ---
 
