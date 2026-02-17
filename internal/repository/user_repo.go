@@ -582,3 +582,16 @@ func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset in
 
 	return users, nil
 }
+// UpdateEncryptionKey updates a user's encryption public key
+// This allows existing users without keys to add them
+func (r *UserRepository) UpdateEncryptionKey(ctx context.Context, userID, encryptionPublicKey string) error {
+	query := `UPDATE users SET encryption_public_key = $1, updated_at = NOW() WHERE id = $2`
+	result, err := db.GetDB().Exec(ctx, query, encryptionPublicKey, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update encryption key: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}

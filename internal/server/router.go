@@ -108,6 +108,7 @@ func setupRoutes(
 	usersAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	usersAuth.GET("/me", userHandler.GetCurrentUser)
 	usersAuth.PUT("/me", userHandler.UpdateProfile)
+	usersAuth.PUT("/me/encryption-key", userHandler.UpdateEncryptionKey) // Add encryption key for existing users
 	usersAuth.DELETE("/me", userHandler.DeleteAccount)
 
 	// Post routes

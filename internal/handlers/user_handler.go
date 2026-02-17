@@ -122,3 +122,37 @@ func (h *UserHandler) DeleteAccount(c echo.Context) error {
 		"message": "Account deleted successfully",
 	})
 }
+// UpdateEncryptionKey updates the user's encryption public key
+// This allows existing users without keys to generate and add them
+func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
+	// Get user ID from JWT token
+	userID := c.Get("user_id").(string)
+
+	var req struct {
+		EncryptionPublicKey string `json:"encryption_public_key" validate:"required"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	if req.EncryptionPublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "encryption_public_key is required",
+		})
+	}
+
+	// Update only the encryption_public_key field
+	err := h.userRepo.UpdateEncryptionKey(c.Request().Context(), userID, req.EncryptionPublicKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to update encryption key: " + err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Encryption key updated successfully",
+	})
+}
