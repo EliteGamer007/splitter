@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
+	"splitter/internal/config"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -15,14 +19,18 @@ import (
 // PostHandler handles post-related requests
 type PostHandler struct {
 	postRepo *repository.PostRepository
+	userRepo *repository.UserRepository
 	storage  service.FileStorage
+	cfg      *config.Config
 }
 
 // NewPostHandler creates a new PostHandler
-func NewPostHandler(postRepo *repository.PostRepository, storage service.FileStorage) *PostHandler {
+func NewPostHandler(postRepo *repository.PostRepository, userRepo *repository.UserRepository, storage service.FileStorage, cfg *config.Config) *PostHandler {
 	return &PostHandler{
 		postRepo: postRepo,
+		userRepo: userRepo,
 		storage:  storage,
+		cfg:      cfg,
 	}
 }
 
@@ -87,6 +95,31 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
 		})
+	}
+
+	// Federation Hook: Deliver to remote followers
+	if h.cfg.Federation.Enabled {
+		log.Printf("[Federation] Post created by %s, triggering delivery...", did)
+		go func() {
+			// Fetch user to get username
+			user, err := h.userRepo.GetByDID(context.Background(), did)
+			if err != nil {
+				log.Printf("[Federation] Failed to fetch user %s for delivery: %v", did, err)
+				return
+			}
+
+			// Construct Actor URI: base_url/ap/users/username
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			log.Printf("[Federation] Building Create activity for %s (post %s)", actorURI, post.ID)
+
+			// Build Create activity
+			activity := federation.BuildCreateNoteActivity(actorURI, post.ID, post.Content, post.CreatedAt)
+
+			// Deliver to followers
+			federation.DeliverToFollowers(activity, did)
+		}()
+	} else {
+		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
 
 	return c.JSON(http.StatusCreated, post)
@@ -198,6 +231,7 @@ func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 
 	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset)
 	if err != nil {
+		c.Logger().Errorf("Failed to retrieve public feed: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve public feed",
 		})

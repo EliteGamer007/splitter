@@ -1,7 +1,10 @@
 package server
 
 import (
+	"log"
+
 	"splitter/internal/config"
+	"splitter/internal/federation"
 	"splitter/internal/handlers"
 	"splitter/internal/middleware"
 	"splitter/internal/repository"
@@ -38,21 +41,37 @@ func NewServer(cfg *config.Config) *Server {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
 	userHandler := handlers.NewUserHandler(userRepo)
-	postHandler := handlers.NewPostHandler(postRepo, storageService)
+	postHandler := handlers.NewPostHandler(postRepo, userRepo, storageService, cfg)
 	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
-	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo)
+	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler()
+
+	// Federation handlers
+	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)
+	actorHandler := handlers.NewActorHandler(userRepo, cfg)
+	inboxHandler := handlers.NewInboxHandler(userRepo, messageRepo, cfg)
+	outboxHandler := handlers.NewOutboxHandler(userRepo, cfg)
+	federationHandler := handlers.NewFederationHandler(userRepo, cfg)
+
+	// Initialize federation keys if federation is enabled
+	if cfg.Federation.Enabled {
+		if err := federation.EnsureInstanceKeys(cfg.Federation.Domain); err != nil {
+			log.Printf("[Federation] WARNING: Failed to initialize keys: %v", err)
+		} else {
+			log.Printf("[Federation] Initialized for domain '%s' at %s", cfg.Federation.Domain, cfg.Federation.URL)
+		}
+	}
 
 	// Global middleware
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.BodyLimit("6M")) // Limit body size to 6MB (allow overhead for 5MB file)
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"},
+		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:8000", "http://localhost:8001"},
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization, "Signature", "Date", "Digest"},
 		AllowCredentials: true,
 	}))
 
@@ -60,7 +79,7 @@ func NewServer(cfg *config.Config) *Server {
 	e.Static("/uploads", "uploads")
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
 
 	return &Server{
 		echo: e,
@@ -80,6 +99,11 @@ func setupRoutes(
 	adminHandler *handlers.AdminHandler,
 	messageHandler *handlers.MessageHandler,
 	replyHandler *handlers.ReplyHandler,
+	webfingerHandler *handlers.WebFingerHandler,
+	actorHandler *handlers.ActorHandler,
+	inboxHandler *handlers.InboxHandler,
+	outboxHandler *handlers.OutboxHandler,
+	federationHandler *handlers.FederationHandler,
 ) {
 	// API v1 group
 	api := e.Group("/api/v1")
@@ -185,6 +209,29 @@ func setupRoutes(
 	admin.POST("/users/:id/suspend", adminHandler.SuspendUser)
 	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)
 	admin.GET("/actions", adminHandler.GetAdminActions)
+
+	// ============================================================
+	// FEDERATION ROUTES
+	// ============================================================
+
+	// WebFinger & ActivityPub (public, no auth)
+	e.GET("/.well-known/webfinger", webfingerHandler.Handle)
+	e.GET("/ap/users/:username", actorHandler.GetActor)          // ActivityPub Actor
+	e.POST("/ap/users/:username/inbox", inboxHandler.Handle)     // Receive activities (per-user)
+	e.POST("/ap/shared-inbox", inboxHandler.Handle)              // Shared inbox (federation)
+	e.GET("/ap/users/:username/outbox", outboxHandler.GetOutbox) // List activities
+
+	// Federation API (public, no auth required for cross-instance discovery)
+	fed := api.Group("/federation")
+	fed.GET("/users", federationHandler.SearchRemoteUsers)        // Search remote users
+	fed.GET("/timeline", federationHandler.GetFederatedTimeline)  // Federated timeline
+	fed.GET("/all-users", federationHandler.GetAllFederatedUsers) // All users across instances
+	fed.GET("/public-users", federationHandler.GetPublicUserList) // Public user list for federation
+
+	// Federation API (authenticated)
+	fedAuth := api.Group("/federation")
+	fedAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	fedAuth.POST("/follow", federationHandler.FollowRemoteUser) // Follow remote user
 }
 
 // Start starts the HTTP server

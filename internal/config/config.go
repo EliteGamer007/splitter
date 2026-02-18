@@ -1,10 +1,22 @@
 package config
 
 import (
+	"log"
 	"os"
 
-	_ "github.com/joho/godotenv/autoload"
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Load env file: use ENV_FILE if set (for instance 2), otherwise default .env
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("Warning: Could not load env file %s: %v", envFile, err)
+	}
+}
 
 // Config holds all application configuration
 type Config struct {

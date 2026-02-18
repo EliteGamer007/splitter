@@ -89,7 +89,7 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
@@ -145,7 +145,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count
 		FROM posts p
@@ -189,7 +189,7 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -264,7 +264,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 		// Authenticated user - include liked and reposted status
 		query = `
 			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, u.username,
+			       p.created_at, p.updated_at, COALESCE(u.username, '') as username,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -283,7 +283,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 		// Unauthenticated user - liked and reposted are always false
 		query = `
 			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, u.username,
+			       p.created_at, p.updated_at, COALESCE(u.username, '') as username,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       false as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
