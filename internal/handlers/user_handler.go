@@ -167,6 +167,7 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 			user.Username,
 			updatedUser.DisplayName,
 			updatedUser.Bio,
+			updatedUser.AvatarURL,
 			updatedUser.PublicKey,
 			updatedUser.EncryptionPublicKey,
 		)
@@ -209,6 +210,20 @@ func (h *UserHandler) UploadAvatar(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to upload avatar",
 		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			updatedUser.DisplayName,
+			updatedUser.Bio,
+			updatedUser.AvatarURL,
+			updatedUser.PublicKey,
+			updatedUser.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
 	}
 
 	return c.JSON(http.StatusOK, updatedUser)
@@ -330,6 +345,7 @@ func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
 				user.Username,
 				user.DisplayName,
 				user.Bio,
+				user.AvatarURL,
 				user.PublicKey,
 				req.EncryptionPublicKey,
 			)

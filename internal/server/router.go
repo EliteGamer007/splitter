@@ -210,6 +210,8 @@ func setupRoutes(
 	admin.POST("/moderation-queue/:id/remove", adminHandler.RemoveModerationContent)
 	admin.POST("/users/:id/warn", adminHandler.WarnUser)
 	admin.POST("/domains/block", adminHandler.BlockDomain)
+	admin.GET("/domains/blocked", adminHandler.GetBlockedDomains)
+	admin.DELETE("/domains/:domain/block", adminHandler.UnblockDomain)
 	admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
 	admin.POST("/users/:id/suspend", adminHandler.SuspendUser)
 	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)

@@ -1,4 +1,4 @@
-# Sprint 2 – User Stories & Tasks Status (Target: ~70%)
+# Sprint 2 – User Stories & Tasks Status 
 
 **Overall Sprint 2 Completion: 74.6%**  
 **Last Updated:** February 20, 2026

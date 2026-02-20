@@ -40,10 +40,6 @@ type Note struct {
 func DeliverActivity(activity *Activity, targetInbox string) error {
 	ctx := context.Background()
 
-	if targetDomain := extractDomainFromURI(targetInbox); targetDomain != "" && IsDomainBlocked(ctx, targetDomain) {
-		return fmt.Errorf("target domain %s is blocked", targetDomain)
-	}
-
 	// Serialize activity
 	body, err := json.Marshal(activity)
 	if err != nil {
@@ -54,6 +50,11 @@ func DeliverActivity(activity *Activity, targetInbox string) error {
 	outboxID, err := storeOutboxActivity(ctx, activity.Type, body, targetInbox)
 	if err != nil {
 		log.Printf("[Federation] Warning: failed to store outbox activity: %v", err)
+	}
+
+	if targetDomain := extractDomainFromURI(targetInbox); targetDomain != "" && IsDomainBlocked(ctx, targetDomain) {
+		updateOutboxStatus(ctx, outboxID, "failed")
+		return fmt.Errorf("target domain %s is blocked", targetDomain)
 	}
 
 	// Create request
@@ -326,7 +327,7 @@ func BuildDeleteActivity(actorURI, objectURI string) *Activity {
 	}
 }
 
-func BuildUpdateActorActivity(actorURI, username, displayName, summary, publicKeyPEM, encryptionPublicKey string) *Activity {
+func BuildUpdateActorActivity(actorURI, username, displayName, summary, avatarURL, publicKeyPEM, encryptionPublicKey string) *Activity {
 	domain := GetInstanceDomain()
 	baseURL := resolveInstanceURL(domain)
 	activityID := fmt.Sprintf("%s/activities/update-%d", baseURL, time.Now().UnixNano())
@@ -348,6 +349,18 @@ func BuildUpdateActorActivity(actorURI, username, displayName, summary, publicKe
 
 	if strings.TrimSpace(encryptionPublicKey) != "" {
 		object["encryption_public_key"] = encryptionPublicKey
+	}
+
+	if trimmedAvatar := strings.TrimSpace(avatarURL); trimmedAvatar != "" {
+		resolvedAvatar := trimmedAvatar
+		if strings.HasPrefix(resolvedAvatar, "/") {
+			resolvedAvatar = strings.TrimRight(baseURL, "/") + resolvedAvatar
+		}
+		object["icon"] = map[string]interface{}{
+			"type":      "Image",
+			"mediaType": "image/jpeg",
+			"url":       resolvedAvatar,
+		}
 	}
 
 	return &Activity{

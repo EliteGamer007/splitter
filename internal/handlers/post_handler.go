@@ -228,7 +228,12 @@ func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 	// Check if user is authenticated to include liked status
 	userDID, _ := c.Get("did").(string)
 
-	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset)
+	localOnly := false
+	if localParam := c.QueryParam("local_only"); localParam == "true" || localParam == "1" {
+		localOnly = true
+	}
+
+	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset, localOnly)
 	if err != nil {
 		c.Logger().Errorf("Failed to retrieve public feed: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{

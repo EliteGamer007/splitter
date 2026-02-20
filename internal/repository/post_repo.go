@@ -290,9 +290,13 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 }
 
 // GetPublicFeed retrieves public posts for unauthenticated users or with optional user context
-func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
+func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int, localOnly bool) ([]*models.Post, error) {
 	var query string
 	var args []interface{}
+	localFilterClause := ""
+	if localOnly {
+		localFilterClause = " AND p.is_remote = false"
+	}
 
 	if userDID != "" {
 		// Authenticated user - include liked and reposted status
@@ -308,7 +312,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $2 OFFSET $3
 		`
@@ -327,7 +331,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $1 OFFSET $2
 		`
@@ -386,7 +390,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 
 // GetPublicFeed retrieves public posts for unauthenticated users
 func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) ([]*models.Post, error) {
-	return r.GetPublicFeedWithUser(ctx, "", limit, offset)
+	return r.GetPublicFeedWithUser(ctx, "", limit, offset, false)
 }
 
 // Update updates a post's content

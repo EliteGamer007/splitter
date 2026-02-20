@@ -630,6 +630,68 @@ func (h *AdminHandler) BlockDomain(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"message": "Domain blocked: " + domain})
 }
 
+// UnblockDomain removes a blocked domain from federation blocklist
+func (h *AdminHandler) UnblockDomain(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	domain := strings.TrimSpace(strings.ToLower(c.Param("domain")))
+	if domain == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Domain required"})
+	}
+
+	result, err := db.GetDB().Exec(c.Request().Context(), `DELETE FROM blocked_domains WHERE domain = $1`, domain)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to unblock domain: " + err.Error()})
+	}
+
+	if result.RowsAffected() == 0 {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Domain not found in block list"})
+	}
+
+	adminID := c.Get("user_id").(string)
+	h.logAdminAction(adminID, "unblock_domain", domain, "")
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Domain unblocked: " + domain})
+}
+
+// GetBlockedDomains returns currently blocked domains
+func (h *AdminHandler) GetBlockedDomains(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	rows, err := db.GetDB().Query(c.Request().Context(),
+		`SELECT domain, COALESCE(reason, ''), blocked_at, blocked_by
+		 FROM blocked_domains
+		 ORDER BY blocked_at DESC`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch blocked domains: " + err.Error()})
+	}
+	defer rows.Close()
+
+	domains := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var domain, reason, blockedBy string
+		var blockedAt time.Time
+		if scanErr := rows.Scan(&domain, &reason, &blockedAt, &blockedBy); scanErr != nil {
+			continue
+		}
+
+		domains = append(domains, map[string]interface{}{
+			"domain":     domain,
+			"reason":     reason,
+			"blocked_at": blockedAt.UTC().Format(time.RFC3339),
+			"blocked_by": blockedBy,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"domains": domains,
+	})
+}
+
 // GetFederationInspector returns live federation traffic and instance health metrics
 func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 	if err := h.requireModOrAdmin(c); err != nil {
