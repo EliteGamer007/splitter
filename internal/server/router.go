@@ -8,7 +8,6 @@ import (
 	"splitter/internal/handlers"
 	"splitter/internal/middleware"
 	"splitter/internal/repository"
-	"splitter/internal/service"
 
 	govalidator "github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -26,11 +25,6 @@ func NewServer(cfg *config.Config) *Server {
 	e := echo.New()
 	e.Validator = &CustomValidator{validator: govalidator.New()}
 
-	// Initialize services
-	// Use current working directory + uploads for local storage
-	// in production this would come from config
-	storageService := service.NewLocalStorage(".", cfg.Server.BaseURL)
-
 	// Initialize repositories
 	userRepo := repository.NewUserRepository()
 	postRepo := repository.NewPostRepository()
@@ -41,7 +35,8 @@ func NewServer(cfg *config.Config) *Server {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
 	userHandler := handlers.NewUserHandler(userRepo)
-	postHandler := handlers.NewPostHandler(postRepo, userRepo, storageService, cfg)
+	postHandler := handlers.NewPostHandler(postRepo, userRepo, cfg)
+	mediaHandler := handlers.NewMediaHandler(postRepo)
 	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
@@ -75,11 +70,11 @@ func NewServer(cfg *config.Config) *Server {
 		AllowCredentials: true,
 	}))
 
-	// Static routes
+	// Static routes (legacy uploads fallback)
 	e.Static("/uploads", "uploads")
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
 
 	return &Server{
 		echo: e,
@@ -94,6 +89,7 @@ func setupRoutes(
 	authHandler *handlers.AuthHandler,
 	userHandler *handlers.UserHandler,
 	postHandler *handlers.PostHandler,
+	mediaHandler *handlers.MediaHandler,
 	followHandler *handlers.FollowHandler,
 	interactionHandler *handlers.InteractionHandler,
 	adminHandler *handlers.AdminHandler,
@@ -126,14 +122,19 @@ func setupRoutes(
 	users := api.Group("/users")
 	users.GET("/:id", userHandler.GetProfile)      // Public - view any user profile by UUID
 	users.GET("/did", userHandler.GetProfileByDID) // Public - view user profile by DID
+	users.GET("/:id/avatar", userHandler.GetAvatar)
 
 	// Protected user routes (require authentication)
 	usersAuth := api.Group("/users")
 	usersAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	usersAuth.GET("/me", userHandler.GetCurrentUser)
 	usersAuth.PUT("/me", userHandler.UpdateProfile)
+	usersAuth.POST("/me/avatar", userHandler.UploadAvatar)
 	usersAuth.PUT("/me/encryption-key", userHandler.UpdateEncryptionKey) // Add encryption key for existing users
 	usersAuth.DELETE("/me", userHandler.DeleteAccount)
+
+	// Media routes
+	api.GET("/media/:id/content", mediaHandler.GetMediaContent)
 
 	// Post routes
 	posts := api.Group("/posts")

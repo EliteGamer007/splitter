@@ -61,13 +61,14 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 							continue
 						}
 						results = append(results, map[string]interface{}{
-							"id":           u.ID,
-							"username":     u.Username,
-							"display_name": u.DisplayName,
-							"domain":       h.cfg.Federation.Domain,
-							"avatar_url":   u.AvatarURL,
-							"did":          u.DID,
-							"is_remote":    false,
+							"id":                    u.ID,
+							"username":              u.Username,
+							"display_name":          u.DisplayName,
+							"domain":                h.cfg.Federation.Domain,
+							"avatar_url":            u.AvatarURL,
+							"did":                   u.DID,
+							"encryption_public_key": u.EncryptionPublicKey,
+							"is_remote":             false,
 						})
 					}
 				}
@@ -79,20 +80,27 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 				} else if actor != nil {
 					// Ensure ghost user to get local ID for messaging
 					var userID string
+					var encryptionPublicKey string
 					if user, err := federation.EnsureRemoteUser(c.Request().Context(), actor.ActorURI); err == nil {
 						userID = user.ID
+						encryptionPublicKey = user.EncryptionPublicKey
 					} else {
 						log.Printf("[Federation] Failed to ensure user: %v", err)
 					}
 
+					if encryptionPublicKey == "" {
+						encryptionPublicKey = actor.EncryptionPublicKey
+					}
+
 					results = append(results, map[string]interface{}{
-						"id":           userID,
-						"username":     actor.Username,
-						"display_name": actor.DisplayName,
-						"domain":       actor.Domain,
-						"avatar_url":   actor.AvatarURL,
-						"actor_uri":    actor.ActorURI,
-						"is_remote":    true,
+						"id":                    userID,
+						"username":              actor.Username,
+						"display_name":          actor.DisplayName,
+						"domain":                actor.Domain,
+						"avatar_url":            actor.AvatarURL,
+						"actor_uri":             actor.ActorURI,
+						"encryption_public_key": encryptionPublicKey,
+						"is_remote":             true,
 					})
 				}
 			}
@@ -106,13 +114,14 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 					continue
 				}
 				results = append(results, map[string]interface{}{
-					"id":           u.ID,
-					"username":     u.Username,
-					"display_name": u.DisplayName,
-					"domain":       h.cfg.Federation.Domain,
-					"avatar_url":   u.AvatarURL,
-					"did":          u.DID,
-					"is_remote":    false,
+					"id":                    u.ID,
+					"username":              u.Username,
+					"display_name":          u.DisplayName,
+					"domain":                h.cfg.Federation.Domain,
+					"avatar_url":            u.AvatarURL,
+					"did":                   u.DID,
+					"encryption_public_key": u.EncryptionPublicKey,
+					"is_remote":             false,
 				})
 			}
 		}
@@ -143,13 +152,14 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 				}
 
 				results = append(results, map[string]interface{}{
-					"id":           userID,
-					"username":     username,
-					"display_name": displayName,
-					"domain":       remoteDomain,
-					"avatar_url":   avatarURL,
-					"actor_uri":    actorURI,
-					"is_remote":    true,
+					"id":                    userID,
+					"username":              username,
+					"display_name":          displayName,
+					"domain":                remoteDomain,
+					"avatar_url":            avatarURL,
+					"encryption_public_key": u["encryption_public_key"],
+					"actor_uri":             actorURI,
+					"is_remote":             true,
 				})
 			}
 		}
@@ -169,13 +179,14 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 					}
 
 					results = append(results, map[string]interface{}{
-						"id":           userID,
-						"username":     a.Username,
-						"display_name": a.DisplayName,
-						"domain":       a.Domain,
-						"avatar_url":   a.AvatarURL,
-						"actor_uri":    a.ActorURI,
-						"is_remote":    true,
+						"id":                    userID,
+						"username":              a.Username,
+						"display_name":          a.DisplayName,
+						"domain":                a.Domain,
+						"avatar_url":            a.AvatarURL,
+						"actor_uri":             a.ActorURI,
+						"encryption_public_key": a.EncryptionPublicKey,
+						"is_remote":             true,
 					})
 				}
 			}
@@ -331,14 +342,15 @@ func (h *FederationHandler) GetAllFederatedUsers(c echo.Context) error {
 				continue // skip ghost users
 			}
 			allUsers = append(allUsers, map[string]interface{}{
-				"id":           u.ID,
-				"username":     u.Username,
-				"display_name": u.DisplayName,
-				"domain":       h.cfg.Federation.Domain,
-				"avatar_url":   u.AvatarURL,
-				"did":          u.DID,
-				"is_remote":    false,
-				"bio":          u.Bio,
+				"id":                    u.ID,
+				"username":              u.Username,
+				"display_name":          u.DisplayName,
+				"domain":                h.cfg.Federation.Domain,
+				"avatar_url":            u.AvatarURL,
+				"did":                   u.DID,
+				"encryption_public_key": u.EncryptionPublicKey,
+				"is_remote":             false,
+				"bio":                   u.Bio,
 			})
 		}
 	}
@@ -351,14 +363,15 @@ func (h *FederationHandler) GetAllFederatedUsers(c echo.Context) error {
 		remoteUsers := fetchRemoteUserList(baseURL)
 		for _, u := range remoteUsers {
 			allUsers = append(allUsers, map[string]interface{}{
-				"id":           u["id"],
-				"username":     u["username"],
-				"display_name": u["display_name"],
-				"domain":       domain,
-				"avatar_url":   u["avatar_url"],
-				"did":          u["did"],
-				"is_remote":    true,
-				"bio":          u["bio"],
+				"id":                    u["id"],
+				"username":              u["username"],
+				"display_name":          u["display_name"],
+				"domain":                domain,
+				"avatar_url":            u["avatar_url"],
+				"did":                   u["did"],
+				"encryption_public_key": u["encryption_public_key"],
+				"is_remote":             true,
+				"bio":                   u["bio"],
 			})
 		}
 	}
@@ -447,12 +460,13 @@ func (h *FederationHandler) GetPublicUserList(c echo.Context) error {
 			continue
 		}
 		publicUsers = append(publicUsers, map[string]interface{}{
-			"id":           u.ID,
-			"username":     u.Username,
-			"display_name": u.DisplayName,
-			"avatar_url":   u.AvatarURL,
-			"bio":          u.Bio,
-			"did":          u.DID,
+			"id":                    u.ID,
+			"username":              u.Username,
+			"display_name":          u.DisplayName,
+			"avatar_url":            u.AvatarURL,
+			"bio":                   u.Bio,
+			"did":                   u.DID,
+			"encryption_public_key": u.EncryptionPublicKey,
 		})
 	}
 

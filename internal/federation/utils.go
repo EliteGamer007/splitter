@@ -2,8 +2,12 @@ package federation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"splitter/internal/db"
@@ -25,6 +29,15 @@ func EnsureRemoteUser(ctx context.Context, actorURI string) (*models.User, error
 	)
 
 	if err == nil {
+		if user.EncryptionPublicKey == "" {
+			if remoteKey := fetchRemoteEncryptionPublicKey(user.InstanceDomain, user.Username); remoteKey != "" {
+				_, _ = db.GetDB().Exec(ctx,
+					`UPDATE users SET encryption_public_key = $1, updated_at = NOW() WHERE id = $2`,
+					remoteKey, user.ID,
+				)
+				user.EncryptionPublicKey = remoteKey
+			}
+		}
 		return &user, nil
 	}
 
@@ -40,6 +53,11 @@ func EnsureRemoteUser(ctx context.Context, actorURI string) (*models.User, error
 	// Role is 'user'
 	log.Printf("[Federation] Creating ghost user for %s@%s", remoteActor.Username, remoteActor.Domain)
 
+	remoteEncryptionKey := remoteActor.EncryptionPublicKey
+	if remoteEncryptionKey == "" {
+		remoteEncryptionKey = fetchRemoteEncryptionPublicKey(remoteActor.Domain, remoteActor.Username)
+	}
+
 	err = db.GetDB().QueryRow(ctx,
 		`INSERT INTO users (username, instance_domain, did, display_name, avatar_url, public_key, encryption_public_key, role)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'user')
@@ -50,7 +68,7 @@ func EnsureRemoteUser(ctx context.Context, actorURI string) (*models.User, error
 		remoteActor.DisplayName,
 		remoteActor.AvatarURL,
 		remoteActor.PublicKeyPEM,
-		"", // Encryption key - might need to fetch this separately if supported
+		remoteEncryptionKey,
 	).Scan(&user.ID, &user.Username, &user.InstanceDomain, &user.DID)
 
 	if err != nil {
@@ -128,9 +146,23 @@ func extractDomainFromURI(uri string) string {
 	}
 
 	// Otherwise parse from URL
-	// http://example.com/... -> example.com
-	// This is sophisticated enough for now
-	return ""
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return ""
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return ""
+	}
+	if strings.Contains(host, "localhost") || strings.Contains(host, "127.0.0.1") {
+		if strings.Contains(parsed.Host, ":8000") {
+			return "splitter-1"
+		}
+		if strings.Contains(parsed.Host, ":8001") {
+			return "splitter-2"
+		}
+	}
+	return host
 }
 
 func splitURI(uri string) []string {
@@ -160,4 +192,41 @@ func splitURI(uri string) []string {
 		parts = append(parts, current)
 	}
 	return parts
+}
+
+func fetchRemoteEncryptionPublicKey(domain, username string) string {
+	if domain == "" || username == "" {
+		return ""
+	}
+
+	baseURL := resolveInstanceURL(domain)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(baseURL + "/api/v1/federation/public-users?limit=200")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	var payload struct {
+		Users []struct {
+			Username            string `json:"username"`
+			EncryptionPublicKey string `json:"encryption_public_key"`
+		} `json:"users"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return ""
+	}
+
+	for _, remoteUser := range payload.Users {
+		if strings.EqualFold(remoteUser.Username, username) {
+			return strings.TrimSpace(remoteUser.EncryptionPublicKey)
+		}
+	}
+
+	return ""
 }

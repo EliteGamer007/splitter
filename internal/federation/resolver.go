@@ -15,17 +15,18 @@ import (
 
 // RemoteActor represents a cached remote user from another instance
 type RemoteActor struct {
-	ID            string    `json:"id"`
-	ActorURI      string    `json:"actor_uri"`
-	Username      string    `json:"username"`
-	Domain        string    `json:"domain"`
-	InboxURL      string    `json:"inbox_url"`
-	OutboxURL     string    `json:"outbox_url"`
-	PublicKeyPEM  string    `json:"public_key_pem"`
-	DisplayName   string    `json:"display_name"`
-	AvatarURL     string    `json:"avatar_url"`
-	LastFetchedAt time.Time `json:"last_fetched_at"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                  string    `json:"id"`
+	ActorURI            string    `json:"actor_uri"`
+	Username            string    `json:"username"`
+	Domain              string    `json:"domain"`
+	InboxURL            string    `json:"inbox_url"`
+	OutboxURL           string    `json:"outbox_url"`
+	PublicKeyPEM        string    `json:"public_key_pem"`
+	EncryptionPublicKey string    `json:"encryption_public_key"`
+	DisplayName         string    `json:"display_name"`
+	AvatarURL           string    `json:"avatar_url"`
+	LastFetchedAt       time.Time `json:"last_fetched_at"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // InstanceURLMap maps domain names to actual URLs (for local testing)
@@ -137,13 +138,14 @@ func fetchActor(actorURI string) (*RemoteActor, error) {
 	}
 
 	var actorJSON struct {
-		ID                string `json:"id"`
-		Type              string `json:"type"`
-		PreferredUsername string `json:"preferredUsername"`
-		Name              string `json:"name"`
-		Inbox             string `json:"inbox"`
-		Outbox            string `json:"outbox"`
-		Icon              *struct {
+		ID                  string `json:"id"`
+		Type                string `json:"type"`
+		PreferredUsername   string `json:"preferredUsername"`
+		Name                string `json:"name"`
+		Inbox               string `json:"inbox"`
+		Outbox              string `json:"outbox"`
+		EncryptionPublicKey string `json:"encryption_public_key"`
+		Icon                *struct {
 			URL string `json:"url"`
 		} `json:"icon"`
 		PublicKey *struct {
@@ -158,11 +160,12 @@ func fetchActor(actorURI string) (*RemoteActor, error) {
 	}
 
 	actor := &RemoteActor{
-		ActorURI:    actorJSON.ID,
-		Username:    actorJSON.PreferredUsername,
-		InboxURL:    actorJSON.Inbox,
-		OutboxURL:   actorJSON.Outbox,
-		DisplayName: actorJSON.Name,
+		ActorURI:            actorJSON.ID,
+		Username:            actorJSON.PreferredUsername,
+		InboxURL:            actorJSON.Inbox,
+		OutboxURL:           actorJSON.Outbox,
+		EncryptionPublicKey: actorJSON.EncryptionPublicKey,
+		DisplayName:         actorJSON.Name,
 	}
 	if actorJSON.PublicKey != nil {
 		actor.PublicKeyPEM = actorJSON.PublicKey.PublicKeyPEM

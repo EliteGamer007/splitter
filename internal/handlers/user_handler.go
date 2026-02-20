@@ -1,10 +1,15 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -99,6 +104,75 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 	return c.JSON(http.StatusOK, updatedUser)
 }
 
+// UploadAvatar uploads and stores avatar image in DB for authenticated user.
+func (h *UserHandler) UploadAvatar(c echo.Context) error {
+	did := c.Get("did").(string)
+
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
+
+	file, fileErr := c.FormFile("avatar")
+	if fileErr == http.ErrMissingFile {
+		file, fileErr = c.FormFile("file")
+	}
+	if fileErr != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Avatar file is required",
+		})
+	}
+
+	avatarBytes, mediaType, err := service.ReadAndValidateImage(file, 5*1024*1024)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Invalid avatar image: %v", err),
+		})
+	}
+
+	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, mediaType)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to upload avatar",
+		})
+	}
+
+	return c.JSON(http.StatusOK, updatedUser)
+}
+
+// GetAvatar serves user avatar content from DB, with fallback for legacy disk URLs.
+func (h *UserHandler) GetAvatar(c echo.Context) error {
+	userID := c.Param("id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+
+	avatarData, mediaType, avatarURL, err := h.userRepo.GetAvatarContentByUserID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Avatar not found"})
+	}
+
+	if len(avatarData) > 0 {
+		if mediaType == "" {
+			mediaType = "image/jpeg"
+		}
+		return c.Blob(http.StatusOK, mediaType, avatarData)
+	}
+
+	if strings.HasPrefix(avatarURL, "/uploads/") {
+		legacyPath := filepath.Join(".", filepath.FromSlash(strings.TrimPrefix(avatarURL, "/")))
+		legacyData, readErr := os.ReadFile(legacyPath)
+		if readErr == nil && len(legacyData) > 0 {
+			detectedType := http.DetectContentType(legacyData)
+			return c.Blob(http.StatusOK, detectedType, legacyData)
+		}
+	}
+
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "Avatar content not found"})
+}
+
 // DeleteAccount deletes the authenticated user's account
 func (h *UserHandler) DeleteAccount(c echo.Context) error {
 	// Get DID from JWT token
@@ -122,6 +196,7 @@ func (h *UserHandler) DeleteAccount(c echo.Context) error {
 		"message": "Account deleted successfully",
 	})
 }
+
 // UpdateEncryptionKey updates the user's encryption public key
 // This allows existing users without keys to generate and add them
 func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {

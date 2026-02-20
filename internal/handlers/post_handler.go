@@ -20,16 +20,14 @@ import (
 type PostHandler struct {
 	postRepo *repository.PostRepository
 	userRepo *repository.UserRepository
-	storage  service.FileStorage
 	cfg      *config.Config
 }
 
 // NewPostHandler creates a new PostHandler
-func NewPostHandler(postRepo *repository.PostRepository, userRepo *repository.UserRepository, storage service.FileStorage, cfg *config.Config) *PostHandler {
+func NewPostHandler(postRepo *repository.PostRepository, userRepo *repository.UserRepository, cfg *config.Config) *PostHandler {
 	return &PostHandler{
 		postRepo: postRepo,
 		userRepo: userRepo,
-		storage:  storage,
 		cfg:      cfg,
 	}
 }
@@ -67,16 +65,17 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	}
 
 	// Handle file upload
-	var mediaURL, mediaType string
+	var mediaData []byte
+	var mediaType string
 	if fileErr == nil {
-		// File present, save it
-		url, mType, err := h.storage.Save(file)
+		// File present, validate and read
+		bytes, mType, err := service.ReadAndValidateImage(file, 5*1024*1024)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{
 				"error": fmt.Sprintf("Failed to upload file: %v", err),
 			})
 		}
-		mediaURL = url
+		mediaData = bytes
 		mediaType = mType
 	} else if fileErr != http.ErrMissingFile {
 		// Real error occurred
@@ -90,7 +89,7 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		Visibility: visibility,
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaURL, mediaType)
+	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaData, mediaType)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",

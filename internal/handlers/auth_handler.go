@@ -5,12 +5,14 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"splitter/internal/auth"
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -40,11 +42,82 @@ func NewAuthHandler(userRepo *repository.UserRepository, jwtSecret string) *Auth
 // Register handles user registration with username/email/password
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req models.UserCreate
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request body",
-		})
+
+	contentType := c.Request().Header.Get("Content-Type")
+	var avatarBytes []byte
+	var avatarMediaType string
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := c.Request().ParseMultipartForm(6 * 1024 * 1024); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Invalid multipart form data",
+			})
+		}
+
+		multipartForm, _ := c.MultipartForm()
+
+		formValue := func(keys ...string) string {
+			for _, key := range keys {
+				if multipartForm != nil {
+					if values, ok := multipartForm.Value[key]; ok && len(values) > 0 {
+						value := strings.TrimSpace(values[0])
+						if value != "" {
+							return value
+						}
+					}
+				}
+				if value := strings.TrimSpace(c.FormValue(key)); value != "" {
+					return value
+				}
+				if value := strings.TrimSpace(c.Request().PostFormValue(key)); value != "" {
+					return value
+				}
+			}
+			return ""
+		}
+
+		req = models.UserCreate{
+			Username:            formValue("username", "userName"),
+			Email:               formValue("email"),
+			Password:            formValue("password"),
+			DisplayName:         formValue("display_name", "displayName"),
+			Bio:                 formValue("bio"),
+			InstanceDomain:      formValue("instance_domain", "instanceDomain"),
+			DID:                 formValue("did"),
+			PublicKey:           formValue("public_key", "publicKey"),
+			EncryptionPublicKey: formValue("encryption_public_key", "encryptionPublicKey"),
+		}
+
+		avatarFile, fileErr := c.FormFile("avatar")
+		if fileErr == http.ErrMissingFile {
+			avatarFile, fileErr = c.FormFile("file")
+		}
+		if fileErr == nil {
+			var err error
+			avatarBytes, avatarMediaType, err = service.ReadAndValidateImage(avatarFile, 5*1024*1024)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, map[string]string{
+					"error": "Invalid avatar image: " + err.Error(),
+				})
+			}
+		}
+	} else {
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Invalid request body",
+			})
+		}
 	}
+
+	req.Username = strings.TrimSpace(req.Username)
+	req.Email = strings.TrimSpace(req.Email)
+	req.Password = strings.TrimSpace(req.Password)
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	req.Bio = strings.TrimSpace(req.Bio)
+	req.InstanceDomain = strings.TrimSpace(req.InstanceDomain)
+	req.DID = strings.TrimSpace(req.DID)
+	req.PublicKey = strings.TrimSpace(req.PublicKey)
+	req.EncryptionPublicKey = strings.TrimSpace(req.EncryptionPublicKey)
 
 	// Validate using model method
 	if err := req.Validate(); err != nil {
@@ -106,6 +179,17 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create user: " + err.Error(),
 		})
+	}
+
+	if len(avatarBytes) > 0 {
+		updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, avatarMediaType)
+		if err != nil {
+			log.Printf("Update Avatar DB error: %v", err)
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "User created but failed to save avatar",
+			})
+		}
+		user = updatedUser
 	}
 
 	// Generate JWT token

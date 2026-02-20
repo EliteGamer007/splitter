@@ -582,6 +582,7 @@ func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset in
 
 	return users, nil
 }
+
 // UpdateEncryptionKey updates a user's encryption public key
 // This allows existing users without keys to add them
 func (r *UserRepository) UpdateEncryptionKey(ctx context.Context, userID, encryptionPublicKey string) error {
@@ -594,4 +595,67 @@ func (r *UserRepository) UpdateEncryptionKey(ctx context.Context, userID, encryp
 		return fmt.Errorf("user not found")
 	}
 	return nil
+}
+
+// UpdateAvatar stores avatar binary data in DB and updates avatar URL.
+func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatarData []byte, mediaType string) (*models.User, error) {
+	avatarURL := fmt.Sprintf("/api/v1/users/%s/avatar", userID)
+	query := `
+		UPDATE users
+		SET avatar_data = $1,
+		    avatar_media_type = $2,
+		    avatar_url = $3,
+		    updated_at = NOW()
+		WHERE id = $4
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+	`
+
+	var user models.User
+	err := db.GetDB().QueryRow(ctx, query, avatarData, mediaType, avatarURL, userID).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.InstanceDomain,
+		&user.DID,
+		&user.DisplayName,
+		&user.Bio,
+		&user.AvatarURL,
+		&user.PublicKey,
+		&user.EncryptionPublicKey,
+		&user.Role,
+		&user.ModerationRequested,
+		&user.IsLocked,
+		&user.IsSuspended,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to update avatar: %w", err)
+	}
+
+	return &user, nil
+}
+
+// GetAvatarContentByUserID retrieves avatar bytes, type and URL for a user.
+func (r *UserRepository) GetAvatarContentByUserID(ctx context.Context, userID string) ([]byte, string, string, error) {
+	query := `
+		SELECT COALESCE(avatar_data, ''::bytea), COALESCE(avatar_media_type, ''), COALESCE(avatar_url, '')
+		FROM users
+		WHERE id = $1
+	`
+
+	var avatarData []byte
+	var mediaType, avatarURL string
+	err := db.GetDB().QueryRow(ctx, query, userID).Scan(&avatarData, &mediaType, &avatarURL)
+	if err == pgx.ErrNoRows {
+		return nil, "", "", fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to get avatar: %w", err)
+	}
+
+	return avatarData, mediaType, avatarURL, nil
 }

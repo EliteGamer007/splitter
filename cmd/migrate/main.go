@@ -49,7 +49,13 @@ func main() {
 
 	// Migration Queries
 	queries := []string{
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS public_key TEXT;`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS encryption_public_key TEXT DEFAULT '';`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data BYTEA;`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_media_type TEXT;`,
+		`ALTER TABLE media ADD COLUMN IF NOT EXISTS media_data BYTEA;`,
 		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS ciphertext TEXT;`,
 	}
 
