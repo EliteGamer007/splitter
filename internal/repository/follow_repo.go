@@ -87,8 +87,8 @@ func (r *FollowRepository) Delete(ctx context.Context, followerDID, followingDID
 // GetFollowers retrieves users following a specific user
 func (r *FollowRepository) GetFollowers(ctx context.Context, userDID string, limit, offset int) ([]*models.User, error) {
 	query := `
-		SELECT u.id, u.username, u.instance_domain, u.did, u.display_name, 
-		       u.bio, u.avatar_url, u.public_key, u.is_locked, u.is_suspended,
+		SELECT u.id, u.username, COALESCE(u.instance_domain, ''), COALESCE(u.did, ''), u.display_name,
+		       COALESCE(u.bio, ''), COALESCE(u.avatar_url, ''), COALESCE(u.public_key, ''), u.is_locked, u.is_suspended,
 		       u.created_at, u.updated_at
 		FROM users u
 		INNER JOIN follows f ON u.did = f.follower_did
@@ -131,8 +131,8 @@ func (r *FollowRepository) GetFollowers(ctx context.Context, userDID string, lim
 // GetFollowing retrieves users followed by a specific user
 func (r *FollowRepository) GetFollowing(ctx context.Context, userDID string, limit, offset int) ([]*models.User, error) {
 	query := `
-		SELECT u.id, u.username, u.instance_domain, u.did, u.display_name, 
-		       u.bio, u.avatar_url, u.public_key, u.is_locked, u.is_suspended,
+		SELECT u.id, u.username, COALESCE(u.instance_domain, ''), COALESCE(u.did, ''), u.display_name,
+		       COALESCE(u.bio, ''), COALESCE(u.avatar_url, ''), COALESCE(u.public_key, ''), u.is_locked, u.is_suspended,
 		       u.created_at, u.updated_at
 		FROM users u
 		INNER JOIN follows f ON u.did = f.following_did

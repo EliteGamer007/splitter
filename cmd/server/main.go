@@ -17,6 +17,10 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// DEBUG: Print DB Config to verify isolation
+	log.Printf("DEBUG: Loaded Config -- DB_HOST=%s, DB_NAME=%s, FEDERATION_DOMAIN=%s",
+		cfg.Database.Host, cfg.Database.Name, cfg.Federation.Domain)
+
 	// Initialize database connection
 	if err := db.InitDB(cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)

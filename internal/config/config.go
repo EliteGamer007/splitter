@@ -1,16 +1,29 @@
 package config
 
 import (
+	"log"
 	"os"
 
-	_ "github.com/joho/godotenv/autoload"
+	"github.com/joho/godotenv"
 )
+
+func init() {
+	// Load env file: use ENV_FILE if set (for instance 2), otherwise default .env
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("Warning: Could not load env file %s: %v", envFile, err)
+	}
+}
 
 // Config holds all application configuration
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	JWT      JWTConfig
+	Database   DatabaseConfig
+	Server     ServerConfig
+	JWT        JWTConfig
+	Federation FederationConfig
 }
 
 // DatabaseConfig holds database-related configuration
@@ -37,6 +50,13 @@ type JWTConfig struct {
 	Expiration int // in hours
 }
 
+// FederationConfig holds federation-related configuration
+type FederationConfig struct {
+	Domain  string // Instance domain identifier (e.g., "splitter-1")
+	URL     string // Full URL of this instance (e.g., "http://localhost:8000")
+	Enabled bool   // Whether federation is enabled
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -57,6 +77,11 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "your-secret-key"),
 			Expiration: 24, // 24 hours
+		},
+		Federation: FederationConfig{
+			Domain:  getEnv("FEDERATION_DOMAIN", "localhost"),
+			URL:     getEnv("FEDERATION_URL", "http://localhost:8000"),
+			Enabled: getEnv("FEDERATION_ENABLED", "false") == "true",
 		},
 	}
 }

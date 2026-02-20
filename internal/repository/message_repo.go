@@ -21,6 +21,14 @@ func NewMessageRepository() *MessageRepository {
 
 // GetOrCreateThread gets an existing thread between two users or creates one
 func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, userBID string) (*models.MessageThread, error) {
+	allowed, reason, err := r.canSendMessageToRecipient(ctx, userAID, userBID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, fmt.Errorf("message request blocked: %s", reason)
+	}
+
 	// Check if thread exists (either direction)
 	query := `
 		SELECT id, participant_a_id, participant_b_id, created_at, updated_at
@@ -30,7 +38,7 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 	`
 
 	var thread models.MessageThread
-	err := db.GetDB().QueryRow(ctx, query, userAID, userBID).Scan(
+	err = db.GetDB().QueryRow(ctx, query, userAID, userBID).Scan(
 		&thread.ID,
 		&thread.ParticipantAID,
 		&thread.ParticipantBID,
@@ -66,6 +74,53 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 	}
 
 	return &thread, nil
+}
+
+func (r *MessageRepository) canSendMessageToRecipient(ctx context.Context, senderID, recipientID string) (bool, string, error) {
+	var senderDID string
+	if err := db.GetDB().QueryRow(ctx, `SELECT did FROM users WHERE id = $1`, senderID).Scan(&senderDID); err != nil {
+		if err == pgx.ErrNoRows {
+			return false, "sender not found", nil
+		}
+		return false, "failed to load sender", fmt.Errorf("failed to load sender DID: %w", err)
+	}
+
+	var recipientDID string
+	var messagePrivacy string
+	if err := db.GetDB().QueryRow(ctx,
+		`SELECT did, COALESCE(NULLIF(message_privacy, ''), 'everyone')
+		 FROM users
+		 WHERE id = $1`,
+		recipientID,
+	).Scan(&recipientDID, &messagePrivacy); err != nil {
+		if err == pgx.ErrNoRows {
+			return false, "recipient not found", nil
+		}
+		return false, "failed to load recipient", fmt.Errorf("failed to load recipient privacy settings: %w", err)
+	}
+
+	switch messagePrivacy {
+	case "none":
+		return false, "recipient does not accept direct messages", nil
+	case "followers":
+		var follows bool
+		err := db.GetDB().QueryRow(ctx,
+			`SELECT EXISTS(
+				SELECT 1 FROM follows
+				WHERE follower_did = $1 AND following_did = $2 AND status = 'accepted'
+			)`,
+			senderDID, recipientDID,
+		).Scan(&follows)
+		if err != nil {
+			return false, "failed to verify follower relationship", fmt.Errorf("failed to check follower relationship: %w", err)
+		}
+		if !follows {
+			return false, "only followers can message this user", nil
+		}
+		return true, "", nil
+	default:
+		return true, "", nil
+	}
 }
 
 // SendMessage sends a message in a thread

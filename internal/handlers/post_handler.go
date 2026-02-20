@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
+	"splitter/internal/config"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -15,14 +19,16 @@ import (
 // PostHandler handles post-related requests
 type PostHandler struct {
 	postRepo *repository.PostRepository
-	storage  service.FileStorage
+	userRepo *repository.UserRepository
+	cfg      *config.Config
 }
 
 // NewPostHandler creates a new PostHandler
-func NewPostHandler(postRepo *repository.PostRepository, storage service.FileStorage) *PostHandler {
+func NewPostHandler(postRepo *repository.PostRepository, userRepo *repository.UserRepository, cfg *config.Config) *PostHandler {
 	return &PostHandler{
 		postRepo: postRepo,
-		storage:  storage,
+		userRepo: userRepo,
+		cfg:      cfg,
 	}
 }
 
@@ -59,16 +65,17 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	}
 
 	// Handle file upload
-	var mediaURL, mediaType string
+	var mediaData []byte
+	var mediaType string
 	if fileErr == nil {
-		// File present, save it
-		url, mType, err := h.storage.Save(file)
+		// File present, validate and read
+		bytes, mType, err := service.ReadAndValidateImage(file, 5*1024*1024)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{
 				"error": fmt.Sprintf("Failed to upload file: %v", err),
 			})
 		}
-		mediaURL = url
+		mediaData = bytes
 		mediaType = mType
 	} else if fileErr != http.ErrMissingFile {
 		// Real error occurred
@@ -82,11 +89,36 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		Visibility: visibility,
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaURL, mediaType)
+	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaData, mediaType)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
 		})
+	}
+
+	// Federation Hook: Deliver to remote followers
+	if h.cfg.Federation.Enabled {
+		log.Printf("[Federation] Post created by %s, triggering delivery...", did)
+		go func() {
+			// Fetch user to get username
+			user, err := h.userRepo.GetByDID(context.Background(), did)
+			if err != nil {
+				log.Printf("[Federation] Failed to fetch user %s for delivery: %v", did, err)
+				return
+			}
+
+			// Construct Actor URI: base_url/ap/users/username
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			log.Printf("[Federation] Building Create activity for %s (post %s)", actorURI, post.ID)
+
+			// Build Create activity
+			activity := federation.BuildCreateNoteActivity(actorURI, post.ID, post.Content, post.CreatedAt)
+
+			// Deliver to followers
+			federation.DeliverToFollowers(activity, did)
+		}()
+	} else {
+		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
 
 	return c.JSON(http.StatusCreated, post)
@@ -196,8 +228,14 @@ func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 	// Check if user is authenticated to include liked status
 	userDID, _ := c.Get("did").(string)
 
-	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset)
+	localOnly := false
+	if localParam := c.QueryParam("local_only"); localParam == "true" || localParam == "1" {
+		localOnly = true
+	}
+
+	posts, err := h.postRepo.GetPublicFeedWithUser(c.Request().Context(), userDID, limit, offset, localOnly)
 	if err != nil {
+		c.Logger().Errorf("Failed to retrieve public feed: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve public feed",
 		})
@@ -261,10 +299,25 @@ func (h *PostHandler) DeletePost(c echo.Context) error {
 	role, _ := c.Get("role").(string)
 	isAdmin := role == "admin" || role == "moderator"
 
+	meta, _ := h.postRepo.GetFederationMeta(c.Request().Context(), postID)
+
 	if err := h.postRepo.Delete(c.Request().Context(), postID, did, isAdmin); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete post",
 		})
+	}
+
+	if h.cfg.Federation.Enabled && !isAdmin {
+		if user, err := h.userRepo.GetByDID(c.Request().Context(), did); err == nil && user != nil {
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			objectURI := fmt.Sprintf("%s/posts/%s", h.cfg.Federation.URL, postID)
+			if meta != nil && meta.OriginalPostURI != "" {
+				objectURI = meta.OriginalPostURI
+			}
+
+			deleteActivity := federation.BuildDeleteActivity(actorURI, objectURI)
+			go federation.DeliverToFollowers(deleteActivity, did)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{

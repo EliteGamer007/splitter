@@ -14,13 +14,19 @@ import (
 // PostRepository handles database operations for posts
 type PostRepository struct{}
 
+type PostFederationMeta struct {
+	AuthorDID       string
+	OriginalPostURI string
+	IsRemote        bool
+}
+
 // NewPostRepository creates a new PostRepository
 func NewPostRepository() *PostRepository {
 	return &PostRepository{}
 }
 
 // Create creates a new post in the database
-func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaURL, mediaType string) (*models.Post, error) {
+func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaData []byte, mediaType string) (*models.Post, error) {
 	visibility := post.Visibility
 	if visibility == "" {
 		visibility = "public"
@@ -58,22 +64,26 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 	}
 
 	// Insert media if present
-	if mediaURL != "" {
+	if len(mediaData) > 0 {
 		mediaQuery := `
-			INSERT INTO media (post_id, media_url, media_type)
-			VALUES ($1, $2, $3)
-			RETURNING id, post_id, media_url, media_type, created_at
+			INSERT INTO media (post_id, media_url, media_type, media_data)
+			VALUES ($1, '', $2, $3)
+			RETURNING id, post_id, media_type, created_at
 		`
 		var media models.Media
-		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaURL, mediaType).Scan(
+		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaType, mediaData).Scan(
 			&media.ID,
 			&media.PostID,
-			&media.MediaURL,
 			&media.MediaType,
 			&media.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create media: %w", err)
+		}
+
+		media.MediaURL = fmt.Sprintf("/api/v1/media/%s/content", media.ID)
+		if _, err := tx.Exec(ctx, `UPDATE media SET media_url = $1 WHERE id = $2`, media.MediaURL, media.ID); err != nil {
+			return nil, fmt.Errorf("failed to update media url: %w", err)
 		}
 		newPost.Media = []models.Media{media}
 	}
@@ -85,11 +95,32 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 	return &newPost, nil
 }
 
+// GetMediaContent retrieves media bytes and type by media ID.
+func (r *PostRepository) GetMediaContent(ctx context.Context, mediaID string) ([]byte, string, string, error) {
+	query := `
+		SELECT COALESCE(media_data, ''::bytea), COALESCE(media_type, ''), COALESCE(media_url, '')
+		FROM media
+		WHERE id = $1
+	`
+
+	var mediaData []byte
+	var mediaType, mediaURL string
+	err := db.GetDB().QueryRow(ctx, query, mediaID).Scan(&mediaData, &mediaType, &mediaURL)
+	if err == pgx.ErrNoRows {
+		return nil, "", "", fmt.Errorf("media not found")
+	}
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to get media content: %w", err)
+	}
+
+	return mediaData, mediaType, mediaURL, nil
+}
+
 // GetByID retrieves a post by ID
 func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
@@ -112,6 +143,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		&post.CreatedAt,
 		&post.UpdatedAt,
 		&post.Username,
+		&post.AvatarURL,
 		&post.LikeCount,
 		&post.DirectReplyCount,
 		&post.TotalReplyCount,
@@ -145,7 +177,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count
 		FROM posts p
@@ -173,6 +205,7 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.Username,
+			&post.AvatarURL,
 			&post.LikeCount,
 			&post.DirectReplyCount,
 			&post.TotalReplyCount,
@@ -189,7 +222,7 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, u.username,
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -227,6 +260,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.Username,
+			&post.AvatarURL,
 			&post.LikeCount,
 			&post.Liked,
 			&post.RepostCount,
@@ -256,15 +290,19 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 }
 
 // GetPublicFeed retrieves public posts for unauthenticated users or with optional user context
-func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
+func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int, localOnly bool) ([]*models.Post, error) {
 	var query string
 	var args []interface{}
+	localFilterClause := ""
+	if localOnly {
+		localFilterClause = " AND p.is_remote = false"
+	}
 
 	if userDID != "" {
 		// Authenticated user - include liked and reposted status
 		query = `
 			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, u.username,
+			       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -274,7 +312,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $2 OFFSET $3
 		`
@@ -283,7 +321,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 		// Unauthenticated user - liked and reposted are always false
 		query = `
 			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, u.username,
+			       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       false as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -293,7 +331,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $1 OFFSET $2
 		`
@@ -321,6 +359,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.Username,
+			&post.AvatarURL,
 			&post.LikeCount,
 			&post.Liked,
 			&post.RepostCount,
@@ -351,7 +390,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 
 // GetPublicFeed retrieves public posts for unauthenticated users
 func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) ([]*models.Post, error) {
-	return r.GetPublicFeedWithUser(ctx, "", limit, offset)
+	return r.GetPublicFeedWithUser(ctx, "", limit, offset, false)
 }
 
 // Update updates a post's content
@@ -421,4 +460,23 @@ func (r *PostRepository) Delete(ctx context.Context, postID, authorDID string, i
 	}
 
 	return nil
+}
+
+func (r *PostRepository) GetFederationMeta(ctx context.Context, postID string) (*PostFederationMeta, error) {
+	query := `
+		SELECT author_did, COALESCE(original_post_uri, ''), is_remote
+		FROM posts
+		WHERE id = $1
+	`
+
+	var meta PostFederationMeta
+	err := db.GetDB().QueryRow(ctx, query, postID).Scan(&meta.AuthorDID, &meta.OriginalPostURI, &meta.IsRemote)
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("post not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get post federation metadata: %w", err)
+	}
+
+	return &meta, nil
 }

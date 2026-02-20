@@ -1,8 +1,14 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 
+	"splitter/internal/config"
+	"splitter/internal/federation"
+	"splitter/internal/models"
 	"splitter/internal/repository"
 
 	"github.com/labstack/echo/v4"
@@ -12,13 +18,17 @@ import (
 type InteractionHandler struct {
 	interactionRepo *repository.InteractionRepository
 	userRepo        *repository.UserRepository
+	postRepo        *repository.PostRepository
+	cfg             *config.Config
 }
 
 // NewInteractionHandler creates a new InteractionHandler
-func NewInteractionHandler(interactionRepo *repository.InteractionRepository, userRepo *repository.UserRepository) *InteractionHandler {
+func NewInteractionHandler(interactionRepo *repository.InteractionRepository, userRepo *repository.UserRepository, postRepo *repository.PostRepository, cfg *config.Config) *InteractionHandler {
 	return &InteractionHandler{
 		interactionRepo: interactionRepo,
 		userRepo:        userRepo,
+		postRepo:        postRepo,
+		cfg:             cfg,
 	}
 }
 
@@ -44,6 +54,8 @@ func (h *InteractionHandler) LikePost(c echo.Context) error {
 			"error": "Failed to like post",
 		})
 	}
+
+	h.dispatchFederatedInteraction(c, currentUser, postID, "Like")
 
 	return c.JSON(http.StatusCreated, map[string]string{
 		"message": "Post liked successfully",
@@ -100,6 +112,8 @@ func (h *InteractionHandler) RepostPost(c echo.Context) error {
 			"error": "Failed to repost",
 		})
 	}
+
+	h.dispatchFederatedInteraction(c, currentUser, postID, "Announce")
 
 	return c.JSON(http.StatusCreated, map[string]string{
 		"message": "Post reposted successfully",
@@ -212,4 +226,42 @@ func (h *InteractionHandler) GetBookmarks(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, posts)
+}
+
+func (h *InteractionHandler) dispatchFederatedInteraction(c echo.Context, currentUser *models.User, postID, activityType string) {
+	if h.cfg == nil || !h.cfg.Federation.Enabled {
+		return
+	}
+
+	meta, err := h.postRepo.GetFederationMeta(c.Request().Context(), postID)
+	if err != nil || meta == nil {
+		return
+	}
+
+	if !meta.IsRemote || !strings.HasPrefix(meta.AuthorDID, "http") {
+		return
+	}
+
+	objectURI := meta.OriginalPostURI
+	if strings.TrimSpace(objectURI) == "" {
+		objectURI = fmt.Sprintf("%s/posts/%s", h.cfg.Federation.URL, postID)
+	}
+
+	actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, currentUser.Username)
+
+	go func(targetActorURI string) {
+		var activity *federation.Activity
+		switch activityType {
+		case "Like":
+			activity = federation.BuildLikeActivity(actorURI, objectURI)
+		case "Announce":
+			activity = federation.BuildAnnounceActivity(actorURI, objectURI)
+		default:
+			return
+		}
+
+		if err := federation.DeliverToActor(activity, targetActorURI); err != nil {
+			log.Printf("[Federation] Failed to federate %s for post %s to %s: %v", activityType, postID, targetActorURI, err)
+		}
+	}(meta.AuthorDID)
 }

@@ -21,6 +21,7 @@ CREATE TABLE users (
     bio TEXT,
     avatar_url TEXT,
     public_key TEXT,  -- Optional for password users
+    encryption_public_key TEXT DEFAULT '',  -- E2EE encryption public key (ECDH)
     role TEXT DEFAULT 'user' CHECK (role IN ('user', 'moderator', 'admin')),
     moderation_requested BOOLEAN DEFAULT FALSE,
     moderation_requested_at TIMESTAMPTZ,
@@ -79,6 +80,8 @@ CREATE TABLE posts (
     visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','followers','circle')),
     is_remote BOOLEAN DEFAULT FALSE,
     original_post_uri TEXT,
+    direct_reply_count INT DEFAULT 0,
+    total_reply_count INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
@@ -102,6 +105,22 @@ CREATE TABLE interactions (
     interaction_type TEXT CHECK (interaction_type IN ('like','repost')),
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(post_id, actor_did, interaction_type)
+);
+
+-- Reply threads
+CREATE TABLE replies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES replies(id) ON DELETE CASCADE,
+    author_did TEXT NOT NULL,
+    content TEXT NOT NULL,
+    depth INT NOT NULL,
+    likes_count INT DEFAULT 0,
+    direct_reply_count INT DEFAULT 0,
+    total_reply_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ
 );
 
 -- Private saved posts
@@ -136,11 +155,13 @@ CREATE TABLE messages (
     recipient_did TEXT,
     sender_id UUID REFERENCES users(id),
     recipient_id UUID REFERENCES users(id),
-    ciphertext BYTEA,
+    ciphertext TEXT,  -- E2EE encrypted content
     content TEXT,  -- For unencrypted messages
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT now(),
-    delivered_at TIMESTAMPTZ
+    delivered_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ,  -- WhatsApp-style soft delete
+    edited_at TIMESTAMPTZ    -- Message edit timestamp
 );
 
 -- ============================================================
@@ -264,6 +285,14 @@ CREATE INDEX idx_message_threads_participants ON message_threads(participant_a_i
 -- Federation indexes
 CREATE INDEX idx_inbox_actor ON inbox_activities(actor_uri);
 CREATE INDEX idx_outbox_status ON outbox_activities(status);
+
+-- Reply indexes
+CREATE INDEX idx_replies_post_id ON replies(post_id);
+CREATE INDEX idx_replies_parent_id ON replies(parent_id);
+CREATE INDEX idx_replies_author_did ON replies(author_did);
+
+-- Message deletion index
+CREATE INDEX idx_messages_deleted_at ON messages(deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- Moderation indexes
 CREATE INDEX idx_moderation_requests_status ON moderation_requests(status);

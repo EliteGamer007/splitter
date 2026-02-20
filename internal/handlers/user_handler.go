@@ -1,10 +1,18 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"splitter/internal/config"
+	"splitter/internal/db"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -12,12 +20,14 @@ import (
 // UserHandler handles user-related requests
 type UserHandler struct {
 	userRepo *repository.UserRepository
+	cfg      *config.Config
 }
 
 // NewUserHandler creates a new UserHandler
-func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
+func NewUserHandler(userRepo *repository.UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{
 		userRepo: userRepo,
+		cfg:      cfg,
 	}
 }
 
@@ -82,21 +92,172 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		})
 	}
 
-	var req models.UserUpdate
+	var req struct {
+		DisplayName       *string `json:"display_name,omitempty"`
+		Bio               *string `json:"bio,omitempty"`
+		AvatarURL         *string `json:"avatar_url,omitempty"`
+		DefaultVisibility *string `json:"default_visibility"`
+		MessagePrivacy    *string `json:"message_privacy"`
+		AccountLocked     *bool   `json:"account_locked"`
+	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
 		})
 	}
 
-	updatedUser, err := h.userRepo.Update(c.Request().Context(), user.ID, &req)
+	profileReq := &models.UserUpdate{
+		DisplayName: req.DisplayName,
+		Bio:         req.Bio,
+		AvatarURL:   req.AvatarURL,
+	}
+
+	updatedUser, err := h.userRepo.Update(c.Request().Context(), user.ID, profileReq)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update profile",
 		})
 	}
 
+	if req.DefaultVisibility != nil || req.MessagePrivacy != nil || req.AccountLocked != nil {
+		defaultVisibility := ""
+		if req.DefaultVisibility != nil {
+			defaultVisibility = strings.TrimSpace(*req.DefaultVisibility)
+		}
+
+		messagePrivacy := ""
+		if req.MessagePrivacy != nil {
+			messagePrivacy = strings.TrimSpace(*req.MessagePrivacy)
+		}
+
+		var accountLocked *bool
+		if req.AccountLocked != nil {
+			accountLocked = req.AccountLocked
+		}
+
+		if messagePrivacy != "" && messagePrivacy != "everyone" && messagePrivacy != "followers" && messagePrivacy != "none" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid message_privacy value"})
+		}
+
+		if defaultVisibility != "" && defaultVisibility != "public" && defaultVisibility != "followers" && defaultVisibility != "circle" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid default_visibility value"})
+		}
+
+		_, err = db.GetDB().Exec(c.Request().Context(),
+			`UPDATE users
+			 SET default_visibility = COALESCE(NULLIF($1, ''), default_visibility),
+			     message_privacy = COALESCE(NULLIF($2, ''), message_privacy),
+			     is_locked = COALESCE($3, is_locked),
+			     updated_at = NOW()
+			 WHERE id = $4`,
+			defaultVisibility,
+			messagePrivacy,
+			accountLocked,
+			user.ID,
+		)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update privacy settings"})
+		}
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			updatedUser.DisplayName,
+			updatedUser.Bio,
+			updatedUser.AvatarURL,
+			updatedUser.PublicKey,
+			updatedUser.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
+	}
+
 	return c.JSON(http.StatusOK, updatedUser)
+}
+
+// UploadAvatar uploads and stores avatar image in DB for authenticated user.
+func (h *UserHandler) UploadAvatar(c echo.Context) error {
+	did := c.Get("did").(string)
+
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
+
+	file, fileErr := c.FormFile("avatar")
+	if fileErr == http.ErrMissingFile {
+		file, fileErr = c.FormFile("file")
+	}
+	if fileErr != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Avatar file is required",
+		})
+	}
+
+	avatarBytes, mediaType, err := service.ReadAndValidateImage(file, 5*1024*1024)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Invalid avatar image: %v", err),
+		})
+	}
+
+	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, mediaType)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to upload avatar",
+		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			updatedUser.DisplayName,
+			updatedUser.Bio,
+			updatedUser.AvatarURL,
+			updatedUser.PublicKey,
+			updatedUser.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
+	}
+
+	return c.JSON(http.StatusOK, updatedUser)
+}
+
+// GetAvatar serves user avatar content from DB, with fallback for legacy disk URLs.
+func (h *UserHandler) GetAvatar(c echo.Context) error {
+	userID := c.Param("id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+	}
+
+	avatarData, mediaType, avatarURL, err := h.userRepo.GetAvatarContentByUserID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Avatar not found"})
+	}
+
+	if len(avatarData) > 0 {
+		if mediaType == "" {
+			mediaType = "image/jpeg"
+		}
+		return c.Blob(http.StatusOK, mediaType, avatarData)
+	}
+
+	if strings.HasPrefix(avatarURL, "/uploads/") {
+		legacyPath := filepath.Join(".", filepath.FromSlash(strings.TrimPrefix(avatarURL, "/")))
+		legacyData, readErr := os.ReadFile(legacyPath)
+		if readErr == nil && len(legacyData) > 0 {
+			detectedType := http.DetectContentType(legacyData)
+			return c.Blob(http.StatusOK, detectedType, legacyData)
+		}
+	}
+
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "Avatar content not found"})
 }
 
 // DeleteAccount deletes the authenticated user's account
@@ -112,16 +273,40 @@ func (h *UserHandler) DeleteAccount(c echo.Context) error {
 		})
 	}
 
+	var postIDs []string
+	rows, qErr := db.GetDB().Query(c.Request().Context(), `SELECT id::text FROM posts WHERE author_did = $1 AND deleted_at IS NULL`, user.DID)
+	if qErr == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var postID string
+			if err := rows.Scan(&postID); err == nil {
+				postIDs = append(postIDs, postID)
+			}
+		}
+	}
+
 	if err := h.userRepo.Delete(c.Request().Context(), user.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete account",
 		})
 	}
 
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		for _, postID := range postIDs {
+			postDelete := federation.BuildDeleteActivity(actorURI, fmt.Sprintf("%s/posts/%s", h.cfg.Federation.URL, postID))
+			go federation.DeliverToFollowers(postDelete, user.DID)
+		}
+
+		accountDelete := federation.BuildDeleteActivity(actorURI, actorURI)
+		go federation.DeliverToFollowers(accountDelete, user.DID)
+	}
+
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "Account deleted successfully",
 	})
 }
+
 // UpdateEncryptionKey updates the user's encryption public key
 // This allows existing users without keys to generate and add them
 func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
@@ -150,6 +335,22 @@ func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update encryption key: " + err.Error(),
 		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		if user, fetchErr := h.userRepo.GetByID(c.Request().Context(), userID); fetchErr == nil && user != nil {
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			activity := federation.BuildUpdateActorActivity(
+				actorURI,
+				user.Username,
+				user.DisplayName,
+				user.Bio,
+				user.AvatarURL,
+				user.PublicKey,
+				req.EncryptionPublicKey,
+			)
+			go federation.DeliverToFollowers(activity, user.DID)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{

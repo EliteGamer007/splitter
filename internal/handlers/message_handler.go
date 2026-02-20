@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"splitter/internal/config"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 
@@ -14,13 +17,15 @@ import (
 type MessageHandler struct {
 	msgRepo  *repository.MessageRepository
 	userRepo *repository.UserRepository
+	cfg      *config.Config
 }
 
 // NewMessageHandler creates a new MessageHandler
-func NewMessageHandler(msgRepo *repository.MessageRepository, userRepo *repository.UserRepository) *MessageHandler {
+func NewMessageHandler(msgRepo *repository.MessageRepository, userRepo *repository.UserRepository, cfg *config.Config) *MessageHandler {
 	return &MessageHandler{
 		msgRepo:  msgRepo,
 		userRepo: userRepo,
+		cfg:      cfg,
 	}
 }
 
@@ -100,6 +105,7 @@ func (h *MessageHandler) GetMessages(c echo.Context) error {
 // SendMessage sends a message to another user
 func (h *MessageHandler) SendMessage(c echo.Context) error {
 	userID := c.Get("user_id").(string)
+	ctx := c.Request().Context()
 
 	var req struct {
 		RecipientID string `json:"recipient_id"`
@@ -126,15 +132,23 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	}
 
 	// Verify recipient exists
-	recipient, err := h.userRepo.GetByID(c.Request().Context(), req.RecipientID)
+	recipient, err := h.userRepo.GetByID(ctx, req.RecipientID)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Recipient not found",
 		})
 	}
 
+	// Get sender details
+	sender, err := h.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to get sender profile",
+		})
+	}
+
 	// Get or create thread
-	thread, err := h.msgRepo.GetOrCreateThread(c.Request().Context(), userID, req.RecipientID)
+	thread, err := h.msgRepo.GetOrCreateThread(ctx, userID, req.RecipientID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to get/create thread: " + err.Error(),
@@ -142,11 +156,53 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	}
 
 	// Send message
-	msg, err := h.msgRepo.SendMessage(c.Request().Context(), thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext)
+	msg, err := h.msgRepo.SendMessage(ctx, thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to send message: " + err.Error(),
 		})
+	}
+
+	// FEDERATION: If recipient is remote, deliver activity
+	if h.cfg.Federation.Enabled && recipient.InstanceDomain != h.cfg.Federation.Domain && recipient.InstanceDomain != "localhost" {
+		go func() {
+			// Resolve remote actor to get inbox
+			// Recipient DID should be the actor URI for remote users
+			remoteActor, err := federation.ResolveRemoteUser(recipient.Username + "@" + recipient.InstanceDomain)
+			if err != nil {
+				// Try using DID if it looks like an actor URI
+				remoteActor, err = federation.ResolveRemoteUser(recipient.DID)
+				if err != nil {
+					// Last resort
+					return
+				}
+			}
+
+			// Build activity
+			// Note: For DMs, we send a Create(Note) addressed ONLY to the recipient
+			// We use the ciphertext if available? ActivityPub standard is usually plaintext (or encoded).
+			// Splitter uses E2EE, but ActivityPub doesn't natively support it easily without extensions.
+			// For now, we send the Ciphertext as content or a specific field if we want to support E2EE federation.
+			// However, since we are sending to a standard AP server (which might not be Splitter),
+			// we should probably send the plaintext Content as fallback + Ciphertext if possible.
+			// But wait, if the recipient IS another Splitter instance, they expect E2EE.
+			// Currently `Create` activity uses `Content`.
+			// Let's send `Ciphertext` in the content field if it exists, labelled as such?
+			// Or just send Content for now to keep it simple and standard compliant.
+			// If we send plaintext Content, it won't be E2EE but it will work.
+			// Let's settle on sending `Content` (plaintext) for now to ensure interoperability.
+			// If we want E2EE, we'd need to negotiate keys which we did via the frontend.
+			// BUT: The frontend did E2EE. The `req.Content` might already be encrypted?
+			// No, `req.Content` is usually a fallback/notification text or empty if E2EE is strict.
+			// In `DMPage.jsx`, `sendMessage` sends `encMessage` as `ciphertext` and `message` as `content`.
+			// So `content` IS the plaintext message (if provided).
+
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, sender.Username)
+			activity := federation.BuildCreateDMActivity(actorURI, recipient.DID, req.Content)
+
+			// Deliver
+			federation.DeliverActivity(activity, remoteActor.InboxURL)
+		}()
 	}
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
@@ -220,6 +276,7 @@ func (h *MessageHandler) MarkAsRead(c echo.Context) error {
 		"message": "Messages marked as read",
 	})
 }
+
 // DeleteMessage soft-deletes a message (WhatsApp-style)
 func (h *MessageHandler) DeleteMessage(c echo.Context) error {
 	userID := c.Get("user_id").(string)

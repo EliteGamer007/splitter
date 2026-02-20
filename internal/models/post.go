@@ -10,6 +10,7 @@ type Post struct {
 	ID               string     `json:"id"`
 	AuthorDID        string     `json:"author_did"`
 	Username         string     `json:"username,omitempty"`
+	AvatarURL        string     `json:"avatar_url,omitempty"`
 	Content          string     `json:"content"`
 	Visibility       string     `json:"visibility,omitempty"`
 	IsRemote         bool       `json:"is_remote"`
