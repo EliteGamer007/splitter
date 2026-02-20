@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"splitter/internal/config"
@@ -280,6 +281,19 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 	defer rows.Close()
 
 	var posts []map[string]interface{}
+	seen := make(map[string]bool)
+	addPost := func(post map[string]interface{}) {
+		id, _ := post["id"].(string)
+		author, _ := post["author_did"].(string)
+		content, _ := post["content"].(string)
+		key := fmt.Sprintf("%s|%s|%s", id, author, content)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		posts = append(posts, post)
+	}
+
 	for rows.Next() {
 		var id, authorDID, content, visibility, originalURI, username, displayName, avatarURL string
 		var isRemote bool
@@ -313,7 +327,76 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			post["domain"] = extractDomainFromDID(authorDID)
 		}
 
-		posts = append(posts, post)
+		addPost(post)
+	}
+
+	// Fetch live remote public posts from known instances.
+	for domain, baseURL := range federation.InstanceURLMap {
+		if domain == h.cfg.Federation.Domain {
+			continue
+		}
+
+		client := &http.Client{}
+		resp, reqErr := client.Get(baseURL + "/api/v1/posts/public?limit=50&offset=0")
+		if reqErr != nil {
+			log.Printf("[Federation] Failed to fetch remote timeline from %s: %v", baseURL, reqErr)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			_ = resp.Body.Close()
+			continue
+		}
+
+		var remotePosts []map[string]interface{}
+		if decodeErr := json.NewDecoder(resp.Body).Decode(&remotePosts); decodeErr != nil {
+			_ = resp.Body.Close()
+			continue
+		}
+		_ = resp.Body.Close()
+
+		for _, remotePost := range remotePosts {
+			authorDID, _ := remotePost["author_did"].(string)
+			content, _ := remotePost["content"].(string)
+			visibility, _ := remotePost["visibility"].(string)
+			if visibility == "" {
+				visibility = "public"
+			}
+			if visibility != "public" {
+				continue
+			}
+
+			username, _ := remotePost["username"].(string)
+			displayName, _ := remotePost["display_name"].(string)
+			avatarURL, _ := remotePost["avatar_url"].(string)
+			createdAt := remotePost["created_at"]
+			id, _ := remotePost["id"].(string)
+			likeCount, _ := remotePost["like_count"].(float64)
+			repostCount, _ := remotePost["repost_count"].(float64)
+			originalURI, _ := remotePost["original_post_uri"].(string)
+
+			if authorDID == "" && username != "" {
+				authorDID = fmt.Sprintf("%s/ap/users/%s", baseURL, username)
+			}
+
+			post := map[string]interface{}{
+				"id":                id,
+				"author_did":        authorDID,
+				"content":           content,
+				"visibility":        visibility,
+				"is_remote":         true,
+				"original_post_uri": originalURI,
+				"like_count":        int(likeCount),
+				"repost_count":      int(repostCount),
+				"created_at":        createdAt,
+				"username":          username,
+				"display_name":      displayName,
+				"avatar_url":        avatarURL,
+				"domain":            domain,
+			}
+
+			addPost(post)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -411,6 +494,16 @@ func fetchRemoteUserList(baseURL string) []map[string]interface{} {
 
 // Helper: extract username from DID like did:web:splitter-1:alice → alice
 func extractUsernameFromDID(did string) string {
+	if strings.HasPrefix(did, "http://") || strings.HasPrefix(did, "https://") {
+		parsed, err := url.Parse(did)
+		if err == nil {
+			parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			if len(parts) >= 2 {
+				return parts[len(parts)-1]
+			}
+		}
+	}
+
 	parts := strings.Split(did, ":")
 	if len(parts) > 0 {
 		return parts[len(parts)-1]
@@ -420,6 +513,22 @@ func extractUsernameFromDID(did string) string {
 
 // Helper: extract domain from DID like did:web:splitter-1:alice → splitter-1
 func extractDomainFromDID(did string) string {
+	if strings.HasPrefix(did, "http://") || strings.HasPrefix(did, "https://") {
+		parsed, err := url.Parse(did)
+		if err == nil {
+			host := parsed.Host
+			if strings.Contains(host, "localhost:8001") {
+				return "splitter-2"
+			}
+			if strings.Contains(host, "localhost:8000") {
+				return "splitter-1"
+			}
+			if host != "" {
+				return parsed.Hostname()
+			}
+		}
+	}
+
 	parts := strings.Split(did, ":")
 	if len(parts) >= 3 {
 		return parts[2]
