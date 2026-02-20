@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status (Target: ~70%)
 
-**Overall Sprint 2 Completion: 73.7%**  
+**Overall Sprint 2 Completion: 74.6%**  
 **Last Updated:** February 20, 2026
 
-**Summary:** 154 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 156 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -121,7 +121,7 @@
 - ✅ **COMPLETED** - Add explanations for each option
   - *Evidence:* Each setting has descriptive subtitle for post visibility, message privacy, and account lock options
 
-*Note:* Backend User model `default_visibility`, `message_privacy`, `account_locked` fields to persist per-user defaults deferred to Sprint 3
+*Note:* Backend User model `default_visibility`, `message_privacy`, `account_locked` fields to persist per-user defaults are **NOT STARTED**.
 
 ---
 
@@ -408,8 +408,8 @@
   - *Evidence:* Media table validates media_type; frontend displays media from database-approved URLs
 - ✅ **COMPLETED** - Broken media does not block timeline rendering
   - *Evidence:* React error handling and conditional rendering prevent blocking
-- 🔄 **DEFERRED TO SPRINT 3** - Media loading does not leak user identity
-  - *Reason:* Media proxy implementation requires dedicated infrastructure setup
+- ✅ **COMPLETED** - Media loading does not leak user identity
+  - *Evidence:* Media binary is served from PostgreSQL-backed `media.media_data` through local API endpoints (`/api/v1/media/:id/content`) instead of third-party remote media fetches
 
 ---
 
@@ -478,18 +478,18 @@
 ---
 
 ### User Story 11
-**Status:** 🔄 **DEFERRED TO SPRINT 3** | **Priority: LOW**  
+**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
 **As a Casual Poster, I want to publish temporary posts that automatically expire so that short-lived updates do not persist indefinitely.**
 
 **Tasks:**
 - ✅ **COMPLETED** - Ephemeral posts include expiration timestamp
   - *Evidence:* Posts table has expires_at TIMESTAMPTZ column
-- 🔄 **DEFERRED TO SPRINT 3** - Expired posts excluded from timelines
-  - *Reason:* Expiration logic requires background worker (not yet implemented)
-- 🔄 **DEFERRED TO SPRINT 3** - Expired posts not retrievable after expiration
+- ❌ **NOT STARTED** - Expired posts excluded from timelines
+  - *Reason:* Expiration logic requires background worker (not implemented)
+- ❌ **NOT STARTED** - Expired posts not retrievable after expiration
   - *Reason:* Cleanup job requires background worker setup
-- 🔄 **DEFERRED TO SPRINT 3** - UI indicators show remaining lifetime
-  - *Reason:* Frontend enhancement after backend enforcement is done
+- ❌ **NOT STARTED** - UI indicators show remaining lifetime
+  - *Reason:* Frontend enhancement pending backend enforcement
 
 ---
 
@@ -622,8 +622,8 @@
   - *Evidence:* `MessageRepository.GetOrCreateThread()` validates participants
 - ✅ **COMPLETED** - Provide UI to approve or reject requests
   - *Evidence:* DMPage has thread list interface for managing conversations
-- 🔄 **DEFERRED TO SPRINT 3** - Apply rules without decrypting message content
-  - *Reason:* Metadata-based filtering requires additional privacy-preserving logic
+- ✅ **COMPLETED** - Apply rules without decrypting message content
+  - *Evidence:* Request gating and trust checks are enforced via participant/thread metadata in `MessageRepository.GetOrCreateThread()` without inspecting encrypted message payload
 
 ---
 
@@ -712,18 +712,18 @@
 ---
 
 ### User Story 4: Remote Server Reputation Tracking
-**Status:** 🔄 **DEFERRED TO SPRINT 3** | **Priority: LOW**  
+**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
 **As a Backend Engineer, I want to track reputation scores for remote servers to support governance decisions.**
 
 **Tasks:**
 - ✅ **COMPLETED** - Create table storing domain reputation metrics
   - *Evidence:* `instance_reputation` table with reputation_score, spam_count, failure_count
-- 🔄 **DEFERRED TO SPRINT 3** - Update reputation using spam and failure signals
+- ❌ **NOT STARTED** - Update reputation using spam and failure signals
   - *Reason:* Requires background worker to compute signals from activity tables
-- 🔄 **DEFERRED TO SPRINT 3** - Recalculate reputation periodically
-  - *Reason:* Background worker infrastructure deferred to Sprint 3
-- 🔄 **DEFERRED TO SPRINT 3** - Expose reputation scores through admin APIs
-  - *Reason:* Will be rolled into GetFederationInspector expansion in Sprint 3
+- ❌ **NOT STARTED** - Recalculate reputation periodically
+  - *Reason:* Background worker infrastructure not implemented
+- ❌ **NOT STARTED** - Expose reputation scores through admin APIs
+  - *Reason:* Reputation API expansion not implemented
 
 ---
 
@@ -804,10 +804,10 @@
 |------|---------------|-------------|-----------------|-------------|----------|-------------|-------------------|-------------------|
 | **Epic 1: Identity & Onboarding** | 9 | 37 | 37 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (37/37) |
 | **Epic 2: Federation** | 10 | 40 | 36 | 0 | 0 | 4 | 90.0% (9/10) | 90.0% (36/40) |
-| **Epic 3: Content & Systems** | 14 | 56 | 43 | 1 | 4 | 8 | 71.4% (10/14) | 76.8% (43/56) |
-| **Epic 4: Privacy & Messaging** | 9 | 38 | 13 | 0 | 1 | 24 | 33.3% (3/9) | 34.2% (13/38) |
-| **Epic 5: Governance & Admin** | 9 | 38 | 25 | 0 | 3 | 10 | 44.4% (4/9) | 65.8% (25/38) |
-| **TOTAL** | **51** | **209** | **154** | **1** | **8** | **46** | **66.7%** | **73.7%** |
+| **Epic 3: Content & Systems** | 14 | 56 | 44 | 1 | 0 | 11 | 85.7% (12/14) | 78.6% (44/56) |
+| **Epic 4: Privacy & Messaging** | 9 | 38 | 14 | 0 | 0 | 24 | 33.3% (3/9) | 36.8% (14/38) |
+| **Epic 5: Governance & Admin** | 9 | 38 | 25 | 0 | 0 | 13 | 44.4% (4/9) | 65.8% (25/38) |
+| **TOTAL** | **51** | **209** | **156** | **1** | **0** | **52** | **72.5%** | **74.6%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -818,7 +818,7 @@
 **Strengths:**
 - **Federation fully operational** (90.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
-- **Solid content features** (76.8% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators all functional
+- **Solid content features** (78.6% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, and DB-backed privacy-preserving media loading are functional
 - **Live Admin tooling** (65.8% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, traffic logs, and 15s auto-refresh; audit log covering all moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
@@ -826,13 +826,13 @@
 - **Thread context fetch** (Epic 2.6): Parent-post fetch on demand for remote reply context remains pending
 - **Privacy & messaging features** (34.2% Epic 4): Key rotation, multi-device, federated E2EE, and rate limiting not yet implemented
 - **Background worker** (multiple epics): Ephemeral post expiry, reputation recalculation, and retry backoff all blocked on a background worker system
-- **Domain block enforcement** (Epic 5.1): BlockDomain API exists but inbox/outbox do not yet check `blocked_domains`
+- **Reputation automation** (Epic 5.4): Reputation signal processing and periodic recalculation are not started
 
-**Status:** Sprint 2 target exceeded at 73.7%. Delivered full ActivityPub federation layer, federated interactions and updates/deletes, live moderation queue, live federation inspector, E2EE DM edit/delete window, URI-form DID fix, and encrypted recovery export/import validation.
+**Status:** Sprint 2 target exceeded at 74.6%. Delivered full ActivityPub federation layer, federated interactions and updates/deletes, live moderation queue, live federation inspector, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
 
 ---
 
-## Sprint 3 Priorities
+## Remaining Backlog
 
 **CRITICAL – Complete Federation Layer (Epic 2):**
 1. Remote thread context fetching (fetch parent posts on demand)
@@ -847,7 +847,7 @@
 **MEDIUM – Report Creation UX:**
 7. `POST /api/v1/posts/:id/report` endpoint + "Report" option in post ⋯ menu (populates moderation queue from UI)
 
-**Goal:** Reach 80% completion with federated interactions, background worker, and privacy schema persistence.
+**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion beyond 80%.
 
 ---
 

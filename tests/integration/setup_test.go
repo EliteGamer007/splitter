@@ -104,6 +104,16 @@ func SetupTestEnv(t *testing.T) func() {
 		migrationSQL += sContent
 	}
 
+	// Bring integration schema in sync with runtime migration additions used by
+	// recently implemented auth/privacy/media features.
+	migrationSQL += `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS encryption_public_key TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS message_privacy TEXT DEFAULT 'everyone';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS default_visibility TEXT DEFAULT 'public';
+		ALTER TABLE media ADD COLUMN IF NOT EXISTS media_data BYTEA;
+		ALTER TABLE messages ADD COLUMN IF NOT EXISTS ciphertext TEXT;
+	`
+
 	// execute all migrations in one go or separate transactions?
 	// one go is fine for setup
 	_, err = adminPool.Exec(context.Background(), migrationSQL)

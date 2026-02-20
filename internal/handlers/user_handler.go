@@ -92,18 +92,72 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		})
 	}
 
-	var req models.UserUpdate
+	var req struct {
+		DisplayName       *string `json:"display_name,omitempty"`
+		Bio               *string `json:"bio,omitempty"`
+		AvatarURL         *string `json:"avatar_url,omitempty"`
+		DefaultVisibility *string `json:"default_visibility"`
+		MessagePrivacy    *string `json:"message_privacy"`
+		AccountLocked     *bool   `json:"account_locked"`
+	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
 		})
 	}
 
-	updatedUser, err := h.userRepo.Update(c.Request().Context(), user.ID, &req)
+	profileReq := &models.UserUpdate{
+		DisplayName: req.DisplayName,
+		Bio:         req.Bio,
+		AvatarURL:   req.AvatarURL,
+	}
+
+	updatedUser, err := h.userRepo.Update(c.Request().Context(), user.ID, profileReq)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update profile",
 		})
+	}
+
+	if req.DefaultVisibility != nil || req.MessagePrivacy != nil || req.AccountLocked != nil {
+		defaultVisibility := ""
+		if req.DefaultVisibility != nil {
+			defaultVisibility = strings.TrimSpace(*req.DefaultVisibility)
+		}
+
+		messagePrivacy := ""
+		if req.MessagePrivacy != nil {
+			messagePrivacy = strings.TrimSpace(*req.MessagePrivacy)
+		}
+
+		var accountLocked *bool
+		if req.AccountLocked != nil {
+			accountLocked = req.AccountLocked
+		}
+
+		if messagePrivacy != "" && messagePrivacy != "everyone" && messagePrivacy != "followers" && messagePrivacy != "none" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid message_privacy value"})
+		}
+
+		if defaultVisibility != "" && defaultVisibility != "public" && defaultVisibility != "followers" && defaultVisibility != "circle" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid default_visibility value"})
+		}
+
+		_, err = db.GetDB().Exec(c.Request().Context(),
+			`UPDATE users
+			 SET default_visibility = COALESCE(NULLIF($1, ''), default_visibility),
+			     message_privacy = COALESCE(NULLIF($2, ''), message_privacy),
+			     is_locked = COALESCE($3, is_locked),
+			     updated_at = NOW()
+			 WHERE id = $4`,
+			defaultVisibility,
+			messagePrivacy,
+			accountLocked,
+			user.ID,
+		)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update privacy settings"})
+		}
 	}
 
 	if h.cfg != nil && h.cfg.Federation.Enabled {
