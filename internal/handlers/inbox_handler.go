@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"splitter/internal/config"
@@ -90,6 +91,10 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 		return h.handleCreate(c, activity)
 	case "Like":
 		return h.handleLike(c, activity)
+	case "Announce":
+		return h.handleAnnounce(c, activity)
+	case "Update":
+		return h.handleUpdate(c, activity)
 	case "Delete":
 		return h.handleDelete(c, activity)
 	case "Undo":
@@ -100,6 +105,95 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 			"status": "accepted",
 		})
 	}
+}
+
+// handleAnnounce processes incoming Announce (repost/boost) activities
+func (h *InboxHandler) handleAnnounce(c echo.Context, activity map[string]interface{}) error {
+	ctx := c.Request().Context()
+	actorURI, _ := activity["actor"].(string)
+	objectURI, _ := activity["object"].(string)
+
+	if strings.TrimSpace(objectURI) == "" {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ignored"})
+	}
+
+	_, err := db.GetDB().Exec(ctx,
+		`INSERT INTO interactions (post_id, actor_did, interaction_type)
+		 SELECT id, $1, 'repost' FROM posts WHERE original_post_uri = $2 OR id::text = $3
+		 ON CONFLICT DO NOTHING`,
+		actorURI, objectURI, extractPostIDFromURI(objectURI),
+	)
+	if err != nil {
+		log.Printf("[Inbox] Failed to process announce: %v", err)
+	}
+
+	if id, _ := activity["id"].(string); id != "" {
+		federation.MarkActivityProcessed(ctx, id)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "announced"})
+}
+
+// handleUpdate processes incoming Update activities for actor metadata
+func (h *InboxHandler) handleUpdate(c echo.Context, activity map[string]interface{}) error {
+	ctx := c.Request().Context()
+	actorURI, _ := activity["actor"].(string)
+	obj, ok := activity["object"].(map[string]interface{})
+	if !ok {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ignored"})
+	}
+
+	objType, _ := obj["type"].(string)
+	if objType != "Person" {
+		if id, _ := activity["id"].(string); id != "" {
+			federation.MarkActivityProcessed(ctx, id)
+		}
+		return c.JSON(http.StatusOK, map[string]string{"status": "ignored"})
+	}
+
+	name, _ := obj["name"].(string)
+	summary, _ := obj["summary"].(string)
+	encryptionKey, _ := obj["encryption_public_key"].(string)
+	avatarURL := ""
+	if icon, ok := obj["icon"].(map[string]interface{}); ok {
+		avatarURL, _ = icon["url"].(string)
+	}
+	publicKeyPEM := ""
+	if pkObj, ok := obj["publicKey"].(map[string]interface{}); ok {
+		publicKeyPEM, _ = pkObj["publicKeyPem"].(string)
+	}
+
+	if _, err := federation.EnsureRemoteUser(ctx, actorURI); err != nil {
+		log.Printf("[Inbox] Failed to ensure remote user during update: %v", err)
+	}
+
+	_, _ = db.GetDB().Exec(ctx,
+		`UPDATE users
+		 SET display_name = COALESCE(NULLIF($1, ''), display_name),
+		     bio = COALESCE(NULLIF($2, ''), bio),
+		     avatar_url = COALESCE(NULLIF($3, ''), avatar_url),
+		     public_key = COALESCE(NULLIF($4, ''), public_key),
+		     encryption_public_key = COALESCE(NULLIF($5, ''), encryption_public_key),
+		     updated_at = NOW()
+		 WHERE did = $6`,
+		name, summary, avatarURL, publicKeyPEM, encryptionKey, actorURI,
+	)
+
+	_, _ = db.GetDB().Exec(ctx,
+		`UPDATE remote_actors
+		 SET display_name = COALESCE(NULLIF($1, ''), display_name),
+		     avatar_url = COALESCE(NULLIF($2, ''), avatar_url),
+		     public_key_pem = COALESCE(NULLIF($3, ''), public_key_pem),
+		     last_fetched_at = NOW()
+		 WHERE actor_uri = $4`,
+		name, avatarURL, publicKeyPEM, actorURI,
+	)
+
+	if id, _ := activity["id"].(string); id != "" {
+		federation.MarkActivityProcessed(ctx, id)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "updated"})
 }
 
 // handleFollow processes incoming Follow requests
@@ -349,6 +443,7 @@ func (h *InboxHandler) handleLike(c echo.Context, activity map[string]interface{
 // handleDelete processes incoming Delete activities
 func (h *InboxHandler) handleDelete(c echo.Context, activity map[string]interface{}) error {
 	ctx := c.Request().Context()
+	actorURI, _ := activity["actor"].(string)
 	objectURI := ""
 
 	if obj, ok := activity["object"].(string); ok {
@@ -358,10 +453,32 @@ func (h *InboxHandler) handleDelete(c echo.Context, activity map[string]interfac
 	}
 
 	if objectURI != "" {
-		_, err := db.GetDB().Exec(ctx,
-			`UPDATE posts SET deleted_at = now() WHERE original_post_uri = $1`, objectURI)
-		if err != nil {
-			log.Printf("[Inbox] Failed to delete remote post: %v", err)
+		isActorDelete := strings.Contains(objectURI, "/ap/users/") && !strings.Contains(objectURI, "/posts/")
+
+		if isActorDelete {
+			if _, err := db.GetDB().Exec(ctx, `UPDATE posts SET deleted_at = now() WHERE author_did = $1`, objectURI); err != nil {
+				log.Printf("[Inbox] Failed to delete remote actor posts: %v", err)
+			}
+			if _, err := db.GetDB().Exec(ctx, `DELETE FROM interactions WHERE actor_did = $1`, objectURI); err != nil {
+				log.Printf("[Inbox] Failed to delete remote actor interactions: %v", err)
+			}
+			if _, err := db.GetDB().Exec(ctx, `DELETE FROM follows WHERE follower_did = $1 OR following_did = $1`, objectURI); err != nil {
+				log.Printf("[Inbox] Failed to delete remote actor follows: %v", err)
+			}
+			if _, err := db.GetDB().Exec(ctx, `DELETE FROM users WHERE did = $1`, objectURI); err != nil {
+				log.Printf("[Inbox] Failed to delete remote actor user: %v", err)
+			}
+			if _, err := db.GetDB().Exec(ctx, `DELETE FROM remote_actors WHERE actor_uri = $1`, objectURI); err != nil {
+				log.Printf("[Inbox] Failed to delete remote actor cache: %v", err)
+			}
+		} else {
+			_, err := db.GetDB().Exec(ctx,
+				`UPDATE posts SET deleted_at = now() WHERE original_post_uri = $1 OR (author_did = $2 AND id::text = $3)`,
+				objectURI, actorURI, extractPostIDFromURI(objectURI),
+			)
+			if err != nil {
+				log.Printf("[Inbox] Failed to delete remote post: %v", err)
+			}
 		}
 	}
 

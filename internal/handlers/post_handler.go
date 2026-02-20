@@ -294,10 +294,25 @@ func (h *PostHandler) DeletePost(c echo.Context) error {
 	role, _ := c.Get("role").(string)
 	isAdmin := role == "admin" || role == "moderator"
 
+	meta, _ := h.postRepo.GetFederationMeta(c.Request().Context(), postID)
+
 	if err := h.postRepo.Delete(c.Request().Context(), postID, did, isAdmin); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete post",
 		})
+	}
+
+	if h.cfg.Federation.Enabled && !isAdmin {
+		if user, err := h.userRepo.GetByDID(c.Request().Context(), did); err == nil && user != nil {
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			objectURI := fmt.Sprintf("%s/posts/%s", h.cfg.Federation.URL, postID)
+			if meta != nil && meta.OriginalPostURI != "" {
+				objectURI = meta.OriginalPostURI
+			}
+
+			deleteActivity := federation.BuildDeleteActivity(actorURI, objectURI)
+			go federation.DeliverToFollowers(deleteActivity, did)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{

@@ -271,15 +271,44 @@ func (r *UserRepository) Update(ctx context.Context, id string, update *models.U
 
 // Delete deletes a user by UUID
 func (r *UserRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM users WHERE id = $1`
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-	result, err := db.GetDB().Exec(ctx, query, id)
+	var did string
+	err = tx.QueryRow(ctx, `SELECT did FROM users WHERE id = $1`, id).Scan(&did)
+	if err == pgx.ErrNoRows {
+		return fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to load user DID: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE posts SET deleted_at = NOW() WHERE author_did = $1 AND deleted_at IS NULL`, did); err != nil {
+		return fmt.Errorf("failed to soft-delete user posts: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM interactions WHERE actor_did = $1`, did); err != nil {
+		return fmt.Errorf("failed to remove user interactions: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM follows WHERE follower_did = $1 OR following_did = $1`, did); err != nil {
+		return fmt.Errorf("failed to remove user follows: %w", err)
+	}
+
+	result, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("user not found")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit user deletion: %w", err)
 	}
 
 	return nil

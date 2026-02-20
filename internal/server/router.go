@@ -34,11 +34,11 @@ func NewServer(cfg *config.Config) *Server {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
-	userHandler := handlers.NewUserHandler(userRepo)
+	userHandler := handlers.NewUserHandler(userRepo, cfg)
 	postHandler := handlers.NewPostHandler(postRepo, userRepo, cfg)
 	mediaHandler := handlers.NewMediaHandler(postRepo)
 	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
-	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo)
+	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo, postRepo, cfg)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler()

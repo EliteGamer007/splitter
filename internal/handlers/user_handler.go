@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"splitter/internal/config"
+	"splitter/internal/db"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -17,12 +20,14 @@ import (
 // UserHandler handles user-related requests
 type UserHandler struct {
 	userRepo *repository.UserRepository
+	cfg      *config.Config
 }
 
 // NewUserHandler creates a new UserHandler
-func NewUserHandler(userRepo *repository.UserRepository) *UserHandler {
+func NewUserHandler(userRepo *repository.UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{
 		userRepo: userRepo,
+		cfg:      cfg,
 	}
 }
 
@@ -99,6 +104,19 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update profile",
 		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			updatedUser.DisplayName,
+			updatedUser.Bio,
+			updatedUser.PublicKey,
+			updatedUser.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
 	}
 
 	return c.JSON(http.StatusOK, updatedUser)
@@ -186,10 +204,33 @@ func (h *UserHandler) DeleteAccount(c echo.Context) error {
 		})
 	}
 
+	var postIDs []string
+	rows, qErr := db.GetDB().Query(c.Request().Context(), `SELECT id::text FROM posts WHERE author_did = $1 AND deleted_at IS NULL`, user.DID)
+	if qErr == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var postID string
+			if err := rows.Scan(&postID); err == nil {
+				postIDs = append(postIDs, postID)
+			}
+		}
+	}
+
 	if err := h.userRepo.Delete(c.Request().Context(), user.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete account",
 		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		for _, postID := range postIDs {
+			postDelete := federation.BuildDeleteActivity(actorURI, fmt.Sprintf("%s/posts/%s", h.cfg.Federation.URL, postID))
+			go federation.DeliverToFollowers(postDelete, user.DID)
+		}
+
+		accountDelete := federation.BuildDeleteActivity(actorURI, actorURI)
+		go federation.DeliverToFollowers(accountDelete, user.DID)
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
@@ -225,6 +266,21 @@ func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update encryption key: " + err.Error(),
 		})
+	}
+
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		if user, fetchErr := h.userRepo.GetByID(c.Request().Context(), userID); fetchErr == nil && user != nil {
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+			activity := federation.BuildUpdateActorActivity(
+				actorURI,
+				user.Username,
+				user.DisplayName,
+				user.Bio,
+				user.PublicKey,
+				req.EncryptionPublicKey,
+			)
+			go federation.DeliverToFollowers(activity, user.DID)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{

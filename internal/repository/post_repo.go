@@ -14,6 +14,12 @@ import (
 // PostRepository handles database operations for posts
 type PostRepository struct{}
 
+type PostFederationMeta struct {
+	AuthorDID       string
+	OriginalPostURI string
+	IsRemote        bool
+}
+
 // NewPostRepository creates a new PostRepository
 func NewPostRepository() *PostRepository {
 	return &PostRepository{}
@@ -450,4 +456,23 @@ func (r *PostRepository) Delete(ctx context.Context, postID, authorDID string, i
 	}
 
 	return nil
+}
+
+func (r *PostRepository) GetFederationMeta(ctx context.Context, postID string) (*PostFederationMeta, error) {
+	query := `
+		SELECT author_did, COALESCE(original_post_uri, ''), is_remote
+		FROM posts
+		WHERE id = $1
+	`
+
+	var meta PostFederationMeta
+	err := db.GetDB().QueryRow(ctx, query, postID).Scan(&meta.AuthorDID, &meta.OriginalPostURI, &meta.IsRemote)
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("post not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get post federation metadata: %w", err)
+	}
+
+	return &meta, nil
 }

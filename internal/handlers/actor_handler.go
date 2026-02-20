@@ -35,6 +35,7 @@ type ActorResponse struct {
 	Outbox            string          `json:"outbox"`
 	Followers         string          `json:"followers"`
 	Following         string          `json:"following"`
+	EncryptionPubKey  string          `json:"encryption_public_key,omitempty"`
 	Icon              *ActorIcon      `json:"icon,omitempty"`
 	PublicKey         *ActorPublicKey `json:"publicKey"`
 }
@@ -97,6 +98,7 @@ func (h *ActorHandler) GetActor(c echo.Context) error {
 		Outbox:            fmt.Sprintf("%s/ap/users/%s/outbox", baseURL, username),
 		Followers:         fmt.Sprintf("%s/ap/users/%s/followers", baseURL, username),
 		Following:         fmt.Sprintf("%s/ap/users/%s/following", baseURL, username),
+		EncryptionPubKey:  user.EncryptionPublicKey,
 		PublicKey: &ActorPublicKey{
 			ID:           actorID + "#main-key",
 			Owner:        actorID,

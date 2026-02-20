@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"splitter/internal/db"
@@ -38,6 +39,10 @@ type Note struct {
 // DeliverActivity sends an activity to a remote inbox with HTTP Signature
 func DeliverActivity(activity *Activity, targetInbox string) error {
 	ctx := context.Background()
+
+	if targetDomain := extractDomainFromURI(targetInbox); targetDomain != "" && IsDomainBlocked(ctx, targetDomain) {
+		return fmt.Errorf("target domain %s is blocked", targetDomain)
+	}
 
 	// Serialize activity
 	body, err := json.Marshal(activity)
@@ -87,6 +92,24 @@ func DeliverActivity(activity *Activity, targetInbox string) error {
 
 	updateOutboxStatus(ctx, outboxID, "failed")
 	return fmt.Errorf("delivery returned status %d", resp.StatusCode)
+}
+
+// DeliverToActor resolves a remote actor and delivers an activity to their inbox
+func DeliverToActor(activity *Activity, actorURI string) error {
+	if actorURI == "" {
+		return fmt.Errorf("actor URI is required")
+	}
+
+	actor, err := resolveActorFromURI(actorURI)
+	if err != nil {
+		return fmt.Errorf("failed to resolve actor %s: %w", actorURI, err)
+	}
+
+	if actor == nil || actor.InboxURL == "" {
+		return fmt.Errorf("actor inbox not found for %s", actorURI)
+	}
+
+	return DeliverActivity(activity, actor.InboxURL)
 }
 
 // DeliverToFollowers delivers an activity to all remote followers of a user
@@ -255,6 +278,84 @@ func BuildCreateNoteActivity(actorURI, postID, content string, createdAt time.Ti
 		Type:    "Create",
 		Actor:   actorURI,
 		Object:  note,
+		To:      []string{"https://www.w3.org/ns/activitystreams#Public"},
+	}
+}
+
+func BuildLikeActivity(actorURI, objectURI string) *Activity {
+	domain := GetInstanceDomain()
+	baseURL := resolveInstanceURL(domain)
+	activityID := fmt.Sprintf("%s/activities/like-%d", baseURL, time.Now().UnixNano())
+
+	return &Activity{
+		Context: "https://www.w3.org/ns/activitystreams",
+		ID:      activityID,
+		Type:    "Like",
+		Actor:   actorURI,
+		Object:  objectURI,
+	}
+}
+
+func BuildAnnounceActivity(actorURI, objectURI string) *Activity {
+	domain := GetInstanceDomain()
+	baseURL := resolveInstanceURL(domain)
+	activityID := fmt.Sprintf("%s/activities/announce-%d", baseURL, time.Now().UnixNano())
+
+	return &Activity{
+		Context: "https://www.w3.org/ns/activitystreams",
+		ID:      activityID,
+		Type:    "Announce",
+		Actor:   actorURI,
+		Object:  objectURI,
+		To:      []string{"https://www.w3.org/ns/activitystreams#Public"},
+	}
+}
+
+func BuildDeleteActivity(actorURI, objectURI string) *Activity {
+	domain := GetInstanceDomain()
+	baseURL := resolveInstanceURL(domain)
+	activityID := fmt.Sprintf("%s/activities/delete-%d", baseURL, time.Now().UnixNano())
+
+	return &Activity{
+		Context: "https://www.w3.org/ns/activitystreams",
+		ID:      activityID,
+		Type:    "Delete",
+		Actor:   actorURI,
+		Object:  objectURI,
+		To:      []string{"https://www.w3.org/ns/activitystreams#Public"},
+	}
+}
+
+func BuildUpdateActorActivity(actorURI, username, displayName, summary, publicKeyPEM, encryptionPublicKey string) *Activity {
+	domain := GetInstanceDomain()
+	baseURL := resolveInstanceURL(domain)
+	activityID := fmt.Sprintf("%s/activities/update-%d", baseURL, time.Now().UnixNano())
+
+	object := map[string]interface{}{
+		"id":                actorURI,
+		"type":              "Person",
+		"preferredUsername": username,
+		"name":              displayName,
+		"summary":           summary,
+		"inbox":             fmt.Sprintf("%s/ap/users/%s/inbox", baseURL, username),
+		"outbox":            fmt.Sprintf("%s/ap/users/%s/outbox", baseURL, username),
+		"publicKey": map[string]interface{}{
+			"id":           actorURI + "#main-key",
+			"owner":        actorURI,
+			"publicKeyPem": publicKeyPEM,
+		},
+	}
+
+	if strings.TrimSpace(encryptionPublicKey) != "" {
+		object["encryption_public_key"] = encryptionPublicKey
+	}
+
+	return &Activity{
+		Context: "https://www.w3.org/ns/activitystreams",
+		ID:      activityID,
+		Type:    "Update",
+		Actor:   actorURI,
+		Object:  object,
 		To:      []string{"https://www.w3.org/ns/activitystreams#Public"},
 	}
 }
