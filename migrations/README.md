@@ -6,9 +6,9 @@ This directory contains SQL migration files for the Splitter application databas
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| `000_master_schema.sql` | Complete schema (19 tables) | **Fresh database setup** |
-| `001_initial_schema.sql` | Original base schema | Historical reference |
-| `004_consolidated_fixes.sql` | Safe upgrade script | Upgrade existing database |
+| `000_master_schema.sql` | Complete current schema | **Fresh database setup** |
+| `001_initial_schema.sql` | Original base schema | Legacy baseline only |
+| `002_upgrade_to_current.sql` | Safe consolidated upgrade | Upgrade existing database |
 | `verify_migration.sql` | Verification checks | After any migration |
 
 ## Running Migrations
@@ -34,7 +34,7 @@ docker run --rm postgres:15 psql \
 ```bash
 docker run --rm postgres:15 psql \
   'YOUR_CONNECTION_STRING' \
-  -f migrations/004_consolidated_fixes.sql
+  -f migrations/002_upgrade_to_current.sql
 ```
 
 ## Schema Overview
@@ -52,9 +52,8 @@ The database includes tables for:
 
 - ✅ Always backup your database before running migrations
 - ✅ For new databases, use `000_master_schema.sql` (single file, complete schema)
-- ✅ For existing databases, use `004_consolidated_fixes.sql` (safe with IF NOT EXISTS)
+- ✅ For existing databases, use `002_upgrade_to_current.sql` (safe with IF NOT EXISTS)
 - ✅ Neon requires `sslmode=require` in connection strings
-- ❌ Do not use deprecated files (002_*.sql, 003_*.sql) — they have conflicts
 - ❌ Auto-migrations are disabled in the app (manual only)
 
 ## Need Help?

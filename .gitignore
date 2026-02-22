@@ -21,8 +21,8 @@ go.work
 
 # Environment variables
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
 # Docker volumes
 postgres_data/

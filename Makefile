@@ -29,7 +29,7 @@ clean: ## Clean build artifacts
 
 migrate-up: ## Run database migrations
 	@echo "Running migrations..."
-	psql -U $(DB_USER) -d $(DB_NAME) -f migrations/001_initial_schema.sql
+	psql -U $(DB_USER) -d $(DB_NAME) -f migrations/000_master_schema.sql
 
 migrate-down: ## Rollback database migrations (manual)
 	@echo "Please manually rollback migrations"

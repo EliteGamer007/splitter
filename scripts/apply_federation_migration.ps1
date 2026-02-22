@@ -16,15 +16,13 @@ foreach ($line in $env1) {
     }
 }
 
-# Load instance 2 env
-$env2 = Get-Content .env.instance2 | Where-Object { $_ -notmatch '^#' -and $_ -match '=' }
+# Build instance 2 env from .env INSTANCE2_* overrides
 $envVars2 = @{}
-foreach ($line in $env2) {
-    $parts = $line -split '=', 2
-    if ($parts.Length -eq 2) {
-        $envVars2[$parts[0].Trim()] = $parts[1].Trim()
-    }
-}
+$envVars2['DB_HOST'] = $envVars1['DB_HOST']
+$envVars2['DB_PORT'] = $envVars1['DB_PORT']
+$envVars2['DB_USER'] = $envVars1['DB_USER']
+$envVars2['DB_PASSWORD'] = $envVars1['DB_PASSWORD']
+$envVars2['DB_NAME'] = $envVars1['INSTANCE2_DB_NAME']
 
 # Function to apply migration
 function Apply-Migration {
@@ -40,7 +38,7 @@ function Apply-Migration {
     Write-Host "Applying migration to $instanceName ($dbName)..." -ForegroundColor Yellow
     
     $env:PGPASSWORD = $dbPassword
-    $psqlCmd = "psql -h $dbHost -p $dbPort -U $dbUser -d $dbName -f migrations/010_federation_fix.sql"
+    $psqlCmd = "psql -h $dbHost -p $dbPort -U $dbUser -d $dbName -f migrations/002_upgrade_to_current.sql"
     
     try {
         Invoke-Expression $psqlCmd

@@ -12,6 +12,7 @@ A federated social media application with **password-based** and **DID (Decentra
 - [API Endpoints](#api-endpoints)
 - [API Examples](#api-examples)
 - [Database](#database)
+- [Migration Policy](#migration-policy)
 - [Security Features](#security-features)
 - [Development](#development)
 - [Documentation](#documentation)
@@ -231,10 +232,21 @@ curl http://localhost:8000/api/v1/health
 
 Splitter uses **Neon PostgreSQL** cloud database with SSL.
 
-- **Schema:** 19 tables (users, posts, follows, messages, moderation, federation)
+- **Schema:** 21 tables (users, posts, follows, messages, moderation, federation)
 - **Migration:** `migrations/000_master_schema.sql` (complete schema)
 - **SSL:** Required (`sslmode=require`)
 - **Auto-migrations:** Disabled (manual only)
+
+## Migration Policy
+
+- **Fresh database setup:** run `migrations/000_master_schema.sql`
+- **Upgrade existing legacy database:** run `migrations/002_upgrade_to_current.sql`
+- **Baseline legacy file:** `migrations/001_initial_schema.sql` is kept for historical compatibility
+- **Verification after migration:** run `migrations/verify_migration.sql`
+
+Do not add many one-off migration files for small fixes. Prefer either:
+1. Updating `000_master_schema.sql` for current source of truth, and
+2. Extending `002_upgrade_to_current.sql` for backward-safe upgrades.
 
 See [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) for detailed setup.
 

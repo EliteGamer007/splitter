@@ -5,7 +5,7 @@
 - PostgreSQL databases set up (Neon Cloud):
   - neondb for Instance 1
   - neondb_2 for Instance 2
-- Both .env files configured
+- `.env` configured with both base values and `INSTANCE2_*` overrides
 
 ## Start Instance 1 (splitter-1)
 
@@ -22,7 +22,21 @@ go run cmd/server/main.go
 
 ```powershell
 cd "c:\Users\Sanjeev Srinivas\Desktop\splitter"
-$env:ENV_FILE = ".env.instance2"
+Get-Content .env | ForEach-Object {
+  if ($_ -and $_ -notmatch '^#' -and $_ -match '=') {
+    $parts = $_ -split '=', 2
+    if ($parts.Length -eq 2) {
+      [System.Environment]::SetEnvironmentVariable($parts[0].Trim(), $parts[1].Trim(), 'Process')
+    }
+  }
+}
+$env:ENV_FILE = ".env"
+$env:DB_NAME = $env:INSTANCE2_DB_NAME
+$env:APP_PORT = $env:INSTANCE2_APP_PORT
+$env:APP_BASE_URL = $env:INSTANCE2_APP_BASE_URL
+$env:JWT_SECRET = $env:INSTANCE2_JWT_SECRET
+$env:FEDERATION_DOMAIN = $env:INSTANCE2_FEDERATION_DOMAIN
+$env:FEDERATION_BASE_URL = $env:INSTANCE2_FEDERATION_BASE_URL
 go run cmd/server/main.go
 ```
 

@@ -8,7 +8,6 @@ import (
 	"splitter/internal/config"
 	"splitter/internal/db"
 	"splitter/internal/server"
-	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -81,8 +80,7 @@ func SetupTestEnv(t *testing.T) func() {
 
 	files := []string{
 		"../../migrations/001_initial_schema.sql",
-		"../../migrations/004_consolidated_fixes.sql",
-		"../../migrations/005_create_replies_table.sql",
+		"../../migrations/002_upgrade_to_current.sql",
 	}
 
 	for _, f := range files {
@@ -91,28 +89,8 @@ func SetupTestEnv(t *testing.T) func() {
 			t.Fatalf("Failed to read migration file %s: %v", f, err)
 		}
 		sContent := string(content)
-		// Patch for 004 to avoid "column already exists" errors in test environment
-		if strings.Contains(f, "004_consolidated_fixes.sql") {
-			// Fix 1: Scope checks to current schema
-			sContent = strings.ReplaceAll(sContent, "WHERE table_name='", "WHERE table_schema = current_schema() AND table_name='")
-
-			// Fix 2: Use IF NOT EXISTS for columns just in case
-			sContent = strings.ReplaceAll(sContent, "ALTER TABLE users ADD COLUMN email", "ALTER TABLE users ADD COLUMN IF NOT EXISTS email")
-			sContent = strings.ReplaceAll(sContent, "ALTER TABLE users ADD COLUMN password_hash", "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash")
-			sContent = strings.ReplaceAll(sContent, "ALTER TABLE users ADD COLUMN role", "ALTER TABLE users ADD COLUMN IF NOT EXISTS role")
-		}
 		migrationSQL += sContent
 	}
-
-	// Bring integration schema in sync with runtime migration additions used by
-	// recently implemented auth/privacy/media features.
-	migrationSQL += `
-		ALTER TABLE users ADD COLUMN IF NOT EXISTS encryption_public_key TEXT DEFAULT '';
-		ALTER TABLE users ADD COLUMN IF NOT EXISTS message_privacy TEXT DEFAULT 'everyone';
-		ALTER TABLE users ADD COLUMN IF NOT EXISTS default_visibility TEXT DEFAULT 'public';
-		ALTER TABLE media ADD COLUMN IF NOT EXISTS media_data BYTEA;
-		ALTER TABLE messages ADD COLUMN IF NOT EXISTS ciphertext TEXT;
-	`
 
 	// execute all migrations in one go or separate transactions?
 	// one go is fine for setup
