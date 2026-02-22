@@ -20,8 +20,12 @@ CREATE TABLE users (
     display_name TEXT,
     bio TEXT,
     avatar_url TEXT,
+    avatar_data BYTEA,
+    avatar_media_type TEXT,
     public_key TEXT,  -- Optional for password users
     encryption_public_key TEXT DEFAULT '',  -- E2EE encryption public key (ECDH)
+    message_privacy TEXT DEFAULT 'everyone',
+    default_visibility TEXT DEFAULT 'public',
     role TEXT DEFAULT 'user' CHECK (role IN ('user', 'moderator', 'admin')),
     moderation_requested BOOLEAN DEFAULT FALSE,
     moderation_requested_at TIMESTAMPTZ,
@@ -36,12 +40,22 @@ CREATE TABLE remote_actors (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     actor_uri TEXT UNIQUE NOT NULL,
     username TEXT NOT NULL,
-    instance_domain TEXT NOT NULL,
-    did TEXT,
-    public_key TEXT NOT NULL,
+    domain TEXT NOT NULL,
     inbox_url TEXT NOT NULL,
-    outbox_url TEXT NOT NULL,
+    outbox_url TEXT,
+    public_key_pem TEXT,
+    display_name TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
     last_fetched_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Instance RSA keypairs for HTTP signatures
+CREATE TABLE instance_keys (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    domain TEXT UNIQUE NOT NULL,
+    public_key_pem TEXT NOT NULL,
+    private_key_pem TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -94,6 +108,7 @@ CREATE TABLE media (
     post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     media_url TEXT NOT NULL,
     media_type TEXT NOT NULL,
+    media_data BYTEA,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -285,6 +300,8 @@ CREATE INDEX idx_message_threads_participants ON message_threads(participant_a_i
 -- Federation indexes
 CREATE INDEX idx_inbox_actor ON inbox_activities(actor_uri);
 CREATE INDEX idx_outbox_status ON outbox_activities(status);
+CREATE INDEX idx_remote_actors_domain ON remote_actors(domain);
+CREATE INDEX idx_remote_actors_username_domain ON remote_actors(username, domain);
 
 -- Reply indexes
 CREATE INDEX idx_replies_post_id ON replies(post_id);

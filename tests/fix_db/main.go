@@ -37,9 +37,9 @@ func main() {
 
 	ctx := context.Background()
 
-	// Step 1: Run the fix migration
-	log.Println("📋 Step 1: Running database migration to fix column types...")
-	migrationSQL, err := os.ReadFile("migrations/007_fix_e2ee_and_reset.sql")
+	// Step 1: Run the consolidated safe migration
+	log.Println("📋 Step 1: Running consolidated schema upgrade migration...")
+	migrationSQL, err := os.ReadFile("migrations/002_upgrade_to_current.sql")
 	if err != nil {
 		log.Fatalf("❌ Failed to read migration file: %v", err)
 	}
