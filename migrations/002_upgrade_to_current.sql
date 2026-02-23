@@ -96,12 +96,33 @@ ALTER TABLE media ADD COLUMN IF NOT EXISTS media_data BYTEA;
 -- ------------------------------------------------------------------
 -- FEDERATION
 -- ------------------------------------------------------------------
+ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;
+ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS last_error TEXT;
+
+UPDATE outbox_activities
+SET next_retry_at = COALESCE(next_retry_at, now())
+WHERE status IN ('pending','failed');
+
 CREATE TABLE IF NOT EXISTS instance_keys (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     domain TEXT UNIQUE NOT NULL,
     public_key_pem TEXT NOT NULL,
     private_key_pem TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS federation_connections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_domain TEXT NOT NULL,
+    target_domain TEXT NOT NULL,
+    success_count INT DEFAULT 0,
+    failure_count INT DEFAULT 0,
+    last_status TEXT CHECK (last_status IN ('sent', 'failed', 'pending')),
+    last_seen TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(source_domain, target_domain)
 );
 
 -- remote_actors evolved across migrations; keep backward-compatible upgrades
@@ -151,6 +172,10 @@ CREATE INDEX IF NOT EXISTS idx_replies_author_did ON replies(author_did);
 CREATE INDEX IF NOT EXISTS idx_messages_deleted_at ON messages(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_remote_actors_domain ON remote_actors(domain);
 CREATE INDEX IF NOT EXISTS idx_remote_actors_username_domain ON remote_actors(username, domain);
+CREATE INDEX IF NOT EXISTS idx_outbox_next_retry ON outbox_activities(next_retry_at) WHERE status IN ('pending','failed');
+CREATE INDEX IF NOT EXISTS idx_federation_failures_circuit_until ON federation_failures(circuit_open_until);
+CREATE INDEX IF NOT EXISTS idx_federation_connections_source ON federation_connections(source_domain);
+CREATE INDEX IF NOT EXISTS idx_federation_connections_target ON federation_connections(target_domain);
 
 -- ------------------------------------------------------------------
 -- TRIGGERS / COMMENTS

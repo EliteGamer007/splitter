@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status 
 
-**Overall Sprint 2 Completion: 74.6%**  
-**Last Updated:** February 20, 2026
+**Overall Sprint 2 Completion: 80.4%**  
+**Last Updated:** February 23, 2026
 
-**Summary:** 156 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 168 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -666,7 +666,7 @@
 ## Epic 5: Governance, Resilience & Administration
 
 ### User Story 1: Defederation – Blocking Remote Servers
-**Status:** 🟡 **IN PROGRESS** | **Priority: HIGH**  
+**Status:** ✅ **COMPLETED** | **Priority: HIGH**  
 **As an Admin, I want to block or unblock remote server domains so that malicious federation traffic can be completely stopped.**
 
 **Tasks:**
@@ -674,8 +674,8 @@
   - *Evidence:* `blocked_domains` table in schema with domain, reason, blocked_by, blocked_at columns
 - ✅ **COMPLETED** - Build API to block domains *(Sprint 2)*
   - *Evidence:* `admin_handler.go` `BlockDomain()` — upserts into `blocked_domains` with ON CONFLICT DO UPDATE; `POST /api/v1/admin/domains/block`; requires admin/mod JWT role
-- ❌ **NOT STARTED** - Enforce domain blocking in inbox and outbox delivery
-  - *Reason:* Inbox/outbox handlers need to check `blocked_domains` before processing/delivering
+- ✅ **COMPLETED** - Enforce domain blocking in inbox and outbox delivery
+  - *Evidence:* Outbox delivery path rejects blocked target domains in `internal/federation/delivery.go` (`deliverOutboxPayload` + `IsDomainBlocked`), and inbox processing rejects blocked actor domains in `internal/handlers/inbox_handler.go` before activity processing
 - ✅ **COMPLETED** - Display blocked domains in admin dashboard
   - *Evidence:* `AdminPage.jsx` implements federation management with domain blocking form and blocked domains table; `FederationPage.jsx` shows domain status (blocked/healthy/degraded) in connected servers table
 
@@ -712,23 +712,23 @@
 ---
 
 ### User Story 4: Remote Server Reputation Tracking
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a Backend Engineer, I want to track reputation scores for remote servers to support governance decisions.**
 
 **Tasks:**
 - ✅ **COMPLETED** - Create table storing domain reputation metrics
   - *Evidence:* `instance_reputation` table with reputation_score, spam_count, failure_count
-- ❌ **NOT STARTED** - Update reputation using spam and failure signals
-  - *Reason:* Requires background worker to compute signals from activity tables
-- ❌ **NOT STARTED** - Recalculate reputation periodically
-  - *Reason:* Background worker infrastructure not implemented
-- ❌ **NOT STARTED** - Expose reputation scores through admin APIs
-  - *Reason:* Reputation API expansion not implemented
+- ✅ **COMPLETED** - Update reputation using spam and failure signals
+  - *Evidence:* `internal/federation/worker.go` `RecalculateInstanceReputation()` computes per-domain score from spam signals (`admin_actions` block reasons) and failure/success signals (`outbox_activities`)
+- ✅ **COMPLETED** - Recalculate reputation periodically
+  - *Evidence:* `cmd/worker/main.go` periodic ticker loop runs `RecalculateInstanceReputation()` at configured interval (`WORKER_REPUTATION_INTERVAL_SECONDS`)
+- ✅ **COMPLETED** - Expose reputation scores through admin APIs
+  - *Evidence:* `admin_handler.go` `GetInstanceReputation()` + route `GET /api/v1/admin/federation/reputation` in `router.go`
 
 ---
 
 ### User Story 5: Federation Retry Queue Monitoring
-**Status:** 🟡 **IN PROGRESS** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As a Backend Engineer, I want to monitor retry queues to ensure reliable federation delivery.**
 
 **Tasks:**
@@ -736,21 +736,24 @@
   - *Evidence:* `GetFederationInspector()` — `COUNT(*) FROM outbox_activities WHERE status IN ('pending','failed')` returned as `retry_queue` in metrics response
 - ✅ **COMPLETED** - Expose retry statistics through monitoring APIs *(Sprint 2)*
   - *Evidence:* `GET /api/v1/admin/federation-inspector` returns `metrics.retry_queue`; `FederationPage.jsx` displays this value as a live KPI card
-- ❌ **NOT STARTED** - Display failing domains and retry counts individually
-  - *Reason:* Per-domain retry breakdown requires additional query extension to `GetFederationInspector`
-- ❌ **NOT STARTED** - Configure exponential backoff retry delays
-  - *Reason:* Retry worker with backoff logic requires background worker infrastructure (Sprint 3)
+- ✅ **COMPLETED** - Display failing domains and retry counts individually
+  - *Evidence:* `GetFederationInspector()` now returns `failing_domains` with queued count, max retry count, next retry timestamp, and circuit window; `Splitter-frontend/components/pages/FederationPage.jsx` renders “Retry Queue by Domain” table
+- ✅ **COMPLETED** - Configure exponential backoff retry delays
+  - *Evidence:* `internal/federation/worker.go` `calculateRetryDelay()` + `delivery.go` `updateOutboxFailure()` set `next_retry_at` exponentially; `cmd/worker/main.go` processes due retries via `RetryOutboxBatch()`
 
 ---
 
 ### User Story 6: Circuit Breaking for Unstable Servers
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a Backend Engineer, I want to stop federation requests to unstable servers temporarily.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Track consecutive delivery failures per domain
-- ❌ **NOT STARTED** - Disable federation requests after failure threshold
-- ❌ **NOT STARTED** - Re-enable federation traffic after cooldown period
+- ✅ **COMPLETED** - Track consecutive delivery failures per domain
+  - *Evidence:* `internal/federation/worker.go` `recordDeliveryFailure()` increments `federation_failures.failure_count` and timestamps per domain
+- ✅ **COMPLETED** - Disable federation requests after failure threshold
+  - *Evidence:* `delivery.go` checks `IsCircuitOpen()` before send; `recordDeliveryFailure()` opens circuit by setting `circuit_open_until` when threshold is crossed
+- ✅ **COMPLETED** - Re-enable federation traffic after cooldown period
+  - *Evidence:* `IsCircuitOpen()` automatically re-allows traffic once `circuit_open_until <= now()`; successful deliveries call `recordDeliverySuccess()` to reset circuit/failure counters
 
 ---
 
@@ -771,14 +774,18 @@
 ---
 
 ### User Story 8: Visual Federation Network Overview
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As an Admin, I want a visual map of connected servers to understand federation relationships.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Store known remote server connection data
-- ❌ **NOT STARTED** - Provide API returning graph-friendly federation data
-- ❌ **NOT STARTED** - Render force-directed federation network graph
-- ❌ **NOT STARTED** - Refresh graph periodically with latest data
+- ✅ **COMPLETED** - Store known remote server connection data
+  - *Evidence:* `federation_connections` table added in migrations; delivery path records source→target outcomes through `recordFederationConnection()` in `internal/federation/worker.go`
+- ✅ **COMPLETED** - Provide API returning graph-friendly federation data
+  - *Evidence:* `GET /api/v1/admin/federation/network` implemented in `admin_handler.go` + route wired in `router.go`; returns `nodes[]` and `edges[]`
+- ✅ **COMPLETED** - Render force-directed federation network graph
+  - *Evidence:* `Splitter-frontend/components/pages/FederationPage.jsx` renders SVG force-directed map from `nodes/edges` with directional links and node labels
+- ✅ **COMPLETED** - Refresh graph periodically with latest data
+  - *Evidence:* Existing 15s inspector refresh now also calls `adminApi.getFederationNetwork()` and updates graph state
 
 ---
 
@@ -806,8 +813,8 @@
 | **Epic 2: Federation** | 10 | 40 | 36 | 0 | 0 | 4 | 90.0% (9/10) | 90.0% (36/40) |
 | **Epic 3: Content & Systems** | 14 | 56 | 44 | 1 | 0 | 11 | 85.7% (12/14) | 78.6% (44/56) |
 | **Epic 4: Privacy & Messaging** | 9 | 38 | 14 | 0 | 0 | 24 | 33.3% (3/9) | 36.8% (14/38) |
-| **Epic 5: Governance & Admin** | 9 | 38 | 25 | 0 | 0 | 13 | 44.4% (4/9) | 65.8% (25/38) |
-| **TOTAL** | **51** | **209** | **156** | **1** | **0** | **52** | **72.5%** | **74.6%** |
+| **Epic 5: Governance & Admin** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
+| **TOTAL** | **51** | **209** | **169** | **1** | **0** | **39** | **82.4%** | **80.9%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -819,16 +826,15 @@
 - **Federation fully operational** (90.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
 - **Solid content features** (78.6% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, and DB-backed privacy-preserving media loading are functional
-- **Live Admin tooling** (65.8% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, traffic logs, and 15s auto-refresh; audit log covering all moderation actions
+- **Live Admin tooling** (100.0% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, retry/circuit metrics, traffic logs, and 15s auto-refresh; force-directed federation network map; audit log covering moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
 **Remaining Gaps:**
 - **Thread context fetch** (Epic 2.6): Parent-post fetch on demand for remote reply context remains pending
 - **Privacy & messaging features** (34.2% Epic 4): Key rotation, multi-device, federated E2EE, and rate limiting not yet implemented
-- **Background worker** (multiple epics): Ephemeral post expiry, reputation recalculation, and retry backoff all blocked on a background worker system
-- **Reputation automation** (Epic 5.4): Reputation signal processing and periodic recalculation are not started
+- **Background worker** (remaining scope): Ephemeral post expiry remains pending; federation retry/reputation workers are now implemented
 
-**Status:** Sprint 2 target exceeded at 74.6%. Delivered full ActivityPub federation layer, federated interactions and updates/deletes, live moderation queue, live federation inspector, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
+**Status:** Sprint 2 target exceeded at 80.4%. Delivered full ActivityPub federation layer, federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
 
 ---
 
@@ -841,13 +847,13 @@
 4. Add robustness tests for federation update/delete replay scenarios
 
 **HIGH – Background Worker Infrastructure:**
-5. Implement lightweight background worker for: ephemeral post cleanup, reputation recalculation, retry delivery with exponential backoff
-6. Enforce domain blocking in inbox/outbox handlers (Epic 5.1 completion)
+5. Extend background worker with ephemeral post cleanup and retention housekeeping
+6. Keep retry/reputation/circuit worker policy tuned with production traffic baselines
 
 **MEDIUM – Report Creation UX:**
 7. `POST /api/v1/posts/:id/report` endpoint + "Report" option in post ⋯ menu (populates moderation queue from UI)
 
-**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion beyond 80%.
+**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion toward 85%.
 
 ---
 

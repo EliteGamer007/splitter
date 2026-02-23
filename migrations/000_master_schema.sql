@@ -201,6 +201,9 @@ CREATE TABLE outbox_activities (
     target_inbox TEXT NOT NULL,
     status TEXT CHECK (status IN ('pending','sent','failed')),
     retry_count INT DEFAULT 0,
+    next_retry_at TIMESTAMPTZ,
+    last_attempt_at TIMESTAMPTZ,
+    last_error TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -272,6 +275,20 @@ CREATE TABLE federation_failures (
     circuit_open_until TIMESTAMPTZ
 );
 
+-- Federation server-to-server connection graph data
+CREATE TABLE federation_connections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_domain TEXT NOT NULL,
+    target_domain TEXT NOT NULL,
+    success_count INT DEFAULT 0,
+    failure_count INT DEFAULT 0,
+    last_status TEXT CHECK (last_status IN ('sent', 'failed', 'pending')),
+    last_seen TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(source_domain, target_domain)
+);
+
 -- ============================================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================================
@@ -300,8 +317,12 @@ CREATE INDEX idx_message_threads_participants ON message_threads(participant_a_i
 -- Federation indexes
 CREATE INDEX idx_inbox_actor ON inbox_activities(actor_uri);
 CREATE INDEX idx_outbox_status ON outbox_activities(status);
+CREATE INDEX idx_outbox_next_retry ON outbox_activities(next_retry_at) WHERE status IN ('pending','failed');
 CREATE INDEX idx_remote_actors_domain ON remote_actors(domain);
 CREATE INDEX idx_remote_actors_username_domain ON remote_actors(username, domain);
+CREATE INDEX idx_federation_failures_circuit_until ON federation_failures(circuit_open_until);
+CREATE INDEX idx_federation_connections_source ON federation_connections(source_domain);
+CREATE INDEX idx_federation_connections_target ON federation_connections(target_domain);
 
 -- Reply indexes
 CREATE INDEX idx_replies_post_id ON replies(post_id);
