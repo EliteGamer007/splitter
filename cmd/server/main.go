@@ -4,9 +4,11 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"splitter/internal/config"
 	"splitter/internal/db"
+	"splitter/internal/federation"
 	"splitter/internal/repository"
 	"splitter/internal/server"
 
@@ -37,6 +39,12 @@ func main() {
 	ensureAdminUser() // Silent check, no logging needed
 
 	// Initialize and start server
+	federation.ConfigureDeliveryPolicy(
+		cfg.Worker.MaxRetryCount,
+		cfg.Worker.CircuitFailureThreshold,
+		time.Duration(cfg.Worker.CircuitCooldownSeconds)*time.Second,
+	)
+
 	srv := server.NewServer(cfg)
 
 	port := os.Getenv("PORT")
