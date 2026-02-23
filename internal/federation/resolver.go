@@ -29,6 +29,16 @@ type RemoteActor struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
+// RemoteNote represents a fetched remote ActivityPub Note used for thread context.
+type RemoteNote struct {
+	ID           string
+	AttributedTo string
+	Content      string
+	InReplyTo    string
+	PublishedAt  time.Time
+	Deleted      bool
+}
+
 // InstanceURLMap maps domain names to actual URLs (for local testing)
 var InstanceURLMap = map[string]string{
 	"splitter-1": "http://localhost:8000",
@@ -248,4 +258,88 @@ func GetAllRemoteActors(ctx context.Context) ([]*RemoteActor, error) {
 func httpGet(url string) (*http.Response, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	return client.Get(url)
+}
+
+// FetchRemoteNote fetches an ActivityPub note URI and normalizes fields needed for local caching.
+func FetchRemoteNote(noteURI string) (*RemoteNote, error) {
+	if strings.TrimSpace(noteURI) == "" {
+		return nil, fmt.Errorf("note URI is required")
+	}
+
+	req, err := http.NewRequest("GET", noteURI, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/activity+json, application/ld+json")
+
+	client := &http.Client{Timeout: 12 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+		return &RemoteNote{ID: noteURI, Deleted: true}, nil
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return nil, fmt.Errorf("remote note fetch failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var payload map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("failed to decode remote note: %w", err)
+	}
+
+	activityType, _ := payload["type"].(string)
+	if strings.EqualFold(activityType, "Delete") || strings.EqualFold(activityType, "Tombstone") {
+		return &RemoteNote{ID: noteURI, Deleted: true}, nil
+	}
+
+	objectPayload := payload
+	activityActor, _ := payload["actor"].(string)
+	if strings.EqualFold(activityType, "Create") {
+		if obj, ok := payload["object"].(map[string]interface{}); ok {
+			objectPayload = obj
+		}
+	}
+
+	objectType, _ := objectPayload["type"].(string)
+	if objectType != "" && !strings.EqualFold(objectType, "Note") {
+		return nil, fmt.Errorf("unsupported object type %s", objectType)
+	}
+
+	id, _ := objectPayload["id"].(string)
+	if strings.TrimSpace(id) == "" {
+		id = noteURI
+	}
+
+	attributedTo, _ := objectPayload["attributedTo"].(string)
+	if strings.TrimSpace(attributedTo) == "" {
+		attributedTo, _ = objectPayload["actor"].(string)
+	}
+	if strings.TrimSpace(attributedTo) == "" {
+		attributedTo = activityActor
+	}
+
+	content, _ := objectPayload["content"].(string)
+	inReplyTo, _ := objectPayload["inReplyTo"].(string)
+
+	publishedAt := time.Now().UTC()
+	if published, _ := objectPayload["published"].(string); strings.TrimSpace(published) != "" {
+		if parsed, parseErr := time.Parse(time.RFC3339, published); parseErr == nil {
+			publishedAt = parsed.UTC()
+		}
+	}
+
+	return &RemoteNote{
+		ID:           strings.TrimSpace(id),
+		AttributedTo: strings.TrimSpace(attributedTo),
+		Content:      strings.TrimSpace(content),
+		InReplyTo:    strings.TrimSpace(inReplyTo),
+		PublishedAt:  publishedAt,
+		Deleted:      false,
+	}, nil
 }

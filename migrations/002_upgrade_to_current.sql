@@ -73,6 +73,7 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 -- ------------------------------------------------------------------
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_remote BOOLEAN DEFAULT FALSE;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS original_post_uri TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS in_reply_to_uri TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS direct_reply_count INT DEFAULT 0;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS total_reply_count INT DEFAULT 0;
 
@@ -164,6 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_moderation_requests_status ON moderation_requests
 CREATE INDEX IF NOT EXISTS idx_follows_follower_status ON follows(follower_did, status);
 CREATE INDEX IF NOT EXISTS idx_follows_following_status ON follows(following_did, status);
 CREATE INDEX IF NOT EXISTS idx_posts_visibility ON posts(visibility);
+CREATE INDEX IF NOT EXISTS idx_posts_in_reply_to_uri ON posts(in_reply_to_uri) WHERE in_reply_to_uri IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_admin_actions_admin_id ON admin_actions(admin_id);
 CREATE INDEX IF NOT EXISTS idx_admin_actions_created_at ON admin_actions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_replies_post_id ON replies(post_id);

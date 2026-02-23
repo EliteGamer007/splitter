@@ -120,6 +120,7 @@ func (r *PostRepository) GetMediaContent(ctx context.Context, mediaID string) ([
 func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		       COALESCE(p.original_post_uri, ''), COALESCE(p.in_reply_to_uri, ''),
 		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count,
@@ -140,6 +141,8 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		&post.Content,
 		&post.Visibility,
 		&post.IsRemote,
+		&post.OriginalPostURI,
+		&post.InReplyToURI,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 		&post.Username,
@@ -171,6 +174,100 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 	}
 
 	return &post, nil
+}
+
+// GetByOriginalURI retrieves a locally cached post by its original remote URI.
+func (r *PostRepository) GetByOriginalURI(ctx context.Context, originalURI string) (*models.Post, error) {
+	query := `
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+		       COALESCE(p.original_post_uri, ''), COALESCE(p.in_reply_to_uri, ''),
+		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+		       p.direct_reply_count, p.total_reply_count,
+		       m.id, m.media_url, m.media_type, m.created_at
+		FROM posts p
+		LEFT JOIN users u ON p.author_did = u.did
+		LEFT JOIN media m ON p.id = m.post_id
+		WHERE p.original_post_uri = $1 AND p.deleted_at IS NULL
+		ORDER BY p.created_at DESC
+		LIMIT 1
+	`
+
+	var post models.Post
+	var mediaID, mediaURL, mediaType *string
+	var mediaCreatedAt *time.Time
+
+	err := db.GetDB().QueryRow(ctx, query, originalURI).Scan(
+		&post.ID,
+		&post.AuthorDID,
+		&post.Content,
+		&post.Visibility,
+		&post.IsRemote,
+		&post.OriginalPostURI,
+		&post.InReplyToURI,
+		&post.CreatedAt,
+		&post.UpdatedAt,
+		&post.Username,
+		&post.AvatarURL,
+		&post.LikeCount,
+		&post.DirectReplyCount,
+		&post.TotalReplyCount,
+		&mediaID,
+		&mediaURL,
+		&mediaType,
+		&mediaCreatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("post not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get post by original URI: %w", err)
+	}
+
+	if mediaID != nil {
+		post.Media = []models.Media{{
+			ID:        *mediaID,
+			PostID:    post.ID,
+			MediaURL:  *mediaURL,
+			MediaType: *mediaType,
+			CreatedAt: *mediaCreatedAt,
+		}}
+	}
+
+	return &post, nil
+}
+
+// CreateRemoteCachedPost inserts a remote post fetched on demand for thread context.
+func (r *PostRepository) CreateRemoteCachedPost(ctx context.Context, authorDID, content, originalURI, inReplyToURI string, createdAt time.Time) (*models.Post, error) {
+	if originalURI == "" {
+		return nil, fmt.Errorf("original URI is required")
+	}
+
+	var id string
+	err := db.GetDB().QueryRow(ctx, `
+		WITH existing AS (
+			SELECT id::text AS id
+			FROM posts
+			WHERE original_post_uri = $1 AND deleted_at IS NULL
+			ORDER BY created_at DESC
+			LIMIT 1
+		), inserted AS (
+			INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, in_reply_to_uri, created_at)
+			SELECT $2, $3, 'public', true, $1, NULLIF($4, ''), $5
+			WHERE NOT EXISTS (SELECT 1 FROM existing)
+			RETURNING id::text AS id
+		)
+		SELECT id FROM inserted
+		UNION ALL
+		SELECT id FROM existing
+		LIMIT 1
+	`, originalURI, authorDID, content, inReplyToURI, createdAt.UTC()).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cache remote post: %w", err)
+	}
+
+	return r.GetByID(ctx, id)
 }
 
 // GetByAuthorDID retrieves all posts by a specific author

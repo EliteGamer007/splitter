@@ -94,6 +94,7 @@ CREATE TABLE posts (
     visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','followers','circle')),
     is_remote BOOLEAN DEFAULT FALSE,
     original_post_uri TEXT,
+    in_reply_to_uri TEXT,
     direct_reply_count INT DEFAULT 0,
     total_reply_count INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -303,6 +304,7 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_posts_author ON posts(author_did);
 CREATE INDEX idx_posts_created ON posts(created_at DESC);
 CREATE INDEX idx_posts_visibility ON posts(visibility);
+CREATE INDEX idx_posts_in_reply_to_uri ON posts(in_reply_to_uri) WHERE in_reply_to_uri IS NOT NULL;
 
 -- Follow indexes
 CREATE INDEX idx_follows_follower_status ON follows(follower_did, status);

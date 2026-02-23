@@ -59,6 +59,7 @@ func main() {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_media_type TEXT;`,
 		`ALTER TABLE media ADD COLUMN IF NOT EXISTS media_data BYTEA;`,
 		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS ciphertext TEXT;`,
+		`ALTER TABLE posts ADD COLUMN IF NOT EXISTS in_reply_to_uri TEXT;`,
 		`ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;`,
 		`ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ;`,
 		`ALTER TABLE outbox_activities ADD COLUMN IF NOT EXISTS last_error TEXT;`,
@@ -77,6 +78,7 @@ func main() {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_outbox_next_retry ON outbox_activities(next_retry_at) WHERE status IN ('pending','failed');`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_failures_circuit_until ON federation_failures(circuit_open_until);`,
+		`CREATE INDEX IF NOT EXISTS idx_posts_in_reply_to_uri ON posts(in_reply_to_uri) WHERE in_reply_to_uri IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_connections_source ON federation_connections(source_domain);`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_connections_target ON federation_connections(target_domain);`,
 	}

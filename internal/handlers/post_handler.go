@@ -140,7 +140,87 @@ func (h *PostHandler) GetPost(c echo.Context) error {
 		})
 	}
 
+	if post.InReplyToURI != "" {
+		post.ParentContext = h.resolveParentContext(c.Request().Context(), post.InReplyToURI)
+	}
+
 	return c.JSON(http.StatusOK, post)
+}
+
+func (h *PostHandler) resolveParentContext(ctx context.Context, parentURI string) *models.ParentContextInfo {
+	if parentURI == "" {
+		return nil
+	}
+
+	if cachedParent, err := h.postRepo.GetByOriginalURI(ctx, parentURI); err == nil && cachedParent != nil {
+		return &models.ParentContextInfo{
+			Status: "available",
+			Source: "cache",
+			URI:    parentURI,
+			Post:   summarizeParentPost(cachedParent),
+		}
+	}
+
+	note, err := federation.FetchRemoteNote(parentURI)
+	if err != nil {
+		return &models.ParentContextInfo{
+			Status:  "missing",
+			URI:     parentURI,
+			Message: "Parent post could not be fetched",
+		}
+	}
+
+	if note == nil || note.Deleted {
+		return &models.ParentContextInfo{
+			Status:  "missing",
+			URI:     parentURI,
+			Message: "Parent post is missing or deleted",
+		}
+	}
+
+	if note.AttributedTo != "" {
+		_, _ = federation.EnsureRemoteUser(ctx, note.AttributedTo)
+	}
+
+	cachedParent, cacheErr := h.postRepo.CreateRemoteCachedPost(
+		ctx,
+		note.AttributedTo,
+		note.Content,
+		note.ID,
+		note.InReplyTo,
+		note.PublishedAt,
+	)
+	if cacheErr != nil || cachedParent == nil {
+		return &models.ParentContextInfo{
+			Status:  "missing",
+			URI:     parentURI,
+			Message: "Parent post fetch succeeded but cache failed",
+		}
+	}
+
+	return &models.ParentContextInfo{
+		Status: "available",
+		Source: "remote_fetch",
+		URI:    parentURI,
+		Post:   summarizeParentPost(cachedParent),
+	}
+}
+
+func summarizeParentPost(post *models.Post) *models.ParentPostSummary {
+	if post == nil {
+		return nil
+	}
+
+	return &models.ParentPostSummary{
+		ID:              post.ID,
+		AuthorDID:       post.AuthorDID,
+		Username:        post.Username,
+		AvatarURL:       post.AvatarURL,
+		Content:         post.Content,
+		IsRemote:        post.IsRemote,
+		OriginalPostURI: post.OriginalPostURI,
+		CreatedAt:       post.CreatedAt,
+	}
 }
 
 // GetUserPosts retrieves all posts by a specific user (by DID)

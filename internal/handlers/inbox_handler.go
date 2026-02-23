@@ -315,6 +315,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	content, _ := object["content"].(string)
 	noteID, _ := object["id"].(string)
 	published, _ := object["published"].(string)
+	inReplyTo, _ := object["inReplyTo"].(string)
 
 	// Check TO/CC to distinguish Public Post vs DM
 	to, _ := activity["to"].([]interface{})
@@ -391,10 +392,10 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	log.Printf("[Inbox] DEBUG: Inserting remote post values: author_did=%s, content=%s, original_post_uri=%s, published=%v", actorURI, content, noteID, publishedTime)
 
 	_, err := db.GetDB().Exec(ctx,
-		`INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, created_at)
-		 VALUES ($1, $2, 'public', true, $3, $4)
+		`INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, in_reply_to_uri, created_at)
+		 VALUES ($1, $2, 'public', true, $3, NULLIF($4, ''), $5)
 		 ON CONFLICT DO NOTHING`,
-		actorURI, content, noteID, publishedTime,
+		actorURI, content, noteID, inReplyTo, publishedTime,
 	)
 	if err != nil {
 		log.Printf("[Inbox] Failed to store remote post: %v", err)

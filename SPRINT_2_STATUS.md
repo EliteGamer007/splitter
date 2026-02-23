@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status 
 
-**Overall Sprint 2 Completion: 80.4%**  
+**Overall Sprint 2 Completion: 82.8%**  
 **Last Updated:** February 23, 2026
 
-**Summary:** 168 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 173 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -240,14 +240,18 @@
 ---
 
 ### User Story 6
-**Status:** ❌ **NOT STARTED** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As a conversation participant, I want to view the parent post of a reply even if I have not seen it before, so that I can understand the full context of a conversation.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Fetch remote parent posts on demand
-- ❌ **NOT STARTED** - Store fetched posts in local cache
-- ❌ **NOT STARTED** - Display thread context indicators
-- ❌ **NOT STARTED** - Handle missing or deleted parents gracefully
+- ✅ **COMPLETED** - Fetch remote parent posts on demand
+  - *Evidence:* `post_handler.go` resolves `in_reply_to_uri` in `GetPost()` and calls `federation.FetchRemoteNote()` when parent is missing locally
+- ✅ **COMPLETED** - Store fetched posts in local cache
+  - *Evidence:* `post_repo.go` `CreateRemoteCachedPost()` persists fetched parents as remote posts (`original_post_uri`) and reuses cached entries via `GetByOriginalURI()`
+- ✅ **COMPLETED** - Display thread context indicators
+  - *Evidence:* `Splitter-frontend/components/pages/ThreadPage.jsx` renders explicit thread-context cards showing source (`cache` vs `remote_fetch`) and parent preview
+- ✅ **COMPLETED** - Handle missing or deleted parents gracefully
+  - *Evidence:* `federation/resolver.go` treats 404/410 as deleted parent markers; `post_handler.go` returns `parent_context.status = missing` and UI shows warning banner
 
 ---
 
@@ -810,11 +814,11 @@
 | Epic | Total Stories | Total Tasks | Completed Tasks | In Progress | Deferred | Not Started | Story Completion % | Task Completion % |
 |------|---------------|-------------|-----------------|-------------|----------|-------------|-------------------|-------------------|
 | **Epic 1: Identity & Onboarding** | 9 | 37 | 37 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (37/37) |
-| **Epic 2: Federation** | 10 | 40 | 36 | 0 | 0 | 4 | 90.0% (9/10) | 90.0% (36/40) |
+| **Epic 2: Federation** | 10 | 40 | 40 | 0 | 0 | 0 | 100.0% (10/10) | 100.0% (40/40) |
 | **Epic 3: Content & Systems** | 14 | 56 | 44 | 1 | 0 | 11 | 85.7% (12/14) | 78.6% (44/56) |
 | **Epic 4: Privacy & Messaging** | 9 | 38 | 14 | 0 | 0 | 24 | 33.3% (3/9) | 36.8% (14/38) |
 | **Epic 5: Governance & Admin** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
-| **TOTAL** | **51** | **209** | **169** | **1** | **0** | **39** | **82.4%** | **80.9%** |
+| **TOTAL** | **51** | **209** | **173** | **1** | **0** | **35** | **84.3%** | **82.8%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -823,28 +827,26 @@
 ## Key Findings
 
 **Strengths:**
-- **Federation fully operational** (90.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, federated likes/reposts, profile updates, and delete propagation are all implemented
+- **Federation fully operational** (100.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, remote thread-context fetch/cache, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
 - **Solid content features** (78.6% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, and DB-backed privacy-preserving media loading are functional
 - **Live Admin tooling** (100.0% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, retry/circuit metrics, traffic logs, and 15s auto-refresh; force-directed federation network map; audit log covering moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
 **Remaining Gaps:**
-- **Thread context fetch** (Epic 2.6): Parent-post fetch on demand for remote reply context remains pending
 - **Privacy & messaging features** (34.2% Epic 4): Key rotation, multi-device, federated E2EE, and rate limiting not yet implemented
 - **Background worker** (remaining scope): Ephemeral post expiry remains pending; federation retry/reputation workers are now implemented
 
-**Status:** Sprint 2 target exceeded at 80.4%. Delivered full ActivityPub federation layer, federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
+**Status:** Sprint 2 target exceeded at 82.8%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
 
 ---
 
 ## Remaining Backlog
 
 **CRITICAL – Complete Federation Layer (Epic 2):**
-1. Remote thread context fetching (fetch parent posts on demand)
-2. Complete full cross-instance delete acknowledgments/telemetry dashboards
-3. Expand actor update propagation to multi-device key bundles
-4. Add robustness tests for federation update/delete replay scenarios
+1. Complete full cross-instance delete acknowledgments/telemetry dashboards
+2. Expand actor update propagation to multi-device key bundles
+3. Add robustness tests for federation update/delete replay scenarios
 
 **HIGH – Background Worker Infrastructure:**
 5. Extend background worker with ephemeral post cleanup and retention housekeeping
