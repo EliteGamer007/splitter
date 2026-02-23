@@ -217,6 +217,8 @@ func setupRoutes(
 	admin.POST("/users/:id/unsuspend", adminHandler.UnsuspendUser)
 	admin.GET("/actions", adminHandler.GetAdminActions)
 	admin.GET("/federation-inspector", adminHandler.GetFederationInspector)
+	admin.GET("/federation/reputation", adminHandler.GetInstanceReputation)
+	admin.GET("/federation/network", adminHandler.GetFederationNetwork)
 
 	// ============================================================
 	// FEDERATION ROUTES

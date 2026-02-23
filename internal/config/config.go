@@ -24,6 +24,7 @@ type Config struct {
 	Server     ServerConfig
 	JWT        JWTConfig
 	Federation FederationConfig
+	Worker     WorkerConfig
 }
 
 // DatabaseConfig holds database-related configuration
@@ -57,6 +58,15 @@ type FederationConfig struct {
 	Enabled bool   // Whether federation is enabled
 }
 
+// WorkerConfig holds background worker configuration
+type WorkerConfig struct {
+	RetryIntervalSeconds      int
+	ReputationIntervalSeconds int
+	CircuitCooldownSeconds    int
+	MaxRetryCount             int
+	CircuitFailureThreshold   int
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -83,6 +93,13 @@ func Load() *Config {
 			URL:     getEnv("FEDERATION_URL", "http://localhost:8000"),
 			Enabled: getEnv("FEDERATION_ENABLED", "false") == "true",
 		},
+		Worker: WorkerConfig{
+			RetryIntervalSeconds:      getEnvAsInt("WORKER_RETRY_INTERVAL_SECONDS", 15),
+			ReputationIntervalSeconds: getEnvAsInt("WORKER_REPUTATION_INTERVAL_SECONDS", 60),
+			CircuitCooldownSeconds:    getEnvAsInt("WORKER_CIRCUIT_COOLDOWN_SECONDS", 300),
+			MaxRetryCount:             getEnvAsInt("WORKER_MAX_RETRY_COUNT", 6),
+			CircuitFailureThreshold:   getEnvAsInt("WORKER_CIRCUIT_FAILURE_THRESHOLD", 5),
+		},
 	}
 }
 
@@ -92,4 +109,23 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvAsInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed := 0
+	for _, ch := range value {
+		if ch < '0' || ch > '9' {
+			return defaultValue
+		}
+		parsed = parsed*10 + int(ch-'0')
+	}
+	if parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
 }

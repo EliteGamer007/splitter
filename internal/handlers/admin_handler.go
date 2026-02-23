@@ -721,12 +721,15 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 	`).Scan(&validationRate)
 
 	type serverRow struct {
-		Domain    string
-		Blocked   bool
-		LastSeen  *time.Time
-		IncomingM int
-		OutgoingM int
-		FailedH   int
+		Domain          string
+		Blocked         bool
+		LastSeen        *time.Time
+		IncomingM       int
+		OutgoingM       int
+		FailedH         int
+		RetryQueue      int
+		CircuitOpen     bool
+		ReputationScore int
 	}
 
 	serverRows, err := db.GetDB().Query(ctx, `
@@ -734,6 +737,14 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 			SELECT DISTINCT domain FROM remote_actors WHERE domain IS NOT NULL AND domain != ''
 			UNION
 			SELECT DISTINCT domain FROM blocked_domains
+			UNION
+			SELECT DISTINCT domain FROM instance_reputation
+			UNION
+			SELECT DISTINCT domain FROM federation_failures
+			UNION
+			SELECT DISTINCT regexp_replace(target_inbox, '^https?://([^/]+)/?.*$', '\\1') AS domain
+			FROM outbox_activities
+			WHERE target_inbox ILIKE 'http%'
 		)
 		SELECT
 			d.domain,
@@ -745,8 +756,12 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 			) AS last_seen,
 			COALESCE((SELECT COUNT(*) FROM inbox_activities i WHERE i.actor_uri ILIKE '%' || d.domain || '%' AND i.received_at > now() - interval '1 minute'), 0) AS incoming_m,
 			COALESCE((SELECT COUNT(*) FROM outbox_activities o WHERE o.target_inbox ILIKE '%' || d.domain || '%' AND o.created_at > now() - interval '1 minute'), 0) AS outgoing_m,
-			COALESCE((SELECT COUNT(*) FROM outbox_activities o WHERE o.target_inbox ILIKE '%' || d.domain || '%' AND o.status = 'failed' AND o.created_at > now() - interval '1 hour'), 0) AS failed_h
+			COALESCE((SELECT COUNT(*) FROM outbox_activities o WHERE o.target_inbox ILIKE '%' || d.domain || '%' AND o.status = 'failed' AND o.created_at > now() - interval '1 hour'), 0) AS failed_h,
+			COALESCE((SELECT COUNT(*) FROM outbox_activities o WHERE o.target_inbox ILIKE '%' || d.domain || '%' AND o.status IN ('pending','failed')), 0) AS retry_queue,
+			COALESCE((SELECT ff.circuit_open_until > now() FROM federation_failures ff WHERE ff.domain = d.domain), false) AS circuit_open,
+			COALESCE((SELECT ir.reputation_score FROM instance_reputation ir WHERE ir.domain = d.domain), 100) AS reputation_score
 		FROM domains d
+		WHERE d.domain IS NOT NULL AND d.domain != ''
 		ORDER BY d.domain
 	`)
 	if err != nil {
@@ -757,13 +772,15 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 	servers := make([]map[string]interface{}, 0)
 	for serverRows.Next() {
 		row := serverRow{}
-		if scanErr := serverRows.Scan(&row.Domain, &row.Blocked, &row.LastSeen, &row.IncomingM, &row.OutgoingM, &row.FailedH); scanErr != nil {
+		if scanErr := serverRows.Scan(&row.Domain, &row.Blocked, &row.LastSeen, &row.IncomingM, &row.OutgoingM, &row.FailedH, &row.RetryQueue, &row.CircuitOpen, &row.ReputationScore); scanErr != nil {
 			continue
 		}
 
 		status := "healthy"
 		if row.Blocked {
 			status = "blocked"
+		} else if row.CircuitOpen {
+			status = "circuit_open"
 		} else if row.FailedH > 2 {
 			status = "degraded"
 		}
@@ -777,10 +794,75 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 			"domain":       row.Domain,
 			"status":       status,
 			"reputation":   map[bool]string{true: "Blocked", false: "Trusted"}[row.Blocked],
+			"reputation_score": row.ReputationScore,
 			"last_seen":    lastSeen,
 			"incoming_m":   row.IncomingM,
 			"outgoing_m":   row.OutgoingM,
+			"retry_queue":  row.RetryQueue,
+			"failed_h":     row.FailedH,
+			"circuit_open": row.CircuitOpen,
 			"activities_m": row.IncomingM + row.OutgoingM,
+		})
+	}
+
+	failingRows, err := db.GetDB().Query(ctx, `
+		WITH parsed AS (
+			SELECT
+				regexp_replace(target_inbox, '^https?://([^/]+)/?.*$', '\\1') AS domain,
+				retry_count,
+				status,
+				next_retry_at,
+				last_error
+			FROM outbox_activities
+			WHERE target_inbox ILIKE 'http%'
+			  AND status IN ('pending','failed')
+		)
+		SELECT
+			domain,
+			COUNT(*) AS queued,
+			MAX(retry_count) AS max_retry_count,
+			MAX(next_retry_at) AS next_retry_at,
+			MAX(COALESCE(last_error, '')) AS last_error,
+			COALESCE((SELECT ff.circuit_open_until FROM federation_failures ff WHERE ff.domain = parsed.domain), NULL) AS circuit_open_until
+		FROM parsed
+		WHERE COALESCE(domain, '') <> ''
+		GROUP BY domain
+		ORDER BY queued DESC, domain ASC
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch failing domains: " + err.Error()})
+	}
+	defer failingRows.Close()
+
+	failingDomains := make([]map[string]interface{}, 0)
+	for failingRows.Next() {
+		var domain string
+		var queued, maxRetryCount int
+		var nextRetryAt *time.Time
+		var lastError string
+		var circuitOpenUntil *time.Time
+
+		if scanErr := failingRows.Scan(&domain, &queued, &maxRetryCount, &nextRetryAt, &lastError, &circuitOpenUntil); scanErr != nil {
+			continue
+		}
+
+		nextRetry := "—"
+		if nextRetryAt != nil {
+			nextRetry = nextRetryAt.UTC().Format(time.RFC3339)
+		}
+
+		circuitUntil := "—"
+		if circuitOpenUntil != nil {
+			circuitUntil = circuitOpenUntil.UTC().Format(time.RFC3339)
+		}
+
+		failingDomains = append(failingDomains, map[string]interface{}{
+			"domain":             domain,
+			"queued":             queued,
+			"max_retry_count":    maxRetryCount,
+			"next_retry_at":      nextRetry,
+			"last_error":         lastError,
+			"circuit_open_until": circuitUntil,
 		})
 	}
 
@@ -843,9 +925,131 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 			"outgoing_per_minute":  outgoingPerMinute,
 			"signature_validation": fmt.Sprintf("%.2f%%", validationRate),
 			"retry_queue":          retryQueue,
+			"failing_domains":      len(failingDomains),
 		},
 		"servers":         servers,
+		"failing_domains": failingDomains,
 		"recent_incoming": recentIncoming,
 		"recent_outgoing": recentOutgoing,
+	})
+}
+
+// GetInstanceReputation returns per-domain reputation metrics for admin governance.
+func (h *AdminHandler) GetInstanceReputation(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	rows, err := db.GetDB().Query(c.Request().Context(), `
+		SELECT domain, reputation_score, spam_count, failure_count, updated_at
+		FROM instance_reputation
+		ORDER BY reputation_score ASC, domain ASC
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch instance reputation: " + err.Error()})
+	}
+	defer rows.Close()
+
+	items := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var domain string
+		var score, spamCount, failureCount int
+		var updatedAt time.Time
+		if scanErr := rows.Scan(&domain, &score, &spamCount, &failureCount, &updatedAt); scanErr != nil {
+			continue
+		}
+		items = append(items, map[string]interface{}{
+			"domain":           domain,
+			"reputation_score": score,
+			"spam_count":       spamCount,
+			"failure_count":    failureCount,
+			"updated_at":       updatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"items": items})
+}
+
+// GetFederationNetwork returns graph-friendly server relationship data.
+func (h *AdminHandler) GetFederationNetwork(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	ctx := c.Request().Context()
+
+	type edgeRow struct {
+		Source       string
+		Target       string
+		SuccessCount int
+		FailureCount int
+		LastStatus   string
+		LastSeen     time.Time
+	}
+
+	rows, err := db.GetDB().Query(ctx, `
+		SELECT source_domain, target_domain, success_count, failure_count, COALESCE(last_status, 'pending'), last_seen
+		FROM federation_connections
+		ORDER BY updated_at DESC
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch federation graph: " + err.Error()})
+	}
+	defer rows.Close()
+
+	nodeSet := map[string]bool{}
+	edges := make([]map[string]interface{}, 0)
+
+	for rows.Next() {
+		r := edgeRow{}
+		if scanErr := rows.Scan(&r.Source, &r.Target, &r.SuccessCount, &r.FailureCount, &r.LastStatus, &r.LastSeen); scanErr != nil {
+			continue
+		}
+
+		if strings.TrimSpace(r.Source) == "" || strings.TrimSpace(r.Target) == "" {
+			continue
+		}
+
+		nodeSet[r.Source] = true
+		nodeSet[r.Target] = true
+
+		weight := r.SuccessCount + r.FailureCount
+		if weight < 1 {
+			weight = 1
+		}
+
+		edges = append(edges, map[string]interface{}{
+			"source":        r.Source,
+			"target":        r.Target,
+			"weight":        weight,
+			"success_count": r.SuccessCount,
+			"failure_count": r.FailureCount,
+			"last_status":   r.LastStatus,
+			"last_seen":     r.LastSeen.UTC().Format(time.RFC3339),
+		})
+	}
+
+	selfDomain := strings.TrimSpace(c.QueryParam("self"))
+	if selfDomain == "" {
+		selfDomain = "local"
+	}
+	nodeSet[selfDomain] = true
+
+	nodes := make([]map[string]interface{}, 0, len(nodeSet))
+	for domain := range nodeSet {
+		nodeType := "remote"
+		if domain == selfDomain {
+			nodeType = "local"
+		}
+
+		nodes = append(nodes, map[string]interface{}{
+			"id":   domain,
+			"type": nodeType,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"nodes": nodes,
+		"edges": edges,
 	})
 }

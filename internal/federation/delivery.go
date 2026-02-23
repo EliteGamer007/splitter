@@ -52,21 +52,37 @@ func DeliverActivity(activity *Activity, targetInbox string) error {
 		log.Printf("[Federation] Warning: failed to store outbox activity: %v", err)
 	}
 
-	if targetDomain := extractDomainFromURI(targetInbox); targetDomain != "" && IsDomainBlocked(ctx, targetDomain) {
-		updateOutboxStatus(ctx, outboxID, "failed")
+	return deliverOutboxPayload(ctx, outboxID, activity.Type, body, targetInbox)
+}
+
+func deliverOutboxPayload(ctx context.Context, outboxID, activityType string, payload []byte, targetInbox string) error {
+	targetDomain := extractDomainFromURI(targetInbox)
+
+	if targetDomain != "" && IsDomainBlocked(ctx, targetDomain) {
+		updateOutboxFailure(ctx, outboxID, fmt.Sprintf("target domain %s is blocked", targetDomain))
+		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		recordDeliveryFailure(ctx, targetDomain)
 		return fmt.Errorf("target domain %s is blocked", targetDomain)
 	}
 
-	// Create request
-	req, err := http.NewRequest("POST", targetInbox, bytes.NewReader(body))
+	if targetDomain != "" && IsCircuitOpen(ctx, targetDomain) {
+		updateOutboxFailure(ctx, outboxID, fmt.Sprintf("circuit breaker open for domain %s", targetDomain))
+		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		return fmt.Errorf("circuit breaker open for domain %s", targetDomain)
+	}
+
+	req, err := http.NewRequest("POST", targetInbox, bytes.NewReader(payload))
 	if err != nil {
-		updateOutboxStatus(ctx, outboxID, "failed")
+		updateOutboxFailure(ctx, outboxID, "failed to create request")
+		if targetDomain != "" {
+			recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+			recordDeliveryFailure(ctx, targetDomain)
+		}
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/activity+json")
 	req.Header.Set("Accept", "application/activity+json")
 
-	// Sign request
 	privKey := GetInstancePrivateKey()
 	domain := GetInstanceDomain()
 	if privKey != nil {
@@ -76,23 +92,35 @@ func DeliverActivity(activity *Activity, targetInbox string) error {
 		}
 	}
 
-	// Send
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		updateOutboxStatus(ctx, outboxID, "failed")
+		updateOutboxFailure(ctx, outboxID, err.Error())
+		if targetDomain != "" {
+			recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+			recordDeliveryFailure(ctx, targetDomain)
+		}
 		return fmt.Errorf("delivery failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		updateOutboxStatus(ctx, outboxID, "sent")
-		log.Printf("[Federation] Delivered %s to %s (status: %d)", activity.Type, targetInbox, resp.StatusCode)
+		updateOutboxSent(ctx, outboxID)
+		if targetDomain != "" {
+			recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "sent")
+			recordDeliverySuccess(ctx, targetDomain)
+		}
+		log.Printf("[Federation] Delivered %s to %s (status: %d)", activityType, targetInbox, resp.StatusCode)
 		return nil
 	}
 
-	updateOutboxStatus(ctx, outboxID, "failed")
-	return fmt.Errorf("delivery returned status %d", resp.StatusCode)
+	errMsg := fmt.Sprintf("delivery returned status %d", resp.StatusCode)
+	updateOutboxFailure(ctx, outboxID, errMsg)
+	if targetDomain != "" {
+		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		recordDeliveryFailure(ctx, targetDomain)
+	}
+	return fmt.Errorf("%s", errMsg)
 }
 
 // DeliverToActor resolves a remote actor and delivers an activity to their inbox
@@ -377,21 +405,74 @@ func BuildUpdateActorActivity(actorURI, username, displayName, summary, avatarUR
 func storeOutboxActivity(ctx context.Context, activityType string, payload []byte, targetInbox string) (string, error) {
 	var id string
 	err := db.GetDB().QueryRow(ctx,
-		`INSERT INTO outbox_activities (activity_type, payload, target_inbox, status)
-		 VALUES ($1, $2, $3, 'pending') RETURNING id::text`,
+		`INSERT INTO outbox_activities (activity_type, payload, target_inbox, status, next_retry_at)
+		 VALUES ($1, $2, $3, 'pending', now()) RETURNING id::text`,
 		activityType, payload, targetInbox,
 	).Scan(&id)
 	return id, err
 }
 
-// updateOutboxStatus updates the delivery status of an outbox activity
-func updateOutboxStatus(ctx context.Context, id string, status string) {
+func updateOutboxSent(ctx context.Context, id string) {
 	if id == "" {
 		return
 	}
 	db.GetDB().Exec(ctx,
-		`UPDATE outbox_activities SET status = $1, retry_count = retry_count + 1 WHERE id = $2`,
-		status, id)
+		`UPDATE outbox_activities
+		 SET status = 'sent',
+		     last_error = NULL,
+		     next_retry_at = NULL,
+		     last_attempt_at = now()
+		 WHERE id = $1`,
+		id,
+	)
+}
+
+func updateOutboxFailure(ctx context.Context, id string, lastError string) {
+	if id == "" {
+		return
+	}
+
+	attempt := 1
+	_ = db.GetDB().QueryRow(ctx,
+		`SELECT retry_count + 1 FROM outbox_activities WHERE id = $1`,
+		id,
+	).Scan(&attempt)
+
+	db.GetDB().Exec(ctx,
+		`UPDATE outbox_activities
+		 SET status = 'failed',
+		     retry_count = retry_count + 1,
+		     last_error = LEFT($1, 512),
+		     next_retry_at = now() + $2::interval,
+		     last_attempt_at = now()
+		 WHERE id = $3`,
+		lastError,
+		formatBackoffInterval(calculateRetryDelay(attempt)),
+		id,
+	)
+}
+
+// RetryOutboxActivity re-attempts delivery for an existing outbox record.
+func RetryOutboxActivity(ctx context.Context, outboxID string) error {
+	if strings.TrimSpace(outboxID) == "" {
+		return fmt.Errorf("outbox id is required")
+	}
+
+	var activityType string
+	var payload []byte
+	var targetInbox string
+
+	err := db.GetDB().QueryRow(ctx,
+		`SELECT activity_type, payload, target_inbox
+		 FROM outbox_activities
+		 WHERE id = $1`,
+		outboxID,
+	).Scan(&activityType, &payload, &targetInbox)
+	if err != nil {
+		return fmt.Errorf("failed to load outbox activity: %w", err)
+	}
+
+	return deliverOutboxPayload(ctx, outboxID, activityType, payload, targetInbox)
 }
 
 // IsDomainBlocked checks if a domain is blocked for federation

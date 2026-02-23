@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -536,14 +537,33 @@ func (h *InboxHandler) handleUndo(c echo.Context, activity map[string]interface{
 // Helper functions
 
 func extractDomainFromURI(uri string) string {
-	// Extract domain from http://localhost:8000/users/alice → localhost:8000
-	// Map back to splitter domain if possible
+	// Map known local instance base URLs first
 	for domain, baseURL := range federation.InstanceURLMap {
 		if len(uri) > len(baseURL) && uri[:len(baseURL)] == baseURL {
 			return domain
 		}
 	}
-	return uri
+
+	parsed, err := url.Parse(strings.TrimSpace(uri))
+	if err != nil {
+		return ""
+	}
+
+	host := parsed.Hostname()
+	if host == "" {
+		return ""
+	}
+
+	if strings.Contains(host, "localhost") || strings.Contains(host, "127.0.0.1") {
+		if strings.Contains(parsed.Host, ":8000") {
+			return "splitter-1"
+		}
+		if strings.Contains(parsed.Host, ":8001") {
+			return "splitter-2"
+		}
+	}
+
+	return host
 }
 
 func extractUsernameFromURI(uri string) string {
