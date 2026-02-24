@@ -653,6 +653,17 @@ func (h *AuthHandler) CheckKeyRevocation(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "key query parameter is required"})
 	}
 
+	// Support full DID URIs by stripping common prefixes
+	if len(publicKey) > 9 && publicKey[:9] == "did:key:z" {
+		// did:key:z6Mk... -> strip "did:key:z6Mk" (12 chars) or just "did:key:z" (9 chars)
+		// The most common prefix is did:key:z6Mk
+		if len(publicKey) > 12 && publicKey[:12] == "did:key:z6Mk" {
+			publicKey = publicKey[12:]
+		} else {
+			publicKey = publicKey[9:]
+		}
+	}
+
 	revoked, err := h.userRepo.IsKeyRevoked(c.Request().Context(), publicKey)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check key status"})
