@@ -580,14 +580,14 @@
 ---
 
 ### Story 4.3: Cryptographic Key Rotation & Revocation
-**Status:** ❌ **NOT STARTED** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As a security-conscious account holder, I want to rotate or revoke compromised keys without losing my identity.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Implement key rotation signed by current key
-- ❌ **NOT STARTED** - Maintain server-side revocation list per DID
-- ❌ **NOT STARTED** - Propagate key updates using ActivityPub Update
-- ❌ **NOT STARTED** - Reject messages signed with revoked keys
+- ✅ **DONE** - Implement key rotation signed by current key
+- ✅ **DONE** - Maintain server-side revocation list per DID
+- ✅ **DONE** - Propagate key updates using ActivityPub Update
+- ✅ **DONE** - Reject messages signed with revoked keys
 
 ---
 
