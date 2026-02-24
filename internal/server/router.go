@@ -118,6 +118,19 @@ func setupRoutes(
 	auth.POST("/challenge", authHandler.GetChallenge) // Get challenge nonce for DID login (optional)
 	auth.POST("/verify", authHandler.VerifyChallenge) // Verify signed challenge and get JWT (optional)
 
+	// Auth routes (authenticated) — key management
+	authAuth := api.Group("/auth")
+	authAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	authAuth.POST("/register-key", authHandler.RegisterKey)   // Set initial public key (password-only users)
+	authAuth.POST("/rotate-key", authHandler.RotateKey)       // Rotate Ed25519 signing key (Story 4.3)
+	authAuth.POST("/revoke-key", authHandler.RevokeKey)       // Manually revoke current signing key
+	authAuth.GET("/key-history", authHandler.GetKeyHistory)   // View key rotation history
+	authAuth.GET("/revoked-keys", authHandler.GetRevokedKeys) // Own revocation list (authenticated)
+
+	// Public revocation endpoints — no auth required (for federation)
+	api.GET("/auth/check-key", authHandler.CheckKeyRevocation)           // GET /api/v1/auth/check-key?key=<b64>
+	api.GET("/dids/:did/revoked-keys", authHandler.GetPublicRevokedKeys) // Per-DID revocation list
+
 	// User routes
 	users := api.Group("/users")
 	users.GET("/:id", userHandler.GetProfile)      // Public - view any user profile by UUID

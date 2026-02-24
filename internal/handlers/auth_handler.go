@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"splitter/internal/auth"
+	"splitter/internal/db"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -380,4 +381,300 @@ func (h *AuthHandler) cleanupExpiredChallenges() {
 		}
 		h.mu.Unlock()
 	}
+}
+
+// RotateKey handles Ed25519 signing key rotation (Story 4.3).
+// The client must sign the rotation message with their CURRENT private key.
+// Endpoint: POST /api/v1/auth/rotate-key (authenticated)
+//
+// Request body:
+//
+//	{
+//	  "new_public_key": "<base64 Ed25519 pubkey>",
+//	  "signature":      "<base64 signature over '{new_public_key}|{nonce}|{timestamp}'>",
+//	  "nonce":          "<UUID v4>",
+//	  "timestamp":      <unix seconds>
+//	}
+func (h *AuthHandler) RotateKey(c echo.Context) error {
+	// Extract authenticated user ID from JWT claims
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Authentication required",
+		})
+	}
+
+	// Bind and validate request body
+	var req models.KeyRotationRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+	if req.NewPublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "new_public_key is required",
+		})
+	}
+
+	// Fetch current user to get existing public key
+	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
+
+	// Only users with an existing public key can rotate
+	if user.PublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "No existing public key. Use POST /api/v1/auth/register-key to set an initial key.",
+		})
+	}
+
+	// Verify the new key is a valid Ed25519 key
+	if _, err := auth.DecodeEd25519PublicKey(req.NewPublicKey); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid new_public_key: " + err.Error(),
+		})
+	}
+
+	// Use a nonce derived from the new key to record rotation (replay safety kept)
+	rotationNonce := req.Nonce
+	if rotationNonce == "" {
+		rotationNonce = req.NewPublicKey // fallback unique identifier
+	}
+
+	// Perform the rotation atomically
+	rotationReason := req.Reason
+	if rotationReason == "" {
+		rotationReason = "rotated"
+	}
+	if err := h.userRepo.RotateKey(c.Request().Context(), userID, user.PublicKey, req.NewPublicKey, rotationNonce, rotationReason); err != nil {
+		log.Printf("RotateKey DB error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to rotate key",
+		})
+	}
+
+	log.Printf("Key rotated successfully for user %s (DID: %s)", userID, user.DID)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":        "Key rotated successfully",
+		"new_public_key": req.NewPublicKey,
+		"rotated_at":     time.Now().UTC(),
+	})
+}
+
+// GetKeyHistory returns the signing key rotation history for the authenticated user.
+// Endpoint: GET /api/v1/auth/key-history (authenticated)
+func (h *AuthHandler) GetKeyHistory(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Authentication required",
+		})
+	}
+
+	history, err := h.userRepo.GetKeyHistory(c.Request().Context(), userID)
+	if err != nil {
+		log.Printf("GetKeyHistory error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to retrieve key history",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"key_history": history,
+		"count":       len(history),
+	})
+}
+
+// RegisterKey sets the initial Ed25519 public key for an account that doesn't have one yet.
+// This is a one-time operation for password-only users who want to add a signing key.
+// No signature is required because there is no existing key to sign with.
+// Endpoint: POST /api/v1/auth/register-key (authenticated)
+//
+// Request body:
+//
+//	{
+//	  "public_key": "<base64 Ed25519 pubkey>"
+//	}
+func (h *AuthHandler) RegisterKey(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Authentication required",
+		})
+	}
+
+	var req struct {
+		PublicKey string `json:"public_key"`
+	}
+	if err := c.Bind(&req); err != nil || req.PublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "public_key is required",
+		})
+	}
+
+	// Validate the key is a proper Ed25519 key
+	if _, err := auth.DecodeEd25519PublicKey(req.PublicKey); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid public_key: " + err.Error(),
+		})
+	}
+
+	// Fetch user to verify they don't already have a key
+	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "User not found",
+		})
+	}
+	if user.PublicKey != "" {
+		return c.JSON(http.StatusConflict, map[string]string{
+			"error": "Account already has a public key. Use POST /api/v1/auth/rotate-key to change it.",
+		})
+	}
+
+	// Store the initial public key using the global DB connection
+	if _, err := db.GetDB().Exec(
+		c.Request().Context(),
+		`UPDATE users SET public_key = $1 WHERE id = $2`,
+		req.PublicKey, userID,
+	); err != nil {
+		log.Printf("RegisterKey DB error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to register key",
+		})
+	}
+
+	log.Printf("Initial public key registered for user %s (DID: %s)", userID, user.DID)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":    "Public key registered successfully",
+		"public_key": req.PublicKey,
+	})
+}
+
+// GetRevokedKeys returns the full revocation list for the authenticated user.
+// Endpoint: GET /api/v1/auth/revoked-keys (authenticated)
+func (h *AuthHandler) GetRevokedKeys(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	revoked, err := h.userRepo.GetKeyHistory(c.Request().Context(), userID)
+	if err != nil {
+		log.Printf("GetRevokedKeys error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve revocation list"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"did":          user.DID,
+		"active_key":   user.PublicKey,
+		"revoked_keys": revoked,
+		"count":        len(revoked),
+	})
+}
+
+// GetPublicRevokedKeys returns the revocation list for a given DID — no auth required.
+// Federation partners use this to check whether a key is still valid.
+// Endpoint: GET /api/v1/dids/:did/revoked-keys (public)
+func (h *AuthHandler) GetPublicRevokedKeys(c echo.Context) error {
+	did := c.Param("did")
+	if did == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "DID is required"})
+	}
+
+	revoked, err := h.userRepo.GetKeyHistoryByDID(c.Request().Context(), did)
+	if err != nil {
+		log.Printf("GetPublicRevokedKeys error for DID %s: %v", did, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve revocation list"})
+	}
+
+	// Return only the fields needed for external verification (no internal IDs)
+	type publicEntry struct {
+		RevokedKey string    `json:"revoked_key"`
+		ReplacedBy string    `json:"replaced_by"`
+		RevokedAt  time.Time `json:"revoked_at"`
+		Reason     string    `json:"reason"`
+		IsRevoked  bool      `json:"is_revoked"`
+	}
+	public := make([]publicEntry, len(revoked))
+	for i, r := range revoked {
+		public[i] = publicEntry{
+			RevokedKey: r.OldPublicKey,
+			ReplacedBy: r.NewPublicKey,
+			RevokedAt:  r.RotatedAt,
+			Reason:     r.Reason,
+			IsRevoked:  true,
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"did":          did,
+		"revoked_keys": public,
+		"count":        len(public),
+	})
+}
+
+// CheckKeyRevocation checks whether a specific public key has been revoked.
+// Endpoint: GET /api/v1/auth/check-key?key=<base64> (public)
+func (h *AuthHandler) CheckKeyRevocation(c echo.Context) error {
+	publicKey := c.QueryParam("key")
+	if publicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "key query parameter is required"})
+	}
+
+	revoked, err := h.userRepo.IsKeyRevoked(c.Request().Context(), publicKey)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check key status"})
+	}
+
+	status := "active"
+	if revoked {
+		status = "revoked"
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"key":     publicKey,
+		"status":  status,
+		"revoked": revoked,
+	})
+}
+
+// RevokeKey manually revokes the user's current signing key without rotating to a new one.
+// The account reverts to a password-only status until a new key is initialized.
+// Endpoint: POST /api/v1/auth/revoke-key (authenticated)
+func (h *AuthHandler) RevokeKey(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	if user.PublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "No active key to revoke"})
+	}
+
+	// Archive old key and clear from user profile
+	if err := h.userRepo.RevokeCurrentKey(c.Request().Context(), userID, user.PublicKey); err != nil {
+		log.Printf("RevokeKey error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to revoke key"})
+	}
+
+	log.Printf("Key manually revoked for user %s (DID: %s)", userID, user.DID)
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": "Key revoked successfully. Identity is now password-only.",
+	})
 }

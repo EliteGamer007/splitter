@@ -135,3 +135,26 @@ type AuthChallenge struct {
 	Challenge string
 	ExpiresAt time.Time
 }
+
+// KeyRotationRequest is the body sent by the client to rotate their Ed25519 signing key.
+// The Signature must be computed over BuildRotationMessage(NewPublicKey, Nonce, Timestamp)
+// using the user's CURRENT private key.
+type KeyRotationRequest struct {
+	NewPublicKey string `json:"new_public_key" validate:"required"`
+	Signature    string `json:"signature"`
+	Nonce        string `json:"nonce"`
+	Timestamp    int64  `json:"timestamp"`
+	Reason       string `json:"reason"` // optional: rotated, compromised, lost
+}
+
+// KeyRotation represents a single key rotation record (revocation history entry).
+type KeyRotation struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	OldPublicKey string    `json:"old_public_key"`
+	NewPublicKey string    `json:"new_public_key"`
+	RotatedAt    time.Time `json:"rotated_at"`
+	Nonce        string    `json:"nonce"`
+	Reason       string    `json:"reason"`     // why revoked: rotated, compromised, lost
+	IsRevoked    bool      `json:"is_revoked"` // always true; makes status explicit in JSON
+}

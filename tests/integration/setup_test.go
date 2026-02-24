@@ -83,6 +83,8 @@ func SetupTestEnv(t *testing.T) func() {
 		"../../migrations/001_initial_schema.sql",
 		"../../migrations/004_consolidated_fixes.sql",
 		"../../migrations/005_create_replies_table.sql",
+		"../../migrations/006_add_e2ee_fields.sql",
+		"../../migrations/014_add_key_rotations.sql",
 	}
 
 	for _, f := range files {
