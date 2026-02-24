@@ -81,6 +81,8 @@ func SetupTestEnv(t *testing.T) func() {
 	files := []string{
 		"../../migrations/001_initial_schema.sql",
 		"../../migrations/002_upgrade_to_current.sql",
+		"../../migrations/014_add_key_rotations.sql",
+		"../../migrations/015_revocation_reason.sql",
 	}
 
 	for _, f := range files {

@@ -35,6 +35,9 @@ func main() {
 	// 	log.Printf("Warning: Failed to run migrations: %v", err)
 	// }
 
+	// Ensure migration 015 is applied (manual fix for Revoke Key)
+	db.GetDB().Exec(context.Background(), "ALTER TABLE key_rotations ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT 'rotated';")
+
 	// Ensure admin user exists
 	ensureAdminUser() // Silent check, no logging needed
 

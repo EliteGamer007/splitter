@@ -2,7 +2,11 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"log"
+	"time"
 
 	"splitter/internal/db"
 	"splitter/internal/models"
@@ -687,4 +691,160 @@ func (r *UserRepository) GetAvatarContentByUserID(ctx context.Context, userID st
 	}
 
 	return avatarData, mediaType, avatarURL, nil
+}
+
+// RotateKey records a key rotation: archives the old key into key_rotations and
+// updates users.public_key to the new key. Both writes happen in a single transaction.
+func (r *UserRepository) RotateKey(ctx context.Context, userID, oldPublicKey, newPublicKey, nonce, reason string) error {
+	if reason == "" {
+		reason = "rotated"
+	}
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert into revocation list
+	insertQuery := `
+		INSERT INTO key_rotations (user_id, old_public_key, new_public_key, nonce, reason)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	if _, err := tx.Exec(ctx, insertQuery, userID, oldPublicKey, newPublicKey, nonce, reason); err != nil {
+		return fmt.Errorf("failed to record key rotation: %w", err)
+	}
+
+	// Update active key on user
+	updateQuery := `UPDATE users SET public_key = $1, updated_at = NOW() WHERE id = $2`
+	result, err := tx.Exec(ctx, updateQuery, newPublicKey, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user public key: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetKeyHistory returns all key rotation records for a user, newest first.
+func (r *UserRepository) GetKeyHistory(ctx context.Context, userID string) ([]*models.KeyRotation, error) {
+	query := `
+		SELECT id, user_id, old_public_key, new_public_key, rotated_at, nonce,
+		       COALESCE(reason, 'rotated')
+		FROM key_rotations
+		WHERE user_id = $1
+		ORDER BY rotated_at DESC
+	`
+	rows, err := db.GetDB().Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key history: %w", err)
+	}
+	defer rows.Close()
+
+	var rotations []*models.KeyRotation
+	for rows.Next() {
+		var kr models.KeyRotation
+		if err := rows.Scan(&kr.ID, &kr.UserID, &kr.OldPublicKey, &kr.NewPublicKey, &kr.RotatedAt, &kr.Nonce, &kr.Reason); err != nil {
+			return nil, fmt.Errorf("failed to scan key rotation: %w", err)
+		}
+		kr.IsRevoked = true
+		rotations = append(rotations, &kr)
+	}
+	if rotations == nil {
+		rotations = []*models.KeyRotation{}
+	}
+	return rotations, nil
+}
+
+// GetKeyHistoryByDID returns key rotation records for a given DID (public endpoint).
+func (r *UserRepository) GetKeyHistoryByDID(ctx context.Context, did string) ([]*models.KeyRotation, error) {
+	query := `
+		SELECT kr.id, kr.user_id, kr.old_public_key, kr.new_public_key, kr.rotated_at, kr.nonce,
+		       COALESCE(kr.reason, 'rotated')
+		FROM key_rotations kr
+		JOIN users u ON u.id = kr.user_id
+		WHERE u.did = $1
+		ORDER BY kr.rotated_at DESC
+	`
+	rows, err := db.GetDB().Query(ctx, query, did)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key history by DID: %w", err)
+	}
+	defer rows.Close()
+
+	var rotations []*models.KeyRotation
+	for rows.Next() {
+		var kr models.KeyRotation
+		if err := rows.Scan(&kr.ID, &kr.UserID, &kr.OldPublicKey, &kr.NewPublicKey, &kr.RotatedAt, &kr.Nonce, &kr.Reason); err != nil {
+			return nil, fmt.Errorf("failed to scan key rotation: %w", err)
+		}
+		kr.IsRevoked = true
+		rotations = append(rotations, &kr)
+	}
+	if rotations == nil {
+		rotations = []*models.KeyRotation{}
+	}
+	return rotations, nil
+}
+
+// IsKeyRevoked returns true if the given public key appears in the key_rotations revocation list.
+func (r *UserRepository) IsKeyRevoked(ctx context.Context, publicKey string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM key_rotations WHERE old_public_key = $1)`
+	var revoked bool
+	if err := db.GetDB().QueryRow(ctx, query, publicKey).Scan(&revoked); err != nil {
+		return false, fmt.Errorf("failed to check key revocation: %w", err)
+	}
+	return revoked, nil
+}
+
+// IsNonceUsed returns true if the given nonce has already been recorded in key_rotations.
+// Used to prevent rotation request replay attacks.
+func (r *UserRepository) IsNonceUsed(ctx context.Context, nonce string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM key_rotations WHERE nonce = $1)`
+	var used bool
+	if err := db.GetDB().QueryRow(ctx, query, nonce).Scan(&used); err != nil {
+		return false, fmt.Errorf("failed to check nonce: %w", err)
+	}
+	return used, nil
+}
+
+// RevokeCurrentKey archives the user's active key into key_rotations and
+// removes it from the users profile. Both happen in a single transaction.
+func (r *UserRepository) RevokeCurrentKey(ctx context.Context, userID, oldKey string) error {
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Move to revocation list
+	// Generate a unique nonce to avoid DB constraint violations
+	nonceBytes := make([]byte, 8)
+	rand.Read(nonceBytes)
+	nonce := fmt.Sprintf("revoke_%d_%s", time.Now().UnixNano(), hex.EncodeToString(nonceBytes))
+
+	insertQuery := `
+		INSERT INTO key_rotations (user_id, old_public_key, new_public_key, nonce, reason)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	// new_public_key is empty for a manual revocation with no replacement
+	if _, err := tx.Exec(ctx, insertQuery, userID, oldKey, "", nonce, "manually_revoked"); err != nil {
+		log.Printf("[UserRepository] RevokeCurrentKey: failed to archive key for user %s: %v", userID, err)
+		return fmt.Errorf("failed to archive key: %w", err)
+	}
+
+	// 2. Clear from user profile
+	updateQuery := `UPDATE users SET public_key = NULL, updated_at = NOW() WHERE id = $1`
+	if _, err := tx.Exec(ctx, updateQuery, userID); err != nil {
+		log.Printf("[UserRepository] RevokeCurrentKey: failed to clear public_key for user %s: %v", userID, err)
+		return fmt.Errorf("failed to clear user key: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("[UserRepository] RevokeCurrentKey: failed to commit transaction for user %s: %v", userID, err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
