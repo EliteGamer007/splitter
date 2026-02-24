@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	"splitter/internal/auth"
+	"splitter/internal/config"
 	"splitter/internal/db"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -21,16 +24,18 @@ import (
 // AuthHandler handles authentication-related requests
 type AuthHandler struct {
 	userRepo   *repository.UserRepository
+	cfg        *config.Config
 	jwtSecret  string
 	challenges map[string]*models.AuthChallenge // In-memory challenge store
 	mu         sync.RWMutex
 }
 
 // NewAuthHandler creates a new AuthHandler
-func NewAuthHandler(userRepo *repository.UserRepository, jwtSecret string) *AuthHandler {
+func NewAuthHandler(userRepo *repository.UserRepository, cfg *config.Config) *AuthHandler {
 	handler := &AuthHandler{
 		userRepo:   userRepo,
-		jwtSecret:  jwtSecret,
+		cfg:        cfg,
+		jwtSecret:  cfg.JWT.Secret,
 		challenges: make(map[string]*models.AuthChallenge),
 	}
 
@@ -459,6 +464,22 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 
 	log.Printf("Key rotated successfully for user %s (DID: %s)", userID, user.DID)
 
+	// Propagate rotation via ActivityPub
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		// encryptionPublicKey is optional, using existing if not provided
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			user.DisplayName,
+			user.Bio,
+			user.AvatarURL,
+			req.NewPublicKey, // New signing key
+			user.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message":        "Key rotated successfully",
 		"new_public_key": req.NewPublicKey,
@@ -673,6 +694,22 @@ func (h *AuthHandler) RevokeKey(c echo.Context) error {
 	}
 
 	log.Printf("Key manually revoked for user %s (DID: %s)", userID, user.DID)
+
+	// Propagate revocation via ActivityPub
+	if h.cfg != nil && h.cfg.Federation.Enabled {
+		actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+		// For revocation, publicKeyPEM is empty/revoked
+		activity := federation.BuildUpdateActorActivity(
+			actorURI,
+			user.Username,
+			user.DisplayName,
+			user.Bio,
+			user.AvatarURL,
+			"", // Revoked key (empty)
+			user.EncryptionPublicKey,
+		)
+		go federation.DeliverToFollowers(activity, user.DID)
+	}
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "Key revoked successfully. Identity is now password-only.",

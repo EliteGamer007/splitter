@@ -33,7 +33,7 @@ func NewServer(cfg *config.Config) *Server {
 	messageRepo := repository.NewMessageRepository()
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(userRepo, cfg.JWT.Secret)
+	authHandler := handlers.NewAuthHandler(userRepo, cfg)
 	userHandler := handlers.NewUserHandler(userRepo, cfg)
 	postHandler := handlers.NewPostHandler(postRepo, userRepo, cfg)
 	mediaHandler := handlers.NewMediaHandler(postRepo)
