@@ -1,0 +1,57 @@
+version: '3.9'
+
+services:
+  splitter-instance-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: splitter-instance-1
+    ports:
+      - "8000:8000"
+    environment:
+      ENV_FILE: ".env"
+      PORT: "8000"
+      FEDERATION_ENABLED: "true"
+      FEDERATION_DOMAIN: "splitter-1"
+      FEDERATION_URL: "http://localhost:8000"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_INSTANCE1:-neondb}
+      JWT_SECRET: ${JWT_SECRET_INSTANCE1:-instance-1-secret}
+
+  splitter-instance-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: splitter-instance-2
+    ports:
+      - "8001:8001"
+    environment:
+      ENV_FILE: ".env"
+      PORT: "8001"
+      BASE_URL: "http://localhost:8001"
+      FEDERATION_ENABLED: "true"
+      FEDERATION_DOMAIN: "splitter-2"
+      FEDERATION_URL: "http://localhost:8001"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_INSTANCE2:-neondb_2}
+      JWT_SECRET: ${JWT_SECRET_INSTANCE2:-instance-2-secret}
+
+  splitter-frontend:
+    build:
+      context: ../Splitter-frontend
+      dockerfile: Dockerfile
+    container_name: splitter-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+    depends_on:
+      - splitter-instance-1
+      - splitter-instance-2
