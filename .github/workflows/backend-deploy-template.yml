@@ -1,8 +1,6 @@
 name: Backend Deploy (Template)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -11,14 +9,28 @@ permissions:
 jobs:
   deploy-instance-1:
     runs-on: ubuntu-latest
-    if: ${{ secrets.BACKEND_INSTANCE1_DEPLOY_HOOK_URL != '' }}
+    env:
+      INSTANCE1_HOOK: ${{ secrets.BACKEND_INSTANCE1_DEPLOY_HOOK_URL }}
     steps:
       - name: Trigger Instance 1 deploy hook
-        run: curl -fsS -X POST "${{ secrets.BACKEND_INSTANCE1_DEPLOY_HOOK_URL }}"
+        shell: bash
+        run: |
+          if [ -z "${INSTANCE1_HOOK}" ]; then
+            echo "Skipping instance-1 deploy: BACKEND_INSTANCE1_DEPLOY_HOOK_URL is not configured."
+            exit 0
+          fi
+          curl -fsS -X POST "${INSTANCE1_HOOK}"
 
   deploy-instance-2:
     runs-on: ubuntu-latest
-    if: ${{ secrets.BACKEND_INSTANCE2_DEPLOY_HOOK_URL != '' }}
+    env:
+      INSTANCE2_HOOK: ${{ secrets.BACKEND_INSTANCE2_DEPLOY_HOOK_URL }}
     steps:
       - name: Trigger Instance 2 deploy hook
-        run: curl -fsS -X POST "${{ secrets.BACKEND_INSTANCE2_DEPLOY_HOOK_URL }}"
+        shell: bash
+        run: |
+          if [ -z "${INSTANCE2_HOOK}" ]; then
+            echo "Skipping instance-2 deploy: BACKEND_INSTANCE2_DEPLOY_HOOK_URL is not configured."
+            exit 0
+          fi
+          curl -fsS -X POST "${INSTANCE2_HOOK}"

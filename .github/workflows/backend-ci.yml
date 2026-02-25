@@ -84,7 +84,6 @@ jobs:
   db-tests:
     runs-on: ubuntu-latest
     needs: quality
-    if: ${{ secrets.DB_HOST != '' && secrets.DB_PORT != '' && secrets.DB_USER != '' && secrets.DB_PASSWORD != '' && secrets.DB_NAME != '' }}
     env:
       DB_HOST: ${{ secrets.DB_HOST }}
       DB_PORT: ${{ secrets.DB_PORT }}
@@ -101,13 +100,25 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check DB secrets
+        id: db_check
+        shell: bash
+        run: |
+          if [ -n "${DB_HOST}" ] && [ -n "${DB_PORT}" ] && [ -n "${DB_USER}" ] && [ -n "${DB_PASSWORD}" ] && [ -n "${DB_NAME}" ]; then
+            echo "run_db_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_db_tests=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping DB tests because DB_* secrets are not fully configured."
+          fi
+
       - name: Run DB connectivity/schema tests
+        if: ${{ steps.db_check.outputs.run_db_tests == 'true' }}
         run: go test -v ./tests/db
 
   integration-tests:
     runs-on: ubuntu-latest
     needs: [quality, unit-tests]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_integration == 'true' && secrets.DB_HOST != '' && secrets.DB_PORT != '' && secrets.DB_USER != '' && secrets.DB_PASSWORD != '' && secrets.DB_NAME != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_integration == 'true' }}
     env:
       DB_HOST: ${{ secrets.DB_HOST }}
       DB_PORT: ${{ secrets.DB_PORT }}
@@ -124,5 +135,17 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check DB secrets
+        id: integration_db_check
+        shell: bash
+        run: |
+          if [ -n "${DB_HOST}" ] && [ -n "${DB_PORT}" ] && [ -n "${DB_USER}" ] && [ -n "${DB_PASSWORD}" ] && [ -n "${DB_NAME}" ]; then
+            echo "run_integration=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_integration=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping integration tests because DB_* secrets are not fully configured."
+          fi
+
       - name: Run integration tests (manual only)
+        if: ${{ steps.integration_db_check.outputs.run_integration == 'true' }}
         run: go test -v ./tests/integration

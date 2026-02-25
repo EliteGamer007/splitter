@@ -791,17 +791,17 @@ func (h *AdminHandler) GetFederationInspector(c echo.Context) error {
 		}
 
 		servers = append(servers, map[string]interface{}{
-			"domain":       row.Domain,
-			"status":       status,
-			"reputation":   map[bool]string{true: "Blocked", false: "Trusted"}[row.Blocked],
+			"domain":           row.Domain,
+			"status":           status,
+			"reputation":       map[bool]string{true: "Blocked", false: "Trusted"}[row.Blocked],
 			"reputation_score": row.ReputationScore,
-			"last_seen":    lastSeen,
-			"incoming_m":   row.IncomingM,
-			"outgoing_m":   row.OutgoingM,
-			"retry_queue":  row.RetryQueue,
-			"failed_h":     row.FailedH,
-			"circuit_open": row.CircuitOpen,
-			"activities_m": row.IncomingM + row.OutgoingM,
+			"last_seen":        lastSeen,
+			"incoming_m":       row.IncomingM,
+			"outgoing_m":       row.OutgoingM,
+			"retry_queue":      row.RetryQueue,
+			"failed_h":         row.FailedH,
+			"circuit_open":     row.CircuitOpen,
+			"activities_m":     row.IncomingM + row.OutgoingM,
 		})
 	}
 
