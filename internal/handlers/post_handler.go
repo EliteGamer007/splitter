@@ -46,6 +46,7 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	// Limit handled by middleware, but good to have fallback checks
 	content := c.FormValue("content")
 	visibility := c.FormValue("visibility")
+	expiresInMinutesRaw := c.FormValue("expires_in_minutes")
 
 	// Handle file upload check first to validate
 	file, fileErr := c.FormFile("file")
@@ -84,9 +85,26 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		})
 	}
 
+	var expiresInMinutes *int
+	if expiresInMinutesRaw != "" {
+		parsed, parseErr := strconv.Atoi(expiresInMinutesRaw)
+		if parseErr != nil || parsed <= 0 {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "expires_in_minutes must be a positive integer",
+			})
+		}
+		if parsed > 10080 {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "expires_in_minutes cannot exceed 10080 (7 days)",
+			})
+		}
+		expiresInMinutes = &parsed
+	}
+
 	req := models.PostCreate{
-		Content:    content,
-		Visibility: visibility,
+		Content:          content,
+		Visibility:       visibility,
+		ExpiresInMinutes: expiresInMinutes,
 	}
 
 	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaData, mediaType)

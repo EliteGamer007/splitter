@@ -26,6 +26,7 @@ type Post struct {
 	Media            []Media            `json:"media,omitempty"` // Attached media
 	CreatedAt        time.Time          `json:"created_at"`
 	UpdatedAt        *time.Time         `json:"updated_at,omitempty"`
+	ExpiresAt        *time.Time         `json:"expires_at,omitempty"`
 }
 
 // Media represents a media attachment
@@ -58,8 +59,9 @@ type ParentContextInfo struct {
 
 // PostCreate represents the data needed to create a new post
 type PostCreate struct {
-	Content    string `json:"content" validate:"required,max=500"`
-	Visibility string `json:"visibility,omitempty"` // defaults to "public"
+	Content          string `json:"content" validate:"required,max=500"`
+	Visibility       string `json:"visibility,omitempty"`         // defaults to "public"
+	ExpiresInMinutes *int   `json:"expires_in_minutes,omitempty"` // optional ephemeral TTL
 }
 
 // Validate checks if the PostCreate struct is valid
@@ -72,6 +74,14 @@ func (p *PostCreate) Validate(hasMedia bool) error {
 	}
 	if p.Visibility != "" && p.Visibility != "public" && p.Visibility != "followers" && p.Visibility != "private" {
 		return fmt.Errorf("invalid visibility setting")
+	}
+	if p.ExpiresInMinutes != nil {
+		if *p.ExpiresInMinutes <= 0 {
+			return fmt.Errorf("expires_in_minutes must be greater than zero")
+		}
+		if *p.ExpiresInMinutes > 10080 {
+			return fmt.Errorf("expires_in_minutes cannot exceed 10080 (7 days)")
+		}
 	}
 	return nil
 }

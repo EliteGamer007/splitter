@@ -32,6 +32,12 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		visibility = "public"
 	}
 
+	var expiresAt *time.Time
+	if post.ExpiresInMinutes != nil && *post.ExpiresInMinutes > 0 {
+		t := time.Now().UTC().Add(time.Duration(*post.ExpiresInMinutes) * time.Minute)
+		expiresAt = &t
+	}
+
 	tx, err := db.GetDB().Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -39,9 +45,9 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 	defer tx.Rollback(ctx)
 
 	query := `
-		INSERT INTO posts (author_did, content, visibility)
-		VALUES ($1, $2, $3)
-		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at
+		INSERT INTO posts (author_did, content, visibility, expires_at)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, author_did, content, visibility, is_remote, created_at, updated_at, expires_at
 	`
 
 	var newPost models.Post
@@ -49,6 +55,7 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		authorDID,
 		post.Content,
 		visibility,
+		expiresAt,
 	).Scan(
 		&newPost.ID,
 		&newPost.AuthorDID,
@@ -57,6 +64,7 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		&newPost.IsRemote,
 		&newPost.CreatedAt,
 		&newPost.UpdatedAt,
+		&newPost.ExpiresAt,
 	)
 
 	if err != nil {
@@ -119,9 +127,10 @@ func (r *PostRepository) GetMediaContent(ctx context.Context, mediaID string) ([
 // GetByID retrieves a post by ID
 func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
 	query := `
-		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
 		       COALESCE(p.original_post_uri, ''), COALESCE(p.in_reply_to_uri, ''),
-		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+		       p.created_at, p.updated_at, p.expires_at,
+		       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
@@ -129,6 +138,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		LEFT JOIN users u ON p.author_did = u.did
 		LEFT JOIN media m ON p.id = m.post_id
 		WHERE p.id = $1 AND p.deleted_at IS NULL
+		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
 	`
 
 	var post models.Post
@@ -145,6 +155,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		&post.InReplyToURI,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&post.ExpiresAt,
 		&post.Username,
 		&post.AvatarURL,
 		&post.LikeCount,
@@ -181,7 +192,8 @@ func (r *PostRepository) GetByOriginalURI(ctx context.Context, originalURI strin
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
 		       COALESCE(p.original_post_uri, ''), COALESCE(p.in_reply_to_uri, ''),
-		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+		       p.created_at, p.updated_at, p.expires_at,
+		       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count,
 		       m.id, m.media_url, m.media_type, m.created_at
@@ -189,6 +201,7 @@ func (r *PostRepository) GetByOriginalURI(ctx context.Context, originalURI strin
 		LEFT JOIN users u ON p.author_did = u.did
 		LEFT JOIN media m ON p.id = m.post_id
 		WHERE p.original_post_uri = $1 AND p.deleted_at IS NULL
+		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
 		ORDER BY p.created_at DESC
 		LIMIT 1
 	`
@@ -207,6 +220,7 @@ func (r *PostRepository) GetByOriginalURI(ctx context.Context, originalURI strin
 		&post.InReplyToURI,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&post.ExpiresAt,
 		&post.Username,
 		&post.AvatarURL,
 		&post.LikeCount,
@@ -273,13 +287,15 @@ func (r *PostRepository) CreateRemoteCachedPost(ctx context.Context, authorDID, 
 // GetByAuthorDID retrieves all posts by a specific author
 func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+		       p.created_at, p.updated_at, p.expires_at,
+		       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
 		WHERE p.author_did = $1 AND p.deleted_at IS NULL
+		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -301,6 +317,7 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 			&post.IsRemote,
 			&post.CreatedAt,
 			&post.UpdatedAt,
+			&post.ExpiresAt,
 			&post.Username,
 			&post.AvatarURL,
 			&post.LikeCount,
@@ -318,8 +335,9 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 // GetFeed retrieves posts from users that the given user follows
 func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-		       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+		       p.created_at, p.updated_at, p.expires_at,
+		       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -331,6 +349,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 		LEFT JOIN follows f ON p.author_did = f.following_did
 		LEFT JOIN media m ON p.id = m.post_id
 		WHERE (f.follower_did = $1 OR p.author_did = $1) AND p.deleted_at IS NULL
+		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
 		  AND (p.visibility = 'public' OR (p.visibility = 'followers' AND f.follower_did = $1))
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
@@ -356,6 +375,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 			&post.IsRemote,
 			&post.CreatedAt,
 			&post.UpdatedAt,
+			&post.ExpiresAt,
 			&post.Username,
 			&post.AvatarURL,
 			&post.LikeCount,
@@ -398,8 +418,9 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 	if userDID != "" {
 		// Authenticated user - include liked and reposted status
 		query = `
-			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+			       p.created_at, p.updated_at, p.expires_at,
+			       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -409,7 +430,8 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			  AND (p.expires_at IS NULL OR p.expires_at > NOW())` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $2 OFFSET $3
 		`
@@ -417,8 +439,9 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 	} else {
 		// Unauthenticated user - liked and reposted are always false
 		query = `
-			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote, 
-			       p.created_at, p.updated_at, COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+			       p.created_at, p.updated_at, p.expires_at,
+			       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 			       false as liked_by_user,
 			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
@@ -428,7 +451,8 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			FROM posts p
 			LEFT JOIN users u ON p.author_did = u.did
 			LEFT JOIN media m ON p.id = m.post_id
-			WHERE p.visibility = 'public' AND p.deleted_at IS NULL` + localFilterClause + `
+			WHERE p.visibility = 'public' AND p.deleted_at IS NULL
+			  AND (p.expires_at IS NULL OR p.expires_at > NOW())` + localFilterClause + `
 			ORDER BY p.created_at DESC
 			LIMIT $1 OFFSET $2
 		`
@@ -455,6 +479,7 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 			&post.IsRemote,
 			&post.CreatedAt,
 			&post.UpdatedAt,
+			&post.ExpiresAt,
 			&post.Username,
 			&post.AvatarURL,
 			&post.LikeCount,
