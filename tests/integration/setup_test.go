@@ -84,6 +84,7 @@ func SetupTestEnv(t *testing.T) func() {
 		"../../migrations/014_add_key_rotations.sql",
 		"../../migrations/015_revocation_reason.sql",
 		"../../migrations/016_add_offline_message_sync.sql",
+		"../../migrations/017_add_multi_device_and_federated_dm_encryption.sql",
 	}
 
 	for _, f := range files {

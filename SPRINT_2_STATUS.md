@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status 
 
-**Overall Sprint 2 Completion: 90.4%**  
+**Overall Sprint 2 Completion: 96.2%**  
 **Last Updated:** March 1, 2026
 
-**Summary:** 189 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 201 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -596,26 +596,34 @@
 ---
 
 ### Story 4.4: Multi-Device Secure Messaging
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a multi-device user, I want to authorize additional devices securely without weakening encryption.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Generate independent keypairs on secondary devices
-- ❌ **NOT STARTED** - Require primary device approval for authorization
-- ❌ **NOT STARTED** - Associate multiple public keys with one DID
-- ❌ **NOT STARTED** - Encrypt messages for all authorized device keys
+- ✅ **COMPLETED** - Generate independent keypairs on secondary devices
+  - *Evidence:* `POST /api/v1/auth/devices/request` accepts per-device `device_id` and `encryption_public_key`; each device is stored independently in `user_device_keys`
+- ✅ **COMPLETED** - Require primary device approval for authorization
+  - *Evidence:* `POST /api/v1/auth/devices/:deviceId/approve` requires an already-approved `approver_device_id`; secondary devices remain `pending` until approved
+- ✅ **COMPLETED** - Associate multiple public keys with one DID
+  - *Evidence:* `GET /api/v1/dids/:did/device-keys` returns all approved device encryption keys mapped to one DID
+- ✅ **COMPLETED** - Encrypt messages for all authorized device keys
+  - *Evidence:* `messages.encrypted_keys` JSONB envelope stores per-device encrypted payloads; send/sync handlers accept and persist `encrypted_keys`
 
 ---
 
 ### Story 4.5: Federated Encrypted Messaging
-**Status:** ❌ **NOT STARTED** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As a federated network participant, I want encrypted messaging across servers without breaking privacy guarantees.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Encrypt messages before federation delivery
-- ❌ **NOT STARTED** - Sign outgoing messages using HTTP Signatures
-- ❌ **NOT STARTED** - Deliver messages through ActivityPub inbox endpoints
-- ❌ **NOT STARTED** - Verify sender identity and signatures on receipt
+- ✅ **COMPLETED** - Encrypt messages before federation delivery
+  - *Evidence:* Federated DM activity builder includes `ciphertext` + `encrypted_keys` in ActivityPub Note payload (`BuildCreateDMActivity`)
+- ✅ **COMPLETED** - Sign outgoing messages using HTTP Signatures
+  - *Evidence:* `federation.DeliverActivity` signs outbound inbox POSTs via `SignRequest(...)`
+- ✅ **COMPLETED** - Deliver messages through ActivityPub inbox endpoints
+  - *Evidence:* Remote DMs are sent as `Create(Note)` to recipient inbox and processed by `inbox_handler.go` `handleCreate`
+- ✅ **COMPLETED** - Verify sender identity and signatures on receipt
+  - *Evidence:* Inbox handler validates HTTP Signature and actor consistency before processing, then persists DM ciphertext/encrypted key envelope
 
 ---
 
@@ -832,9 +840,9 @@
 | **Epic 1: Identity & Onboarding** | 9 | 37 | 37 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (37/37) |
 | **Epic 2: Federation** | 10 | 40 | 40 | 0 | 0 | 0 | 100.0% (10/10) | 100.0% (40/40) |
 | **Epic 3: Content & Systems** | 14 | 56 | 48 | 1 | 0 | 7 | 92.9% (13/14) | 85.7% (48/56) |
-| **Epic 4: Privacy & Messaging** | 9 | 38 | 26 | 0 | 0 | 12 | 66.7% (6/9) | 68.4% (26/38) |
+| **Epic 4: Privacy & Messaging** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
 | **Epic 5: Governance & Admin** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
-| **TOTAL** | **51** | **209** | **189** | **1** | **0** | **19** | **92.2%** | **90.4%** |
+| **TOTAL** | **51** | **209** | **201** | **1** | **0** | **7** | **92.2%** | **96.2%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -846,15 +854,14 @@
 - **Federation fully operational** (100.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, remote thread-context fetch/cache, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
 - **Solid content features** (85.7% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, DB-backed privacy-preserving media loading, and offline read-only timeline/thread fallback are functional
-- **Messaging hardening expanded** (68.4% Epic 4): Offline-first encrypted DM queue/sync, per-sender/per-instance rate limits, inbox signature+actor validation, and suspicious-event telemetry are now implemented
+- **Messaging suite completed** (100.0% Epic 4): Key rotation/revocation, multi-device key authorization, offline-first encrypted sync, per-device encrypted envelopes, abuse-resistant limits, and secure inbox protections are implemented
 - **Live Admin tooling** (100.0% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, retry/circuit metrics, traffic logs, and 15s auto-refresh; force-directed federation network map; audit log covering moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
 **Remaining Gaps:**
-- **Privacy & messaging features** (68.4% Epic 4): Key rotation, offline-first DM queue/sync, abuse-resistant limits, and secure inbox protections are complete; multi-device and federated E2EE remain pending
 - **Background worker** (remaining scope): Ephemeral post expiry remains pending; federation retry/reputation workers are now implemented
 
-**Status:** Sprint 2 target exceeded at 90.4%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, DB-backed media privacy loading, offline-first encrypted DM queue/sync, and messaging abuse/inbox hardening controls.
+**Status:** Sprint 2 target exceeded at 96.2%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, DB-backed media privacy loading, offline-first encrypted DM queue/sync, multi-device key authorization, and federated encrypted DM envelope handling.
 
 ---
 

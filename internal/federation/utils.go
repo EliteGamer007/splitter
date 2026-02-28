@@ -79,7 +79,7 @@ func EnsureRemoteUser(ctx context.Context, actorURI string) (*models.User, error
 }
 
 // BuildCreateDMActivity creates a Create activity wrapping a Note (DM)
-func BuildCreateDMActivity(actorURI, recipientURI, content string) *Activity {
+func BuildCreateDMActivity(actorURI, recipientURI, content, ciphertext string, encryptedKeys map[string]string) *Activity {
 	domain := GetInstanceDomain()
 	baseURL := resolveInstanceURL(domain)
 
@@ -91,6 +91,8 @@ func BuildCreateDMActivity(actorURI, recipientURI, content string) *Activity {
 		Type:         "Note",
 		AttributedTo: actorURI,
 		Content:      content,
+		Ciphertext:   ciphertext,
+		EncryptedKeys: encryptedKeys,
 		Published:    time.Now().UTC().Format(time.RFC3339),
 		To:           []string{recipientURI}, // Addressed to specific user only
 	}

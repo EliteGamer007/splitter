@@ -37,6 +37,7 @@ type Message struct {
 	ClientMessageID string     `json:"client_message_id,omitempty"`
 	Content         string     `json:"content"`
 	Ciphertext      string     `json:"ciphertext,omitempty"` // Base64 encoded encrypted content
+	EncryptedKeys   string     `json:"encrypted_keys,omitempty"`
 	IsRead          bool       `json:"is_read"`
 	CreatedAt       time.Time  `json:"created_at"`
 	ClientCreatedAt *time.Time `json:"client_created_at,omitempty"`
@@ -159,4 +160,17 @@ type KeyRotation struct {
 	Nonce        string    `json:"nonce"`
 	Reason       string    `json:"reason"`     // why revoked: rotated, compromised, lost
 	IsRevoked    bool      `json:"is_revoked"` // always true; makes status explicit in JSON
+}
+
+type DeviceKey struct {
+	ID                  string     `json:"id"`
+	UserID              string     `json:"user_id"`
+	DeviceID            string     `json:"device_id"`
+	DeviceLabel         string     `json:"device_label,omitempty"`
+	EncryptionPublicKey string     `json:"encryption_public_key"`
+	Status              string     `json:"status"`
+	RequestedAt         time.Time  `json:"requested_at"`
+	ApprovedAt          *time.Time `json:"approved_at,omitempty"`
+	ApprovedByDeviceID  string     `json:"approved_by_device_id,omitempty"`
+	LastSeenAt          *time.Time `json:"last_seen_at,omitempty"`
 }

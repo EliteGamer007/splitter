@@ -848,3 +848,197 @@ func (r *UserRepository) RevokeCurrentKey(ctx context.Context, userID, oldKey st
 
 	return nil
 }
+
+func (r *UserRepository) ListDeviceKeys(ctx context.Context, userID string) ([]*models.DeviceKey, error) {
+	query := `
+		SELECT id, user_id, device_id, COALESCE(device_label, ''), encryption_public_key, status,
+		       requested_at, approved_at, COALESCE(approved_by_device_id, ''), last_seen_at
+		FROM user_device_keys
+		WHERE user_id = $1
+		ORDER BY requested_at DESC
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list device keys: %w", err)
+	}
+	defer rows.Close()
+
+	keys := make([]*models.DeviceKey, 0)
+	for rows.Next() {
+		var item models.DeviceKey
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.DeviceID,
+			&item.DeviceLabel,
+			&item.EncryptionPublicKey,
+			&item.Status,
+			&item.RequestedAt,
+			&item.ApprovedAt,
+			&item.ApprovedByDeviceID,
+			&item.LastSeenAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan device key: %w", err)
+		}
+		keys = append(keys, &item)
+	}
+
+	return keys, nil
+}
+
+func (r *UserRepository) ListApprovedDeviceKeysByDID(ctx context.Context, did string) ([]*models.DeviceKey, error) {
+	query := `
+		SELECT dk.id, dk.user_id, dk.device_id, COALESCE(dk.device_label, ''), dk.encryption_public_key, dk.status,
+		       dk.requested_at, dk.approved_at, COALESCE(dk.approved_by_device_id, ''), dk.last_seen_at
+		FROM user_device_keys dk
+		JOIN users u ON u.id = dk.user_id
+		WHERE u.did = $1 AND dk.status = 'approved'
+		ORDER BY dk.approved_at DESC NULLS LAST, dk.requested_at DESC
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, did)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list approved device keys by did: %w", err)
+	}
+	defer rows.Close()
+
+	keys := make([]*models.DeviceKey, 0)
+	for rows.Next() {
+		var item models.DeviceKey
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.DeviceID,
+			&item.DeviceLabel,
+			&item.EncryptionPublicKey,
+			&item.Status,
+			&item.RequestedAt,
+			&item.ApprovedAt,
+			&item.ApprovedByDeviceID,
+			&item.LastSeenAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan approved device key: %w", err)
+		}
+		keys = append(keys, &item)
+	}
+
+	return keys, nil
+}
+
+func (r *UserRepository) RequestDeviceKey(ctx context.Context, userID, deviceID, deviceLabel, encryptionPublicKey string) (*models.DeviceKey, error) {
+	bootstrapQuery := `
+		SELECT COUNT(*)
+		FROM user_device_keys
+		WHERE user_id = $1 AND status = 'approved'
+	`
+
+	var approvedCount int
+	if err := db.GetDB().QueryRow(ctx, bootstrapQuery, userID).Scan(&approvedCount); err != nil {
+		return nil, fmt.Errorf("failed to evaluate bootstrap approval: %w", err)
+	}
+
+	status := "pending"
+	approvedBy := ""
+	if approvedCount == 0 {
+		status = "approved"
+		approvedBy = "self-bootstrap"
+	}
+
+	query := `
+		INSERT INTO user_device_keys (user_id, device_id, device_label, encryption_public_key, status, approved_at, approved_by_device_id, last_seen_at)
+		VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			CASE WHEN $5 = 'approved' THEN NOW() ELSE NULL END,
+			NULLIF($6, ''),
+			NOW()
+		)
+		ON CONFLICT (user_id, device_id)
+		DO UPDATE SET
+			device_label = EXCLUDED.device_label,
+			encryption_public_key = EXCLUDED.encryption_public_key,
+			status = CASE
+				WHEN user_device_keys.status = 'approved' THEN 'approved'
+				ELSE EXCLUDED.status
+			END,
+			approved_at = CASE
+				WHEN user_device_keys.status = 'approved' THEN user_device_keys.approved_at
+				WHEN EXCLUDED.status = 'approved' THEN NOW()
+				ELSE NULL
+			END,
+			approved_by_device_id = CASE
+				WHEN user_device_keys.status = 'approved' THEN user_device_keys.approved_by_device_id
+				ELSE EXCLUDED.approved_by_device_id
+			END,
+			last_seen_at = NOW()
+		RETURNING id, user_id, device_id, COALESCE(device_label, ''), encryption_public_key, status,
+		          requested_at, approved_at, COALESCE(approved_by_device_id, ''), last_seen_at
+	`
+
+	var item models.DeviceKey
+	if err := db.GetDB().QueryRow(ctx, query, userID, deviceID, deviceLabel, encryptionPublicKey, status, approvedBy).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.DeviceID,
+		&item.DeviceLabel,
+		&item.EncryptionPublicKey,
+		&item.Status,
+		&item.RequestedAt,
+		&item.ApprovedAt,
+		&item.ApprovedByDeviceID,
+		&item.LastSeenAt,
+	); err != nil {
+		return nil, fmt.Errorf("failed to request device key: %w", err)
+	}
+
+	return &item, nil
+}
+
+func (r *UserRepository) ApproveDeviceKey(ctx context.Context, userID, targetDeviceID, approverDeviceID string) (*models.DeviceKey, error) {
+	var approverStatus string
+	if err := db.GetDB().QueryRow(ctx,
+		`SELECT status FROM user_device_keys WHERE user_id = $1 AND device_id = $2`,
+		userID, approverDeviceID,
+	).Scan(&approverStatus); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("approver device not found")
+		}
+		return nil, fmt.Errorf("failed to verify approver device: %w", err)
+	}
+	if approverStatus != "approved" {
+		return nil, fmt.Errorf("approver device is not authorized")
+	}
+
+	query := `
+		UPDATE user_device_keys
+		SET status = 'approved', approved_at = NOW(), approved_by_device_id = $3, last_seen_at = NOW()
+		WHERE user_id = $1 AND device_id = $2
+		RETURNING id, user_id, device_id, COALESCE(device_label, ''), encryption_public_key, status,
+		          requested_at, approved_at, COALESCE(approved_by_device_id, ''), last_seen_at
+	`
+
+	var item models.DeviceKey
+	if err := db.GetDB().QueryRow(ctx, query, userID, targetDeviceID, approverDeviceID).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.DeviceID,
+		&item.DeviceLabel,
+		&item.EncryptionPublicKey,
+		&item.Status,
+		&item.RequestedAt,
+		&item.ApprovedAt,
+		&item.ApprovedByDeviceID,
+		&item.LastSeenAt,
+	); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("target device not found")
+		}
+		return nil, fmt.Errorf("failed to approve device key: %w", err)
+	}
+
+	return &item, nil
+}

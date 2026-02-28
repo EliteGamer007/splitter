@@ -126,17 +126,20 @@ func (r *MessageRepository) canSendMessageToRecipient(ctx context.Context, sende
 }
 
 // SendMessage sends a message in a thread
-func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID, recipientID, content, ciphertext string) (*models.Message, error) {
+func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID, recipientID, content, ciphertext, encryptedKeys string) (*models.Message, error) {
 	query := `
-		INSERT INTO messages (thread_id, sender_did, recipient_did, sender_id, recipient_id, content, ciphertext)
-		SELECT $1, us.did, ur.did, us.id, ur.id, $4, $5
+		INSERT INTO messages (thread_id, sender_did, recipient_did, sender_id, recipient_id, content, ciphertext, encrypted_keys)
+		SELECT $1, us.did, ur.did, us.id, ur.id, $4, $5,
+		       CASE WHEN NULLIF($6, '') IS NULL THEN NULL ELSE $6::jsonb END
 		FROM users us, users ur
 		WHERE us.id = $2 AND ur.id = $3
-		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content,
+		          COALESCE(ciphertext::text, ''), COALESCE(encrypted_keys::text, '{}'),
+		          is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 	`
 
 	var msg models.Message
-	err := db.GetDB().QueryRow(ctx, query, threadID, senderID, recipientID, content, ciphertext).Scan(
+	err := db.GetDB().QueryRow(ctx, query, threadID, senderID, recipientID, content, ciphertext, encryptedKeys).Scan(
 		&msg.ID,
 		&msg.ThreadID,
 		&msg.SenderID,
@@ -144,6 +147,7 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 		&msg.ClientMessageID,
 		&msg.Content,
 		&msg.Ciphertext,
+		&msg.EncryptedKeys,
 		&msg.IsRead,
 		&msg.CreatedAt,
 		&msg.ClientCreatedAt,
@@ -165,7 +169,7 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 
 // SendMessageWithClientMetadata sends (or deduplicates) a client-queued message using client_message_id idempotency.
 // Returns the message and a bool indicating whether a new row was created.
-func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, threadID, senderID, recipientID, clientMessageID, content, ciphertext string, clientCreatedAt *time.Time) (*models.Message, bool, error) {
+func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, threadID, senderID, recipientID, clientMessageID, content, ciphertext, encryptedKeys string, clientCreatedAt *time.Time) (*models.Message, bool, error) {
 	insertQuery := `
 		INSERT INTO messages (
 			thread_id,
@@ -176,19 +180,24 @@ func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, t
 			client_message_id,
 			content,
 			ciphertext,
+			encrypted_keys,
 			client_created_at
 		)
-		SELECT $1, us.did, ur.did, us.id, ur.id, NULLIF($4, ''), $5, $6, $7
+		SELECT $1, us.did, ur.did, us.id, ur.id, NULLIF($4, ''), $5, $6,
+		       CASE WHEN NULLIF($7, '') IS NULL THEN NULL ELSE $7::jsonb END,
+		       $8
 		FROM users us, users ur
 		WHERE us.id = $2 AND ur.id = $3
 		ON CONFLICT (sender_id, client_message_id)
 		WHERE client_message_id IS NOT NULL
 		DO NOTHING
-		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content,
+		          COALESCE(ciphertext::text, ''), COALESCE(encrypted_keys::text, '{}'),
+		          is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 	`
 
 	var msg models.Message
-	err := db.GetDB().QueryRow(ctx, insertQuery, threadID, senderID, recipientID, clientMessageID, content, ciphertext, clientCreatedAt).Scan(
+	err := db.GetDB().QueryRow(ctx, insertQuery, threadID, senderID, recipientID, clientMessageID, content, ciphertext, encryptedKeys, clientCreatedAt).Scan(
 		&msg.ID,
 		&msg.ThreadID,
 		&msg.SenderID,
@@ -196,6 +205,7 @@ func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, t
 		&msg.ClientMessageID,
 		&msg.Content,
 		&msg.Ciphertext,
+		&msg.EncryptedKeys,
 		&msg.IsRead,
 		&msg.CreatedAt,
 		&msg.ClientCreatedAt,
@@ -208,7 +218,9 @@ func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, t
 	if err == pgx.ErrNoRows {
 		inserted = false
 		existingQuery := `
-			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content,
+			       COALESCE(ciphertext::text, ''), COALESCE(encrypted_keys::text, '{}'),
+			       is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 			FROM messages
 			WHERE sender_id = $1 AND client_message_id = NULLIF($2, '')
 			LIMIT 1
@@ -221,6 +233,7 @@ func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, t
 			&msg.ClientMessageID,
 			&msg.Content,
 			&msg.Ciphertext,
+			&msg.EncryptedKeys,
 			&msg.IsRead,
 			&msg.CreatedAt,
 			&msg.ClientCreatedAt,
@@ -258,7 +271,9 @@ func (r *MessageRepository) HasClientMessageID(ctx context.Context, senderID, cl
 // GetThreadMessages gets all messages in a thread
 func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID string, limit, offset int) ([]*models.Message, error) {
 	query := `
-		SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+		SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content,
+		       COALESCE(ciphertext::text, ''), COALESCE(encrypted_keys::text, '{}'),
+		       is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 		FROM messages
 		WHERE thread_id = $1
 		ORDER BY created_at ASC
@@ -282,6 +297,7 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 			&msg.ClientMessageID,
 			&msg.Content,
 			&msg.Ciphertext,
+			&msg.EncryptedKeys,
 			&msg.IsRead,
 			&msg.CreatedAt,
 			&msg.ClientCreatedAt,
@@ -345,7 +361,9 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 
 		// Get last message
 		lastMsgQuery := `
-			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content,
+			       COALESCE(ciphertext::text, ''), COALESCE(encrypted_keys::text, '{}'),
+			       is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 			FROM messages
 			WHERE thread_id = $1 AND deleted_at IS NULL
 			ORDER BY created_at DESC
@@ -360,6 +378,7 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 			&lastMsg.ClientMessageID,
 			&lastMsg.Content,
 			&lastMsg.Ciphertext,
+			&lastMsg.EncryptedKeys,
 			&lastMsg.IsRead,
 			&lastMsg.CreatedAt,
 			&lastMsg.ClientCreatedAt,

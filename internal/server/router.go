@@ -126,10 +126,14 @@ func setupRoutes(
 	authAuth.POST("/revoke-key", authHandler.RevokeKey)       // Manually revoke current signing key
 	authAuth.GET("/key-history", authHandler.GetKeyHistory)   // View key rotation history
 	authAuth.GET("/revoked-keys", authHandler.GetRevokedKeys) // Own revocation list (authenticated)
+	authAuth.POST("/devices/request", authHandler.RequestDeviceKey)
+	authAuth.POST("/devices/:deviceId/approve", authHandler.ApproveDeviceKey)
+	authAuth.GET("/devices", authHandler.ListDeviceKeys)
 
 	// Public revocation endpoints — no auth required (for federation)
 	api.GET("/auth/check-key", authHandler.CheckKeyRevocation)           // GET /api/v1/auth/check-key?key=<b64>
 	api.GET("/dids/:did/revoked-keys", authHandler.GetPublicRevokedKeys) // Per-DID revocation list
+	api.GET("/dids/:did/device-keys", authHandler.GetPublicDeviceKeys)
 
 	// User routes
 	users := api.Group("/users")

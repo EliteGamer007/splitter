@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -114,6 +115,7 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		RecipientID string `json:"recipient_id"`
 		Content     string `json:"content"`
 		Ciphertext  string `json:"ciphertext"`
+		EncryptedKeys map[string]string `json:"encrypted_keys"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -164,8 +166,19 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		})
 	}
 
+	encryptedKeysJSON := ""
+	if len(req.EncryptedKeys) > 0 {
+		if raw, marshalErr := json.Marshal(req.EncryptedKeys); marshalErr == nil {
+			encryptedKeysJSON = string(raw)
+		} else {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "invalid encrypted_keys payload",
+			})
+		}
+	}
+
 	// Send message
-	msg, err := h.msgRepo.SendMessage(ctx, thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext)
+	msg, err := h.msgRepo.SendMessage(ctx, thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext, encryptedKeysJSON)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to send message: " + err.Error(),
@@ -207,7 +220,7 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 			// So `content` IS the plaintext message (if provided).
 
 			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, sender.Username)
-			activity := federation.BuildCreateDMActivity(actorURI, recipient.DID, req.Content)
+			activity := federation.BuildCreateDMActivity(actorURI, recipient.DID, req.Content, req.Ciphertext, req.EncryptedKeys)
 
 			// Deliver
 			federation.DeliverActivity(activity, remoteActor.InboxURL)
@@ -344,6 +357,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			RecipientID     string `json:"recipient_id"`
 			Content         string `json:"content"`
 			Ciphertext      string `json:"ciphertext"`
+			EncryptedKeys   map[string]string `json:"encrypted_keys"`
 			ClientCreatedAt string `json:"client_created_at"`
 		} `json:"queued_messages"`
 	}
@@ -456,6 +470,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			queued.ClientMessageID,
 			queued.Content,
 			queued.Ciphertext,
+			mapToJSONString(queued.EncryptedKeys),
 			clientCreatedAt,
 		)
 		if err != nil {
@@ -494,4 +509,15 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 		"deduplicated_count": deduplicatedCount,
 		"failed_count":       failureCount,
 	})
+}
+
+func mapToJSONString(value map[string]string) string {
+	if len(value) == 0 {
+		return ""
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }

@@ -404,6 +404,8 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	}
 
 	content, _ := object["content"].(string)
+	ciphertext, _ := object["ciphertext"].(string)
+	encryptedKeys := interfaceToStringMap(object["encrypted_keys"])
 	noteID, _ := object["id"].(string)
 	published, _ := object["published"].(string)
 	inReplyTo, _ := object["inReplyTo"].(string)
@@ -464,9 +466,15 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get thread"})
 		}
 
+		encryptedKeysJSON := ""
+		if len(encryptedKeys) > 0 {
+			if raw, marshalErr := json.Marshal(encryptedKeys); marshalErr == nil {
+				encryptedKeysJSON = string(raw)
+			}
+		}
+
 		// 3. Insert Message
-		// Store content as plaintext.
-		_, err = h.msgRepo.SendMessage(ctx, thread.ID, senderUser.ID, targetLocalUser.ID, content, "")
+		_, err = h.msgRepo.SendMessage(ctx, thread.ID, senderUser.ID, targetLocalUser.ID, content, ciphertext, encryptedKeysJSON)
 		if err != nil {
 			log.Printf("[Inbox] Failed to save message: %v", err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save message"})
@@ -731,4 +739,23 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+func interfaceToStringMap(value interface{}) map[string]string {
+	if value == nil {
+		return nil
+	}
+	input, ok := value.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	result := make(map[string]string, len(input))
+	for key, raw := range input {
+		text, castOK := raw.(string)
+		if !castOK {
+			continue
+		}
+		result[key] = text
+	}
+	return result
 }

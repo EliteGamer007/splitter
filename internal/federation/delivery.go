@@ -31,6 +31,8 @@ type Note struct {
 	Type         string      `json:"type"`
 	AttributedTo string      `json:"attributedTo"`
 	Content      string      `json:"content"`
+	Ciphertext   string      `json:"ciphertext,omitempty"`
+	EncryptedKeys map[string]string `json:"encrypted_keys,omitempty"`
 	Published    string      `json:"published"`
 	To           []string    `json:"to,omitempty"`
 	CC           []string    `json:"cc,omitempty"`

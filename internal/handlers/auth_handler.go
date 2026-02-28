@@ -726,3 +726,152 @@ func (h *AuthHandler) RevokeKey(c echo.Context) error {
 		"message": "Key revoked successfully. Identity is now password-only.",
 	})
 }
+
+// RequestDeviceKey registers (or refreshes) a secondary device encryption key.
+// First device for a user is bootstrap-approved; subsequent devices require approval.
+// Endpoint: POST /api/v1/auth/devices/request (authenticated)
+func (h *AuthHandler) RequestDeviceKey(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	var req struct {
+		DeviceID            string `json:"device_id"`
+		DeviceLabel         string `json:"device_label"`
+		EncryptionPublicKey string `json:"encryption_public_key"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+
+	req.DeviceID = strings.TrimSpace(req.DeviceID)
+	req.DeviceLabel = strings.TrimSpace(req.DeviceLabel)
+	req.EncryptionPublicKey = strings.TrimSpace(req.EncryptionPublicKey)
+
+	if req.DeviceID == "" || req.EncryptionPublicKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "device_id and encryption_public_key are required",
+		})
+	}
+
+	deviceKey, err := h.userRepo.RequestDeviceKey(c.Request().Context(), userID, req.DeviceID, req.DeviceLabel, req.EncryptionPublicKey)
+	if err != nil {
+		log.Printf("RequestDeviceKey error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register device key"})
+	}
+
+	statusCode := http.StatusAccepted
+	if deviceKey.Status == "approved" {
+		statusCode = http.StatusCreated
+	}
+
+	return c.JSON(statusCode, map[string]interface{}{
+		"message":    "device key registered",
+		"device_key": deviceKey,
+	})
+}
+
+// ApproveDeviceKey approves a pending device key using an already-authorized device.
+// Endpoint: POST /api/v1/auth/devices/:deviceId/approve (authenticated)
+func (h *AuthHandler) ApproveDeviceKey(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	targetDeviceID := strings.TrimSpace(c.Param("deviceId"))
+	if targetDeviceID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "deviceId is required"})
+	}
+
+	var req struct {
+		ApproverDeviceID string `json:"approver_device_id"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+	req.ApproverDeviceID = strings.TrimSpace(req.ApproverDeviceID)
+	if req.ApproverDeviceID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "approver_device_id is required"})
+	}
+
+	if req.ApproverDeviceID == targetDeviceID {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "approver and target devices must be different"})
+	}
+
+	deviceKey, err := h.userRepo.ApproveDeviceKey(c.Request().Context(), userID, targetDeviceID, req.ApproverDeviceID)
+	if err != nil {
+		errText := strings.ToLower(err.Error())
+		switch {
+		case strings.Contains(errText, "not found"):
+			return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+		case strings.Contains(errText, "not authorized"):
+			return c.JSON(http.StatusForbidden, map[string]string{"error": err.Error()})
+		default:
+			log.Printf("ApproveDeviceKey error for user %s: %v", userID, err)
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to approve device key"})
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":    "device key approved",
+		"device_key": deviceKey,
+	})
+}
+
+// ListDeviceKeys returns all device keys (pending/approved/revoked) for the authenticated user.
+// Endpoint: GET /api/v1/auth/devices (authenticated)
+func (h *AuthHandler) ListDeviceKeys(c echo.Context) error {
+	userID, ok := c.Get("user_id").(string)
+	if !ok || userID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	keys, err := h.userRepo.ListDeviceKeys(c.Request().Context(), userID)
+	if err != nil {
+		log.Printf("ListDeviceKeys error for user %s: %v", userID, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to list device keys"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"device_keys": keys,
+		"count":       len(keys),
+	})
+}
+
+// GetPublicDeviceKeys returns approved device encryption keys for a DID.
+// Endpoint: GET /api/v1/dids/:did/device-keys (public)
+func (h *AuthHandler) GetPublicDeviceKeys(c echo.Context) error {
+	did := strings.TrimSpace(c.Param("did"))
+	if did == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "DID is required"})
+	}
+
+	keys, err := h.userRepo.ListApprovedDeviceKeysByDID(c.Request().Context(), did)
+	if err != nil {
+		log.Printf("GetPublicDeviceKeys error for DID %s: %v", did, err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve device keys"})
+	}
+
+	type publicKey struct {
+		DeviceID            string `json:"device_id"`
+		DeviceLabel         string `json:"device_label,omitempty"`
+		EncryptionPublicKey string `json:"encryption_public_key"`
+	}
+
+	result := make([]publicKey, 0, len(keys))
+	for _, item := range keys {
+		result = append(result, publicKey{
+			DeviceID:            item.DeviceID,
+			DeviceLabel:         item.DeviceLabel,
+			EncryptionPublicKey: item.EncryptionPublicKey,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"did":         did,
+		"device_keys": result,
+		"count":       len(result),
+	})
+}
