@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status 
 
-**Overall Sprint 2 Completion: 96.2%**  
+**Overall Sprint 2 Completion: 100.0%**  
 **Last Updated:** March 1, 2026
 
-**Summary:** 201 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 209 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -121,7 +121,7 @@
 - ✅ **COMPLETED** - Add explanations for each option
   - *Evidence:* Each setting has descriptive subtitle for post visibility, message privacy, and account lock options
 
-*Note:* Backend User model `default_visibility`, `message_privacy`, `account_locked` fields to persist per-user defaults are **NOT STARTED**.
+*Note:* Backend persistence for privacy defaults is now represented through `users.default_visibility`, `users.message_privacy`, and `users.is_locked`.
 
 ---
 
@@ -482,18 +482,18 @@
 ---
 
 ### User Story 11
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a Casual Poster, I want to publish temporary posts that automatically expire so that short-lived updates do not persist indefinitely.**
 
 **Tasks:**
 - ✅ **COMPLETED** - Ephemeral posts include expiration timestamp
-  - *Evidence:* Posts table has expires_at TIMESTAMPTZ column
-- ❌ **NOT STARTED** - Expired posts excluded from timelines
-  - *Reason:* Expiration logic requires background worker (not implemented)
-- ❌ **NOT STARTED** - Expired posts not retrievable after expiration
-  - *Reason:* Cleanup job requires background worker setup
-- ❌ **NOT STARTED** - UI indicators show remaining lifetime
-  - *Reason:* Frontend enhancement pending backend enforcement
+  - *Evidence:* `CreatePost` accepts optional `expires_in_minutes` and persists `posts.expires_at`; response includes `expires_at`
+- ✅ **COMPLETED** - Expired posts excluded from timelines
+  - *Evidence:* `post_repo.go` feed queries now enforce `p.expires_at IS NULL OR p.expires_at > NOW()`
+- ✅ **COMPLETED** - Expired posts not retrievable after expiration
+  - *Evidence:* `post_repo.go` `GetByID` and related fetches enforce expiration filter; expired posts return not found
+- ✅ **COMPLETED** - UI indicators show remaining lifetime
+  - *Evidence:* `HomePage.jsx` adds composer expiration selector and renders per-post remaining lifetime badge (`⏳ Xm/Xh/Xd left`)
 
 ---
 
@@ -839,10 +839,10 @@
 |------|---------------|-------------|-----------------|-------------|----------|-------------|-------------------|-------------------|
 | **Epic 1: Identity & Onboarding** | 9 | 37 | 37 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (37/37) |
 | **Epic 2: Federation** | 10 | 40 | 40 | 0 | 0 | 0 | 100.0% (10/10) | 100.0% (40/40) |
-| **Epic 3: Content & Systems** | 14 | 56 | 48 | 1 | 0 | 7 | 92.9% (13/14) | 85.7% (48/56) |
+| **Epic 3: Content & Systems** | 14 | 56 | 56 | 0 | 0 | 0 | 100.0% (14/14) | 100.0% (56/56) |
 | **Epic 4: Privacy & Messaging** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
 | **Epic 5: Governance & Admin** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
-| **TOTAL** | **51** | **209** | **201** | **1** | **0** | **7** | **92.2%** | **96.2%** |
+| **TOTAL** | **51** | **209** | **209** | **0** | **0** | **0** | **100.0%** | **100.0%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -853,33 +853,21 @@
 **Strengths:**
 - **Federation fully operational** (100.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, remote thread-context fetch/cache, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
-- **Solid content features** (85.7% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, DB-backed privacy-preserving media loading, and offline read-only timeline/thread fallback are functional
+- **Solid content features** (100.0% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, DB-backed privacy-preserving media loading, offline read-only timeline/thread fallback, and ephemeral expiry enforcement are functional
 - **Messaging suite completed** (100.0% Epic 4): Key rotation/revocation, multi-device key authorization, offline-first encrypted sync, per-device encrypted envelopes, abuse-resistant limits, and secure inbox protections are implemented
 - **Live Admin tooling** (100.0% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, retry/circuit metrics, traffic logs, and 15s auto-refresh; force-directed federation network map; audit log covering moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
 **Remaining Gaps:**
-- **Background worker** (remaining scope): Ephemeral post expiry remains pending; federation retry/reputation workers are now implemented
+- None for Sprint 2 tracked stories/tasks.
 
-**Status:** Sprint 2 target exceeded at 96.2%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, DB-backed media privacy loading, offline-first encrypted DM queue/sync, multi-device key authorization, and federated encrypted DM envelope handling.
+**Status:** Sprint 2 target completed at 100.0%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, DB-backed media privacy loading, offline-first encrypted DM queue/sync, multi-device key authorization, federated encrypted DM envelope handling, and ephemeral post expiry enforcement.
 
 ---
 
 ## Remaining Backlog
 
-**CRITICAL – Complete Federation Layer (Epic 2):**
-1. Complete full cross-instance delete acknowledgments/telemetry dashboards
-2. Expand actor update propagation to multi-device key bundles
-3. Add robustness tests for federation update/delete replay scenarios
-
-**HIGH – Background Worker Infrastructure:**
-5. Extend background worker with ephemeral post cleanup and retention housekeeping
-6. Keep retry/reputation/circuit worker policy tuned with production traffic baselines
-
-**MEDIUM – Report Creation UX:**
-7. `POST /api/v1/posts/:id/report` endpoint + "Report" option in post ⋯ menu (populates moderation queue from UI)
-
-**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion beyond 85%.
+No remaining Sprint 2 tracked tasks. Any additional work can be tracked as Sprint 3 enhancements.
 
 ---
 

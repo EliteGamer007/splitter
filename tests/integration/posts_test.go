@@ -177,3 +177,85 @@ func registerUser(t *testing.T, username, email, password string) string {
 	}
 	return result["token"].(string)
 }
+
+func TestEphemeralPostExpiryEnforcement(t *testing.T) {
+	cleanup := SetupTestEnv(t)
+	defer cleanup()
+
+	token := registerUser(t, "ephemeral_author", "ephemeral@example.com", "password123")
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	_ = writer.WriteField("content", "This post should expire")
+	_ = writer.WriteField("visibility", "public")
+	_ = writer.WriteField("expires_in_minutes", "60")
+	_ = writer.Close()
+
+	createReq, err := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/posts", body)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	createReq.Header.Set("Authorization", "Bearer "+token)
+	createReq.Header.Set("Content-Type", writer.FormDataContentType())
+
+	createResp, err := (&http.Client{}).Do(createReq)
+	if err != nil {
+		t.Fatalf("Failed to create post: %v", err)
+	}
+	defer createResp.Body.Close()
+
+	if createResp.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d", createResp.StatusCode)
+	}
+
+	var created map[string]interface{}
+	if err := json.NewDecoder(createResp.Body).Decode(&created); err != nil {
+		t.Fatalf("Failed to decode create response: %v", err)
+	}
+
+	postID, _ := created["id"].(string)
+	if postID == "" {
+		t.Fatal("create response missing post id")
+	}
+	if _, ok := created["expires_at"].(string); !ok {
+		t.Fatal("create response missing expires_at")
+	}
+
+	_, err = db.DB.Exec(context.Background(), `UPDATE posts SET expires_at = NOW() - interval '1 minute' WHERE id = $1`, postID)
+	if err != nil {
+		t.Fatalf("Failed to force post expiration: %v", err)
+	}
+
+	getReq, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/posts/%s", TestServer.URL, postID), nil)
+	getResp, err := (&http.Client{}).Do(getReq)
+	if err != nil {
+		t.Fatalf("Failed to get post: %v", err)
+	}
+	defer getResp.Body.Close()
+
+	if getResp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status 404 for expired post, got %d", getResp.StatusCode)
+	}
+
+	feedReq, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/posts/public", nil)
+	feedResp, err := (&http.Client{}).Do(feedReq)
+	if err != nil {
+		t.Fatalf("Failed to get public feed: %v", err)
+	}
+	defer feedResp.Body.Close()
+
+	if feedResp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200 for feed, got %d", feedResp.StatusCode)
+	}
+
+	var feed []map[string]interface{}
+	if err := json.NewDecoder(feedResp.Body).Decode(&feed); err != nil {
+		t.Fatalf("Failed to decode feed response: %v", err)
+	}
+
+	for _, item := range feed {
+		if item["id"] == postID {
+			t.Fatalf("expired post %s should not appear in feed", postID)
+		}
+	}
+}
