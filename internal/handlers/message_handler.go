@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"splitter/internal/config"
 	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/security"
 
 	"github.com/labstack/echo/v4"
 )
@@ -106,6 +108,7 @@ func (h *MessageHandler) GetMessages(c echo.Context) error {
 func (h *MessageHandler) SendMessage(c echo.Context) error {
 	userID := c.Get("user_id").(string)
 	ctx := c.Request().Context()
+	guard := security.GetMessagingGuard()
 
 	var req struct {
 		RecipientID string `json:"recipient_id"`
@@ -128,6 +131,12 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	if req.RecipientID == userID {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Cannot send message to yourself",
+		})
+	}
+
+	if allowed, reason := guard.AllowLocalSend(userID, 1); !allowed {
+		return c.JSON(http.StatusTooManyRequests, map[string]string{
+			"error": reason,
 		})
 	}
 
@@ -319,5 +328,170 @@ func (h *MessageHandler) EditMessage(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "Message edited",
+	})
+}
+
+// SyncOfflineMessages safely syncs client-queued encrypted messages after reconnect.
+// Idempotency is guaranteed per sender using client_message_id.
+func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
+	userID := c.Get("user_id").(string)
+	ctx := c.Request().Context()
+	guard := security.GetMessagingGuard()
+
+	var req struct {
+		QueuedMessages []struct {
+			ClientMessageID string `json:"client_message_id"`
+			RecipientID     string `json:"recipient_id"`
+			Content         string `json:"content"`
+			Ciphertext      string `json:"ciphertext"`
+			ClientCreatedAt string `json:"client_created_at"`
+		} `json:"queued_messages"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	if len(req.QueuedMessages) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "queued_messages is required",
+		})
+	}
+
+	if len(req.QueuedMessages) > 100 {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Batch too large. Maximum 100 queued messages per sync.",
+		})
+	}
+
+	if allowed, reason := guard.AllowLocalSend(userID, len(req.QueuedMessages)); !allowed {
+		guard.RecordSuspicious(userID, "offline sync rate-limited", map[string]interface{}{
+			"queued_messages": len(req.QueuedMessages),
+		})
+		return c.JSON(http.StatusTooManyRequests, map[string]string{
+			"error": reason,
+		})
+	}
+
+	type syncResult struct {
+		ClientMessageID string          `json:"client_message_id"`
+		Message         *models.Message `json:"message,omitempty"`
+		ThreadID        string          `json:"thread_id,omitempty"`
+		Created         bool            `json:"created"`
+		Error           string          `json:"error,omitempty"`
+	}
+
+	results := make([]syncResult, 0, len(req.QueuedMessages))
+	createdCount := 0
+	deduplicatedCount := 0
+	failureCount := 0
+
+	for _, queued := range req.QueuedMessages {
+		if queued.RecipientID == "" || queued.ClientMessageID == "" || (queued.Content == "" && queued.Ciphertext == "") {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "recipient_id, client_message_id and content/ciphertext are required",
+			})
+			continue
+		}
+
+		if queued.RecipientID == userID {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "cannot send message to yourself",
+			})
+			continue
+		}
+
+		if _, err := h.userRepo.GetByID(ctx, queued.RecipientID); err != nil {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "recipient not found",
+			})
+			continue
+		}
+
+		thread, err := h.msgRepo.GetOrCreateThread(ctx, userID, queued.RecipientID)
+		if err != nil {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "failed to get/create thread: " + err.Error(),
+			})
+			continue
+		}
+
+		var clientCreatedAt *time.Time
+		if queued.ClientCreatedAt != "" {
+			if parsed, parseErr := time.Parse(time.RFC3339, queued.ClientCreatedAt); parseErr == nil {
+				clientCreatedAt = &parsed
+			}
+		}
+
+		existing, existsErr := h.msgRepo.HasClientMessageID(ctx, userID, queued.ClientMessageID)
+		if existsErr != nil {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "failed to check duplicate message id: " + existsErr.Error(),
+			})
+			continue
+		}
+
+		msg, created, err := h.msgRepo.SendMessageWithClientMetadata(
+			ctx,
+			thread.ID,
+			userID,
+			queued.RecipientID,
+			queued.ClientMessageID,
+			queued.Content,
+			queued.Ciphertext,
+			clientCreatedAt,
+		)
+		if err != nil {
+			failureCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Created:         false,
+				Error:           "failed to sync message: " + err.Error(),
+			})
+			continue
+		}
+
+		if existing {
+			created = false
+		} else {
+			created = true
+		}
+
+		if created {
+			createdCount++
+		} else {
+			deduplicatedCount++
+		}
+
+		results = append(results, syncResult{
+			ClientMessageID: queued.ClientMessageID,
+			Message:         msg,
+			ThreadID:        thread.ID,
+			Created:         created,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"results":            results,
+		"created_count":      createdCount,
+		"deduplicated_count": deduplicatedCount,
+		"failed_count":       failureCount,
 	})
 }

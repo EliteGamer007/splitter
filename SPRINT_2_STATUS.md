@@ -1,9 +1,9 @@
 # Sprint 2 – User Stories & Tasks Status 
 
-**Overall Sprint 2 Completion: 82.8%**  
-**Last Updated:** February 23, 2026
+**Overall Sprint 2 Completion: 90.4%**  
+**Last Updated:** March 1, 2026
 
-**Summary:** 173 of 209 tasks completed across 51 user stories in 5 epics.
+**Summary:** 189 of 209 tasks completed across 51 user stories in 5 epics.
 
 ---
 
@@ -530,14 +530,18 @@
 ---
 
 ### User Story 14
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a User, I want to continue viewing previously loaded timelines while offline so that temporary network issues do not interrupt my reading experience.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Timeline content cached locally after loading
-- ❌ **NOT STARTED** - Cached timelines accessible while offline
-- ❌ **NOT STARTED** - UI indicates offline read-only mode
-- ❌ **NOT STARTED** - Write actions disabled when offline
+- ✅ **COMPLETED** - Timeline content cached locally after loading
+  - *Evidence:* `HomePage.jsx` caches timeline posts in localStorage after successful fetch; `ThreadPage.jsx` caches thread payloads after load
+- ✅ **COMPLETED** - Cached timelines accessible while offline
+  - *Evidence:* `HomePage.jsx` and `ThreadPage.jsx` load cached content when network is unavailable and continue read access
+- ✅ **COMPLETED** - UI indicates offline read-only mode
+  - *Evidence:* Offline banner added in both `HomePage.jsx` and `ThreadPage.jsx` with explicit read-only state messaging
+- ✅ **COMPLETED** - Write actions disabled when offline
+  - *Evidence:* Post creation and other write actions in `HomePage.jsx` are disabled offline; reply inputs/actions are disabled in `ThreadPage.jsx`
 
 ---
 
@@ -632,38 +636,50 @@
 ---
 
 ### Story 4.7: Abuse-Resistant Messaging Rate Limits
-**Status:** ❌ **NOT STARTED** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As the messaging subsystem, I want rate limits to reduce spam without breaking encryption.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Apply per-sender and per-instance rate limits
-- ❌ **NOT STARTED** - Track message frequency using metadata only
-- ❌ **NOT STARTED** - Throttle or reject excessive message requests
-- ❌ **NOT STARTED** - Expose rate-limit metrics for monitoring
+- ✅ **COMPLETED** - Apply per-sender and per-instance rate limits
+  - *Evidence:* `internal/security/messaging_guard.go` enforces per-minute/per-hour limits for local senders and per-actor/per-domain limits for remote inbox traffic
+- ✅ **COMPLETED** - Track message frequency using metadata only
+  - *Evidence:* Rate limits use sender IDs/domains and timestamps only (`AllowLocalSend`, `AllowRemoteInbound`); no plaintext message inspection
+- ✅ **COMPLETED** - Throttle or reject excessive message requests
+  - *Evidence:* `message_handler.go` (`SendMessage`, `SyncOfflineMessages`) and `inbox_handler.go` return HTTP 429 when guard limits are exceeded
+- ✅ **COMPLETED** - Expose rate-limit metrics for monitoring
+  - *Evidence:* `admin_handler.go` `GetMessagingSecurity()` + route `GET /api/v1/admin/messaging-security` expose limits, counters, and recent events
 
 ---
 
 ### Story 4.8: Secure Inbox Protection Against Attacks
-**Status:** ❌ **NOT STARTED** | **Priority: MEDIUM**  
+**Status:** ✅ **COMPLETED** | **Priority: MEDIUM**  
 **As an instance operator, I want inbound messaging endpoints protected from fake or flood attacks.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Verify DID and HTTP signatures on messages
-- ❌ **NOT STARTED** - Reject messages from invalid or unknown actors
-- ❌ **NOT STARTED** - Enforce request size and frequency limits
-- ❌ **NOT STARTED** - Log and flag suspicious messaging patterns
+- ✅ **COMPLETED** - Verify DID and HTTP signatures on messages
+  - *Evidence:* `inbox_handler.go` now validates actor identity consistency (`attributedTo` vs `actor`) and verifies HTTP Signature via `federation.VerifyRequest(...)`
+- ✅ **COMPLETED** - Reject messages from invalid or unknown actors
+  - *Evidence:* `inbox_handler.go` resolves remote actors up front and rejects unknown/invalid actors with 401
+- ✅ **COMPLETED** - Enforce request size and frequency limits
+  - *Evidence:* `inbox_handler.go` enforces payload cap (`256KB`) and applies per-actor/per-domain inbound throttling through `MessagingGuard`
+- ✅ **COMPLETED** - Log and flag suspicious messaging patterns
+  - *Evidence:* `MessagingGuard.RecordInboxRejected(...)` and `RecordSuspicious(...)` capture suspicious/rejected event metadata exposed in admin metrics
 
 ---
 
 ### Story 4.9: Offline-First Secure Messaging
-**Status:** ❌ **NOT STARTED** | **Priority: LOW**  
+**Status:** ✅ **COMPLETED** | **Priority: LOW**  
 **As a low-connectivity user, I want to read and write encrypted messages offline reliably.**
 
 **Tasks:**
-- ❌ **NOT STARTED** - Cache encrypted messages locally on device
-- ❌ **NOT STARTED** - Allow offline message composition using keys
-- ❌ **NOT STARTED** - Queue outgoing messages until reconnection
-- ❌ **NOT STARTED** - Sync messages safely after reconnecting
+- ✅ **COMPLETED** - Cache encrypted messages locally on device
+  - *Evidence:* `Splitter-frontend/components/pages/DMPage.jsx` stores queued encrypted payloads in localStorage (`splitter_dm_offline_queue_<userId>`)
+- ✅ **COMPLETED** - Allow offline message composition using keys
+  - *Evidence:* `DMPage.jsx` continues E2EE composition offline and queues JSON ciphertext payloads (`{c, iv}`)
+- ✅ **COMPLETED** - Queue outgoing messages until reconnection
+  - *Evidence:* `DMPage.jsx` queues unsent messages with `client_message_id` and shows queued state in chat UI
+- ✅ **COMPLETED** - Sync messages safely after reconnecting
+  - *Evidence:* Frontend calls `messageApi.syncQueuedMessages(...)`; backend `POST /api/v1/messages/sync` deduplicates via `(sender_id, client_message_id)` and reports created/deduplicated counts
 
 ---
 
@@ -815,10 +831,10 @@
 |------|---------------|-------------|-----------------|-------------|----------|-------------|-------------------|-------------------|
 | **Epic 1: Identity & Onboarding** | 9 | 37 | 37 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (37/37) |
 | **Epic 2: Federation** | 10 | 40 | 40 | 0 | 0 | 0 | 100.0% (10/10) | 100.0% (40/40) |
-| **Epic 3: Content & Systems** | 14 | 56 | 44 | 1 | 0 | 11 | 85.7% (12/14) | 78.6% (44/56) |
-| **Epic 4: Privacy & Messaging** | 9 | 38 | 14 | 0 | 0 | 24 | 33.3% (3/9) | 36.8% (14/38) |
+| **Epic 3: Content & Systems** | 14 | 56 | 48 | 1 | 0 | 7 | 92.9% (13/14) | 85.7% (48/56) |
+| **Epic 4: Privacy & Messaging** | 9 | 38 | 26 | 0 | 0 | 12 | 66.7% (6/9) | 68.4% (26/38) |
 | **Epic 5: Governance & Admin** | 9 | 38 | 38 | 0 | 0 | 0 | 100.0% (9/9) | 100.0% (38/38) |
-| **TOTAL** | **51** | **209** | **173** | **1** | **0** | **35** | **84.3%** | **82.8%** |
+| **TOTAL** | **51** | **209** | **189** | **1** | **0** | **19** | **92.2%** | **90.4%** |
 
 *Note: Story completion counts only fully completed stories (no deferred or not-started tasks). Task completion percentage is based on completed tasks / total tasks.*
 
@@ -829,15 +845,16 @@
 **Strengths:**
 - **Federation fully operational** (100.0% Epic 2): WebFinger, ActivityPub inbox/outbox, HTTP Signatures, deduplication, remote thread-context fetch/cache, federated likes/reposts, profile updates, and delete propagation are all implemented
 - **Strong identity + onboarding** (100.0% Epic 1): DID generation, privacy settings, E2EE key setup, encrypted recovery export/import validation, live instance user counts, and walkthrough are complete
-- **Solid content features** (78.6% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, and DB-backed privacy-preserving media loading are functional
+- **Solid content features** (85.7% Epic 3): Posts, timelines, likes/reposts, bookmarks, threading, edited indicators, DB-backed privacy-preserving media loading, and offline read-only timeline/thread fallback are functional
+- **Messaging hardening expanded** (68.4% Epic 4): Offline-first encrypted DM queue/sync, per-sender/per-instance rate limits, inbox signature+actor validation, and suspicious-event telemetry are now implemented
 - **Live Admin tooling** (100.0% Epic 5): Real moderation queue with approve/remove/warn actions; live federation inspector with per-domain health, retry/circuit metrics, traffic logs, and 15s auto-refresh; force-directed federation network map; audit log covering moderation actions
 - Security-conscious design: client-side keys, soft deletes, JWT role checks on all admin endpoints
 
 **Remaining Gaps:**
-- **Privacy & messaging features** (34.2% Epic 4): Key rotation, multi-device, federated E2EE, and rate limiting not yet implemented
+- **Privacy & messaging features** (68.4% Epic 4): Key rotation, offline-first DM queue/sync, abuse-resistant limits, and secure inbox protections are complete; multi-device and federated E2EE remain pending
 - **Background worker** (remaining scope): Ephemeral post expiry remains pending; federation retry/reputation workers are now implemented
 
-**Status:** Sprint 2 target exceeded at 82.8%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, and DB-backed media privacy loading.
+**Status:** Sprint 2 target exceeded at 90.4%. Delivered full ActivityPub federation layer (including remote parent-thread context fetch/cache), federated interactions and updates/deletes, live moderation queue, retry/circuit-aware federation workers, reputation automation, federation network graph API+UI, E2EE DM edit/delete window, URI-form DID fix, encrypted recovery export/import validation, DB-backed media privacy loading, offline-first encrypted DM queue/sync, and messaging abuse/inbox hardening controls.
 
 ---
 
@@ -855,7 +872,7 @@
 **MEDIUM – Report Creation UX:**
 7. `POST /api/v1/posts/:id/report` endpoint + "Report" option in post ⋯ menu (populates moderation queue from UI)
 
-**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion toward 85%.
+**Goal:** Progress remaining items currently marked **NOT STARTED** and push total completion beyond 85%.
 
 ---
 

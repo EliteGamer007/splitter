@@ -202,6 +202,7 @@ func setupRoutes(
 	messagesAuth.GET("/threads", messageHandler.GetThreads)
 	messagesAuth.GET("/threads/:threadId", messageHandler.GetMessages)
 	messagesAuth.POST("/send", messageHandler.SendMessage)
+	messagesAuth.POST("/sync", messageHandler.SyncOfflineMessages)
 	messagesAuth.POST("/conversation/:userId", messageHandler.StartConversation)
 	messagesAuth.POST("/threads/:threadId/read", messageHandler.MarkAsRead)
 	messagesAuth.DELETE("/:messageId", messageHandler.DeleteMessage) // Delete message (3-hour window)
@@ -232,6 +233,7 @@ func setupRoutes(
 	admin.GET("/federation-inspector", adminHandler.GetFederationInspector)
 	admin.GET("/federation/reputation", adminHandler.GetInstanceReputation)
 	admin.GET("/federation/network", adminHandler.GetFederationNetwork)
+	admin.GET("/messaging-security", adminHandler.GetMessagingSecurity)
 
 	// ============================================================
 	// FEDERATION ROUTES

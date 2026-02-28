@@ -56,8 +56,10 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 
 	// Create new thread
 	insertQuery := `
-		INSERT INTO message_threads (participant_a_id, participant_b_id)
-		VALUES ($1, $2)
+		INSERT INTO message_threads (participant_a, participant_b, participant_a_id, participant_b_id)
+		SELECT ua.did, ub.did, ua.id, ub.id
+		FROM users ua, users ub
+		WHERE ua.id = $1 AND ub.id = $2
 		RETURNING id, participant_a_id, participant_b_id, created_at, updated_at
 	`
 
@@ -126,9 +128,11 @@ func (r *MessageRepository) canSendMessageToRecipient(ctx context.Context, sende
 // SendMessage sends a message in a thread
 func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID, recipientID, content, ciphertext string) (*models.Message, error) {
 	query := `
-		INSERT INTO messages (thread_id, sender_id, recipient_id, content, ciphertext)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, thread_id, sender_id, recipient_id, content, ciphertext, is_read, created_at
+		INSERT INTO messages (thread_id, sender_did, recipient_did, sender_id, recipient_id, content, ciphertext)
+		SELECT $1, us.did, ur.did, us.id, ur.id, $4, $5
+		FROM users us, users ur
+		WHERE us.id = $2 AND ur.id = $3
+		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 	`
 
 	var msg models.Message
@@ -137,10 +141,15 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 		&msg.ThreadID,
 		&msg.SenderID,
 		&msg.RecipientID,
+		&msg.ClientMessageID,
 		&msg.Content,
 		&msg.Ciphertext,
 		&msg.IsRead,
 		&msg.CreatedAt,
+		&msg.ClientCreatedAt,
+		&msg.DeliveredAt,
+		&msg.DeletedAt,
+		&msg.EditedAt,
 	)
 
 	if err != nil {
@@ -154,10 +163,102 @@ func (r *MessageRepository) SendMessage(ctx context.Context, threadID, senderID,
 	return &msg, nil
 }
 
+// SendMessageWithClientMetadata sends (or deduplicates) a client-queued message using client_message_id idempotency.
+// Returns the message and a bool indicating whether a new row was created.
+func (r *MessageRepository) SendMessageWithClientMetadata(ctx context.Context, threadID, senderID, recipientID, clientMessageID, content, ciphertext string, clientCreatedAt *time.Time) (*models.Message, bool, error) {
+	insertQuery := `
+		INSERT INTO messages (
+			thread_id,
+			sender_did,
+			recipient_did,
+			sender_id,
+			recipient_id,
+			client_message_id,
+			content,
+			ciphertext,
+			client_created_at
+		)
+		SELECT $1, us.did, ur.did, us.id, ur.id, NULLIF($4, ''), $5, $6, $7
+		FROM users us, users ur
+		WHERE us.id = $2 AND ur.id = $3
+		ON CONFLICT (sender_id, client_message_id)
+		WHERE client_message_id IS NOT NULL
+		DO NOTHING
+		RETURNING id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+	`
+
+	var msg models.Message
+	err := db.GetDB().QueryRow(ctx, insertQuery, threadID, senderID, recipientID, clientMessageID, content, ciphertext, clientCreatedAt).Scan(
+		&msg.ID,
+		&msg.ThreadID,
+		&msg.SenderID,
+		&msg.RecipientID,
+		&msg.ClientMessageID,
+		&msg.Content,
+		&msg.Ciphertext,
+		&msg.IsRead,
+		&msg.CreatedAt,
+		&msg.ClientCreatedAt,
+		&msg.DeliveredAt,
+		&msg.DeletedAt,
+		&msg.EditedAt,
+	)
+
+	inserted := true
+	if err == pgx.ErrNoRows {
+		inserted = false
+		existingQuery := `
+			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
+			FROM messages
+			WHERE sender_id = $1 AND client_message_id = NULLIF($2, '')
+			LIMIT 1
+		`
+		if fetchErr := db.GetDB().QueryRow(ctx, existingQuery, senderID, clientMessageID).Scan(
+			&msg.ID,
+			&msg.ThreadID,
+			&msg.SenderID,
+			&msg.RecipientID,
+			&msg.ClientMessageID,
+			&msg.Content,
+			&msg.Ciphertext,
+			&msg.IsRead,
+			&msg.CreatedAt,
+			&msg.ClientCreatedAt,
+			&msg.DeliveredAt,
+			&msg.DeletedAt,
+			&msg.EditedAt,
+		); fetchErr != nil {
+			return nil, false, fmt.Errorf("failed to fetch deduplicated message: %w", fetchErr)
+		}
+	} else if err != nil {
+		return nil, false, fmt.Errorf("failed to send/sync message: %w", err)
+	}
+
+	if inserted {
+		updateQuery := `UPDATE message_threads SET updated_at = NOW() WHERE id = $1`
+		_, _ = db.GetDB().Exec(ctx, updateQuery, threadID)
+	}
+
+	return &msg, inserted, nil
+}
+
+// HasClientMessageID checks if a message already exists for sender+client_message_id.
+func (r *MessageRepository) HasClientMessageID(ctx context.Context, senderID, clientMessageID string) (bool, error) {
+	var exists bool
+	err := db.GetDB().QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM messages WHERE sender_id = $1 AND client_message_id = NULLIF($2, ''))`,
+		senderID, clientMessageID,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check client_message_id existence: %w", err)
+	}
+	return exists, nil
+}
+
 // GetThreadMessages gets all messages in a thread
 func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID string, limit, offset int) ([]*models.Message, error) {
 	query := `
-		SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at, deleted_at, edited_at
+		SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 		FROM messages
 		WHERE thread_id = $1
 		ORDER BY created_at ASC
@@ -178,10 +279,13 @@ func (r *MessageRepository) GetThreadMessages(ctx context.Context, threadID stri
 			&msg.ThreadID,
 			&msg.SenderID,
 			&msg.RecipientID,
+			&msg.ClientMessageID,
 			&msg.Content,
 			&msg.Ciphertext,
 			&msg.IsRead,
 			&msg.CreatedAt,
+			&msg.ClientCreatedAt,
+			&msg.DeliveredAt,
 			&msg.DeletedAt,
 			&msg.EditedAt,
 		)
@@ -241,7 +345,7 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 
 		// Get last message
 		lastMsgQuery := `
-			SELECT id, thread_id, sender_id, recipient_id, content, COALESCE(ciphertext, ''), is_read, created_at, deleted_at, edited_at
+			SELECT id, thread_id, sender_id, recipient_id, COALESCE(client_message_id, ''), content, COALESCE(ciphertext::text, ''), is_read, created_at, client_created_at, delivered_at, deleted_at, edited_at
 			FROM messages
 			WHERE thread_id = $1 AND deleted_at IS NULL
 			ORDER BY created_at DESC
@@ -253,10 +357,13 @@ func (r *MessageRepository) GetUserThreads(ctx context.Context, userID string) (
 			&lastMsg.ThreadID,
 			&lastMsg.SenderID,
 			&lastMsg.RecipientID,
+			&lastMsg.ClientMessageID,
 			&lastMsg.Content,
 			&lastMsg.Ciphertext,
 			&lastMsg.IsRead,
 			&lastMsg.CreatedAt,
+			&lastMsg.ClientCreatedAt,
+			&lastMsg.DeliveredAt,
 			&lastMsg.DeletedAt,
 			&lastMsg.EditedAt,
 		)

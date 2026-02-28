@@ -14,6 +14,7 @@ import (
 	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/security"
 
 	"github.com/labstack/echo/v4"
 )
@@ -38,6 +39,18 @@ func NewInboxHandler(userRepo *repository.UserRepository, msgRepo *repository.Me
 // POST /users/:username/inbox
 func (h *InboxHandler) Handle(c echo.Context) error {
 	ctx := c.Request().Context()
+	guard := security.GetMessagingGuard()
+
+	const maxInboxPayloadBytes int64 = 256 * 1024
+	if c.Request().ContentLength > maxInboxPayloadBytes {
+		guard.RecordInboxRejected("unknown", "payload too large", map[string]interface{}{
+			"content_length": c.Request().ContentLength,
+			"max":            maxInboxPayloadBytes,
+		})
+		return c.JSON(http.StatusRequestEntityTooLarge, map[string]string{
+			"error": "payload too large",
+		})
+	}
 
 	// Parse the activity
 	var activity map[string]interface{}
@@ -51,12 +64,66 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 	actorURI, _ := activity["actor"].(string)
 	activityID, _ := activity["id"].(string)
 
+	if strings.TrimSpace(actorURI) == "" {
+		guard.RecordInboxRejected("unknown", "missing actor URI", map[string]interface{}{"activity_type": activityType})
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "missing actor URI",
+		})
+	}
+
+	remoteActor, err := resolveActorFromURI(actorURI)
+	if err != nil || remoteActor == nil {
+		guard.RecordInboxRejected(actorURI, "unknown actor", map[string]interface{}{"error": fmt.Sprintf("%v", err)})
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "unknown actor",
+		})
+	}
+
+	if allowed, reason := guard.AllowRemoteInbound(actorURI, remoteActor.Domain); !allowed {
+		return c.JSON(http.StatusTooManyRequests, map[string]string{
+			"error": reason,
+		})
+	}
+
+	verificationKey := strings.TrimSpace(remoteActor.PublicKeyPEM)
+	if sigKeyID := parseSignatureKeyID(c.Request().Header.Get("Signature")); sigKeyID != "" {
+		if resolvedSigner, signerErr := resolveActorFromURI(stripFragment(sigKeyID)); signerErr == nil && resolvedSigner != nil && strings.TrimSpace(resolvedSigner.PublicKeyPEM) != "" {
+			verificationKey = strings.TrimSpace(resolvedSigner.PublicKeyPEM)
+		}
+	}
+
+	if verificationKey == "" {
+		guard.RecordInboxRejected(actorURI, "missing verification key", map[string]interface{}{"domain": remoteActor.Domain})
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "missing remote signature key",
+		})
+	}
+
+	if err := federation.VerifyRequest(c.Request(), verificationKey); err != nil {
+		guard.RecordInboxRejected(actorURI, "invalid signature", map[string]interface{}{"error": err.Error()})
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "invalid signature",
+		})
+	}
+
+	if strings.TrimSpace(activityType) == "Create" {
+		if obj, ok := activity["object"].(map[string]interface{}); ok {
+			if attributedTo, _ := obj["attributedTo"].(string); attributedTo != "" && attributedTo != actorURI {
+				guard.RecordInboxRejected(actorURI, "actor DID mismatch", map[string]interface{}{"attributed_to": attributedTo})
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "actor mismatch",
+				})
+			}
+		}
+	}
+
 	log.Printf("[Inbox] Received %s from %s (id: %s)", activityType, actorURI, activityID)
 
 	// Check domain blocking
 	actorDomain := extractDomainFromURI(actorURI)
 	if federation.IsDomainBlocked(ctx, actorDomain) {
 		log.Printf("[Inbox] Blocked domain: %s", actorDomain)
+		guard.RecordInboxRejected(actorURI, "blocked domain", map[string]interface{}{"domain": actorDomain})
 		return c.JSON(http.StatusForbidden, map[string]string{
 			"error": "domain blocked",
 		})
@@ -72,7 +139,7 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 
 	// Store in inbox_activities
 	payload, _ := json.Marshal(activity)
-	_, err := db.GetDB().Exec(ctx,
+	_, err = db.GetDB().Exec(ctx,
 		`INSERT INTO inbox_activities (activity_id, actor_uri, activity_type, payload)
 		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (activity_id) DO NOTHING`,
@@ -106,6 +173,30 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 			"status": "accepted",
 		})
 	}
+}
+
+func parseSignatureKeyID(signatureHeader string) string {
+	if strings.TrimSpace(signatureHeader) == "" {
+		return ""
+	}
+	parts := strings.Split(signatureHeader, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if !strings.HasPrefix(part, "keyId=") {
+			continue
+		}
+		value := strings.TrimPrefix(part, "keyId=")
+		value = strings.Trim(value, `"`)
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func stripFragment(uri string) string {
+	if idx := strings.Index(uri, "#"); idx >= 0 {
+		return uri[:idx]
+	}
+	return uri
 }
 
 // handleAnnounce processes incoming Announce (repost/boost) activities

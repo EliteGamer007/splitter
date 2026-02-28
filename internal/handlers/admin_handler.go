@@ -10,6 +10,7 @@ import (
 
 	"splitter/internal/db"
 	"splitter/internal/repository"
+	"splitter/internal/security"
 
 	"github.com/labstack/echo/v4"
 )
@@ -1051,5 +1052,20 @@ func (h *AdminHandler) GetFederationNetwork(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"nodes": nodes,
 		"edges": edges,
+	})
+}
+
+// GetMessagingSecurity returns messaging rate-limit and suspicious-event telemetry.
+func (h *AdminHandler) GetMessagingSecurity(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	snapshot := security.GetMessagingGuard().Snapshot()
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"limits":        snapshot.Limits,
+		"metrics":       snapshot.Metrics,
+		"recent_events": snapshot.RecentEvents,
 	})
 }

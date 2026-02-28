@@ -34,10 +34,12 @@ type Message struct {
 	ThreadID    string     `json:"thread_id"`
 	SenderID    string     `json:"sender_id"`
 	RecipientID string     `json:"recipient_id"`
+	ClientMessageID string  `json:"client_message_id,omitempty"`
 	Content     string     `json:"content"`
 	Ciphertext  string     `json:"ciphertext,omitempty"` // Base64 encoded encrypted content
 	IsRead      bool       `json:"is_read"`
 	CreatedAt   time.Time  `json:"created_at"`
+	ClientCreatedAt *time.Time `json:"client_created_at,omitempty"`
 	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"` // WhatsApp-style soft delete
 	EditedAt    *time.Time `json:"edited_at,omitempty"`  // Message edit timestamp
