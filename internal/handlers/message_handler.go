@@ -112,9 +112,9 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	guard := security.GetMessagingGuard()
 
 	var req struct {
-		RecipientID string `json:"recipient_id"`
-		Content     string `json:"content"`
-		Ciphertext  string `json:"ciphertext"`
+		RecipientID   string            `json:"recipient_id"`
+		Content       string            `json:"content"`
+		Ciphertext    string            `json:"ciphertext"`
 		EncryptedKeys map[string]string `json:"encrypted_keys"`
 	}
 
@@ -353,12 +353,12 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 
 	var req struct {
 		QueuedMessages []struct {
-			ClientMessageID string `json:"client_message_id"`
-			RecipientID     string `json:"recipient_id"`
-			Content         string `json:"content"`
-			Ciphertext      string `json:"ciphertext"`
+			ClientMessageID string            `json:"client_message_id"`
+			RecipientID     string            `json:"recipient_id"`
+			Content         string            `json:"content"`
+			Ciphertext      string            `json:"ciphertext"`
 			EncryptedKeys   map[string]string `json:"encrypted_keys"`
-			ClientCreatedAt string `json:"client_created_at"`
+			ClientCreatedAt string            `json:"client_created_at"`
 		} `json:"queued_messages"`
 	}
 

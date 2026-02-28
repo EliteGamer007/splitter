@@ -26,16 +26,16 @@ type Activity struct {
 
 // Note represents an ActivityPub Note (post)
 type Note struct {
-	Context      interface{} `json:"@context,omitempty"`
-	ID           string      `json:"id"`
-	Type         string      `json:"type"`
-	AttributedTo string      `json:"attributedTo"`
-	Content      string      `json:"content"`
-	Ciphertext   string      `json:"ciphertext,omitempty"`
+	Context       interface{}       `json:"@context,omitempty"`
+	ID            string            `json:"id"`
+	Type          string            `json:"type"`
+	AttributedTo  string            `json:"attributedTo"`
+	Content       string            `json:"content"`
+	Ciphertext    string            `json:"ciphertext,omitempty"`
 	EncryptedKeys map[string]string `json:"encrypted_keys,omitempty"`
-	Published    string      `json:"published"`
-	To           []string    `json:"to,omitempty"`
-	CC           []string    `json:"cc,omitempty"`
+	Published     string            `json:"published"`
+	To            []string          `json:"to,omitempty"`
+	CC            []string          `json:"cc,omitempty"`
 }
 
 // DeliverActivity sends an activity to a remote inbox with HTTP Signature

@@ -87,14 +87,14 @@ func BuildCreateDMActivity(actorURI, recipientURI, content, ciphertext string, e
 	postID := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	note := Note{
-		ID:           fmt.Sprintf("%s/posts/%s", baseURL, postID),
-		Type:         "Note",
-		AttributedTo: actorURI,
-		Content:      content,
-		Ciphertext:   ciphertext,
+		ID:            fmt.Sprintf("%s/posts/%s", baseURL, postID),
+		Type:          "Note",
+		AttributedTo:  actorURI,
+		Content:       content,
+		Ciphertext:    ciphertext,
 		EncryptedKeys: encryptedKeys,
-		Published:    time.Now().UTC().Format(time.RFC3339),
-		To:           []string{recipientURI}, // Addressed to specific user only
+		Published:     time.Now().UTC().Format(time.RFC3339),
+		To:            []string{recipientURI}, // Addressed to specific user only
 	}
 
 	return &Activity{
