@@ -2,6 +2,8 @@ package server
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	"splitter/internal/config"
 	"splitter/internal/federation"
@@ -63,8 +65,22 @@ func NewServer(cfg *config.Config) *Server {
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.BodyLimit("6M")) // Limit body size to 6MB (allow overhead for 5MB file)
+	// CORS: use CORS_ORIGINS env var if set, otherwise default to localhost
+	corsOrigins := []string{
+		"http://localhost:3000", "http://127.0.0.1:3000",
+		"http://localhost:3001", "http://127.0.0.1:3001",
+		"http://localhost:8000", "http://localhost:8001",
+	}
+	if extra := os.Getenv("CORS_ORIGINS"); extra != "" {
+		for _, o := range strings.Split(extra, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				corsOrigins = append(corsOrigins, trimmed)
+			}
+		}
+	}
+	log.Printf("CORS allowed origins: %v", corsOrigins)
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:8000", "http://localhost:8001"},
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization, "Signature", "Date", "Digest"},
 		AllowCredentials: true,

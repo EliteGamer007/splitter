@@ -1,6 +1,9 @@
-version: '3.9'
+networks:
+  splitter-net:
+    driver: bridge
 
 services:
+  # ── Instance 1: Web server ──────────────────────────────────
   splitter-instance-1:
     build:
       context: .
@@ -8,19 +11,30 @@ services:
     container_name: splitter-instance-1
     ports:
       - "8000:8000"
+    networks:
+      - splitter-net
     environment:
-      ENV_FILE: ".env"
+      ENV: "production"
       PORT: "8000"
+      BASE_URL: "http://localhost:8000"
       FEDERATION_ENABLED: "true"
       FEDERATION_DOMAIN: "splitter-1"
-      FEDERATION_URL: "http://localhost:8000"
+      FEDERATION_URL: "http://host.docker.internal:8000"
+      FEDERATION_INSTANCE_MAP: "splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME_INSTANCE1:-neondb}
+      DB_SSLMODE: "require"
       JWT_SECRET: ${JWT_SECRET_INSTANCE1:-instance-1-secret}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Instance 2: Web server ──────────────────────────────────
   splitter-instance-2:
     build:
       context: .
@@ -28,30 +42,77 @@ services:
     container_name: splitter-instance-2
     ports:
       - "8001:8001"
+    networks:
+      - splitter-net
     environment:
-      ENV_FILE: ".env"
+      ENV: "production"
       PORT: "8001"
       BASE_URL: "http://localhost:8001"
       FEDERATION_ENABLED: "true"
       FEDERATION_DOMAIN: "splitter-2"
-      FEDERATION_URL: "http://localhost:8001"
+      FEDERATION_URL: "http://host.docker.internal:8001"
+      FEDERATION_INSTANCE_MAP: "splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME_INSTANCE2:-neondb_2}
+      DB_SSLMODE: "require"
       JWT_SECRET: ${JWT_SECRET_INSTANCE2:-instance-2-secret}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  splitter-frontend:
+  # ── Instance 1: Background worker ──────────────────────────
+  splitter-worker-1:
     build:
-      context: ../Splitter-frontend
+      context: .
       dockerfile: Dockerfile
-    container_name: splitter-frontend
-    ports:
-      - "3000:3000"
+    container_name: splitter-worker-1
+    command: ["worker"]
+    networks:
+      - splitter-net
     environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+      ENV: "production"
+      FEDERATION_ENABLED: "true"
+      FEDERATION_DOMAIN: "splitter-1"
+      FEDERATION_URL: "http://host.docker.internal:8000"
+      FEDERATION_INSTANCE_MAP: "splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_INSTANCE1:-neondb}
+      DB_SSLMODE: "require"
+      JWT_SECRET: ${JWT_SECRET_INSTANCE1:-instance-1-secret}
     depends_on:
-      - splitter-instance-1
-      - splitter-instance-2
+      splitter-instance-1:
+        condition: service_healthy
+
+  # ── Instance 2: Background worker ──────────────────────────
+  splitter-worker-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: splitter-worker-2
+    command: ["worker"]
+    networks:
+      - splitter-net
+    environment:
+      ENV: "production"
+      FEDERATION_ENABLED: "true"
+      FEDERATION_DOMAIN: "splitter-2"
+      FEDERATION_URL: "http://host.docker.internal:8001"
+      FEDERATION_INSTANCE_MAP: "splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_INSTANCE2:-neondb_2}
+      DB_SSLMODE: "require"
+      JWT_SECRET: ${JWT_SECRET_INSTANCE2:-instance-2-secret}
+    depends_on:
+      splitter-instance-2:
+        condition: service_healthy

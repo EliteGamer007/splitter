@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -40,9 +41,28 @@ type RemoteNote struct {
 }
 
 // InstanceURLMap maps domain names to actual URLs (for local testing)
+// Populated from FEDERATION_INSTANCE_MAP env var if set, e.g.:
+//
+//	"splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
 var InstanceURLMap = map[string]string{
 	"splitter-1": "http://localhost:8000",
 	"splitter-2": "http://localhost:8001",
+}
+
+func init() {
+	if envMap := os.Getenv("FEDERATION_INSTANCE_MAP"); envMap != "" {
+		parsed := make(map[string]string)
+		for _, entry := range strings.Split(envMap, ",") {
+			parts := strings.SplitN(strings.TrimSpace(entry), "=", 2)
+			if len(parts) == 2 {
+				parsed[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
+		if len(parsed) > 0 {
+			InstanceURLMap = parsed
+			log.Printf("[Federation] InstanceURLMap loaded from env: %v", InstanceURLMap)
+		}
+	}
 }
 
 // ResolveRemoteUser resolves @username@domain to a RemoteActor
@@ -217,14 +237,30 @@ func getRemoteActorFromCache(ctx context.Context, username, domain string) (*Rem
 
 // upsertRemoteActor inserts or updates a remote actor in the cache
 func upsertRemoteActor(ctx context.Context, actor *RemoteActor) error {
+	// The remote_actors table has both legacy NOT NULL columns (instance_domain, public_key, outbox_url)
+	// and newer columns (domain, public_key_pem, display_name, avatar_url).
+	// We must populate both sets to satisfy NOT NULL constraints.
+	instanceDomain := actor.Domain
+	if instanceDomain == "" {
+		instanceDomain = "unknown"
+	}
+	publicKey := actor.PublicKeyPEM
+	if publicKey == "" {
+		publicKey = ""
+	}
+	outboxURL := actor.OutboxURL
+	if outboxURL == "" {
+		outboxURL = ""
+	}
+
 	_, err := db.GetDB().Exec(ctx,
-		`INSERT INTO remote_actors (actor_uri, username, domain, inbox_url, outbox_url, public_key_pem, display_name, avatar_url, last_fetched_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+		`INSERT INTO remote_actors (actor_uri, username, domain, instance_domain, inbox_url, outbox_url, public_key, public_key_pem, display_name, avatar_url, last_fetched_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
 		 ON CONFLICT (actor_uri) DO UPDATE SET
-		   inbox_url = $4, outbox_url = $5, public_key_pem = $6,
-		   display_name = $7, avatar_url = $8, last_fetched_at = now()`,
-		actor.ActorURI, actor.Username, actor.Domain, actor.InboxURL,
-		actor.OutboxURL, actor.PublicKeyPEM, actor.DisplayName, actor.AvatarURL,
+		   inbox_url = $5, outbox_url = $6, public_key = $7, public_key_pem = $8,
+		   display_name = $9, avatar_url = $10, instance_domain = $4, last_fetched_at = now()`,
+		actor.ActorURI, actor.Username, actor.Domain, instanceDomain, actor.InboxURL,
+		outboxURL, publicKey, actor.PublicKeyPEM, actor.DisplayName, actor.AvatarURL,
 	)
 	return err
 }

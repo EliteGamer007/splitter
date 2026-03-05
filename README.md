@@ -302,6 +302,8 @@ docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
 | [diagrams/architecture-diagram.md](diagrams/architecture-diagram.md) | System architecture diagram |
 | [SPRINT_1_STATUS.md](SPRINT_1_STATUS.md) | Sprint 1 completion details |
 
+| [DEPLOY_BACKEND_RENDER.md](DEPLOY_BACKEND_RENDER.md) | Backend Render deployment feasibility + step-by-step setup |
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
