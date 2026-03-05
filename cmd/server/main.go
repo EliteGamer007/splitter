@@ -50,6 +50,11 @@ func main() {
 
 	srv := server.NewServer(cfg)
 
+	// --- Start background worker loops in-process (goroutine) ---
+	if cfg.Federation.Enabled {
+		go runWorkerLoops(cfg)
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000"
@@ -104,4 +109,51 @@ func ensureAdminUser() error {
 
 	log.Println("Admin user created successfully (username: admin, password: splitteradmin)")
 	return nil
+}
+
+// runWorkerLoops runs the federation background worker loops (retry + reputation)
+// inside the same process as the web server, using goroutines.
+func runWorkerLoops(cfg *config.Config) {
+	ctx := context.Background()
+
+	retryInterval := time.Duration(cfg.Worker.RetryIntervalSeconds) * time.Second
+	reputationInterval := time.Duration(cfg.Worker.ReputationIntervalSeconds) * time.Second
+
+	// Clamp minimum intervals to avoid tight loops if config is 0
+	if retryInterval < 10*time.Second {
+		retryInterval = 30 * time.Second
+	}
+	if reputationInterval < 10*time.Second {
+		reputationInterval = 60 * time.Second
+	}
+
+	retryTicker := time.NewTicker(retryInterval)
+	reputationTicker := time.NewTicker(reputationInterval)
+	defer retryTicker.Stop()
+	defer reputationTicker.Stop()
+
+	log.Printf("[InProcessWorker] Started: retry every %s, reputation every %s", retryInterval, reputationInterval)
+
+	// Initial reputation calculation
+	if err := federation.RecalculateInstanceReputation(ctx); err != nil {
+		log.Printf("[InProcessWorker] Initial reputation calc failed: %v", err)
+	}
+
+	for {
+		select {
+		case <-retryTicker.C:
+			processed, failed, err := federation.RetryOutboxBatch(ctx, 50)
+			if err != nil {
+				log.Printf("[InProcessWorker] Retry batch failed: %v", err)
+				continue
+			}
+			if processed > 0 {
+				log.Printf("[InProcessWorker] Retry batch processed=%d failed=%d", processed, failed)
+			}
+		case <-reputationTicker.C:
+			if err := federation.RecalculateInstanceReputation(ctx); err != nil {
+				log.Printf("[InProcessWorker] Reputation recalculation failed: %v", err)
+			}
+		}
+	}
 }
