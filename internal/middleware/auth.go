@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"splitter/internal/db"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
@@ -68,6 +70,19 @@ func AuthMiddleware(jwtSecret string) echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, map[string]string{
 					"error": "Invalid token claims",
 				})
+			}
+
+			// Check if user is suspended
+			if userID, ok := c.Get("user_id").(string); ok && userID != "" {
+				var isSuspended bool
+				err := db.GetDB().QueryRow(c.Request().Context(),
+					"SELECT is_suspended FROM users WHERE id = $1", userID,
+				).Scan(&isSuspended)
+				if err == nil && isSuspended {
+					return c.JSON(http.StatusForbidden, map[string]string{
+						"error": "Account suspended",
+					})
+				}
 			}
 
 			return next(c)
