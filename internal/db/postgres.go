@@ -7,6 +7,7 @@ import (
 
 	"splitter/internal/config"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,6 +31,9 @@ func InitDB(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("unable to parse connection string: %w", err)
 	}
+
+	// Use simple protocol to avoid prepared statement conflicts with Neon's pooler
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	// Configure pool settings
 	poolConfig.MaxConns = cfg.Database.MaxConns
