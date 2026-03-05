@@ -166,7 +166,7 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		})
 	}
 
-	encryptedKeysJSON := ""
+	encryptedKeysJSON := "{}"
 	if len(req.EncryptedKeys) > 0 {
 		if raw, marshalErr := json.Marshal(req.EncryptedKeys); marshalErr == nil {
 			encryptedKeysJSON = string(raw)
@@ -513,7 +513,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 
 func mapToJSONString(value map[string]string) string {
 	if len(value) == 0 {
-		return ""
+		return "{}"
 	}
 	raw, err := json.Marshal(value)
 	if err != nil {
