@@ -1,0 +1,19 @@
+name: Keep Render Services Alive
+
+on:
+  schedule:
+    # Ping every 5 minutes
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Instance 1
+        run: |
+          curl -sf https://splitter-m0kv.onrender.com/api/v1/health || echo "Instance 1 unreachable"
+
+      - name: Ping Instance 2
+        run: |
+          curl -sf https://splitter-2.onrender.com/api/v1/health || echo "Instance 2 unreachable"
