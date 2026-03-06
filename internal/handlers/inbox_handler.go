@@ -410,12 +410,29 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	published, _ := object["published"].(string)
 	inReplyTo, _ := object["inReplyTo"].(string)
 
-	// Check TO/CC to distinguish Public Post vs DM
-	to, _ := activity["to"].([]interface{})
+	// Collect all possible recipients from ActivityPub fields
+	recipients := []interface{}{}
+
+	if v, ok := object["to"].([]interface{}); ok {
+		recipients = append(recipients, v...)
+	}
+	if v, ok := object["cc"].([]interface{}); ok {
+		recipients = append(recipients, v...)
+	}
+
+	if len(recipients) == 0 {
+		if v, ok := activity["to"].([]interface{}); ok {
+			recipients = append(recipients, v...)
+		}
+		if v, ok := activity["cc"].([]interface{}); ok {
+			recipients = append(recipients, v...)
+		}
+	}
+
 	isPublic := false
 	var targetLocalUser *models.User
 
-	for _, t := range to {
+	for _, t := range recipients {
 		recipient, ok := t.(string)
 		if !ok {
 			continue
