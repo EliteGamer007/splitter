@@ -234,6 +234,7 @@ func setupRoutes(
 	// Admin routes (require authentication + admin role)
 	admin := api.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	admin.Use(middleware.RequireModOrAdmin)
 	admin.GET("/users", adminHandler.GetAllUsers)
 	admin.GET("/users/suspended", adminHandler.GetSuspendedUsers)
 	admin.GET("/moderation-requests", adminHandler.GetModerationRequests)
