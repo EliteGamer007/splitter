@@ -48,11 +48,24 @@ The database includes tables for:
 - **Federation**: ActivityPub inbox/outbox activities and deduplication
 - **Moderation**: Blocked domains, content reports, admin actions, reputation tracking
 
+## ⚠️ Required: Migration 018 (Messaging Schema)
+
+Migration `018_fix_messages_schema.sql` adds columns required by the messaging system (`sender_id`, `recipient_id`, `content`, `encrypted_keys`, `client_message_id`, `is_read`, `client_created_at`, `deleted_at`, `edited_at`). **All instances must apply this migration before running the server** to avoid `"column does not exist"` database errors during Direct Messaging.
+
+```bash
+docker run --rm postgres:15 psql \
+  'YOUR_CONNECTION_STRING' \
+  -f migrations/018_fix_messages_schema.sql
+```
+
+The migration is idempotent and safe to run multiple times.
+
 ## Important Notes
 
 - ✅ Always backup your database before running migrations
 - ✅ For new databases, use `000_master_schema.sql` (single file, complete schema)
 - ✅ For existing databases, use `002_upgrade_to_current.sql` (safe with IF NOT EXISTS)
+- ✅ Apply `018_fix_messages_schema.sql` on **every instance** for DM support
 - ✅ Neon requires `sslmode=require` in connection strings
 - ❌ Auto-migrations are disabled in the app (manual only)
 
