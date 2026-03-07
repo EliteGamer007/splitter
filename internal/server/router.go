@@ -43,7 +43,7 @@ func NewServer(cfg *config.Config) *Server {
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo, postRepo, cfg)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
-	replyHandler := handlers.NewReplyHandler()
+	replyHandler := handlers.NewReplyHandler(cfg)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)

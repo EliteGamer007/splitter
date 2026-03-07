@@ -135,9 +135,13 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 			// Deliver to followers
 			federation.DeliverToFollowers(activity, did)
 		}()
-	} else {
+		} else {
 		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
+
+	// Trigger Split Bot if mentioned
+	replyRepo := repository.NewReplyRepository()
+	service.CheckAndHandleSplitBot(post.Content, post.ID, nil, h.cfg, replyRepo)
 
 	return c.JSON(http.StatusCreated, post)
 }

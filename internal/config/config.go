@@ -25,6 +25,7 @@ type Config struct {
 	JWT        JWTConfig
 	Federation FederationConfig
 	Worker     WorkerConfig
+	Bot        BotConfig
 }
 
 // DatabaseConfig holds database-related configuration
@@ -67,6 +68,11 @@ type WorkerConfig struct {
 	CircuitFailureThreshold   int
 }
 
+// BotConfig holds configuration for the Split AI reply bot
+type BotConfig struct {
+	ApiKey string
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -99,6 +105,9 @@ func Load() *Config {
 			CircuitCooldownSeconds:    getEnvAsInt("WORKER_CIRCUIT_COOLDOWN_SECONDS", 300),
 			MaxRetryCount:             getEnvAsInt("WORKER_MAX_RETRY_COUNT", 6),
 			CircuitFailureThreshold:   getEnvAsInt("WORKER_CIRCUIT_FAILURE_THRESHOLD", 5),
+		},
+		Bot: BotConfig{
+			ApiKey: getEnv("SPLIT_BOT_API_KEY", ""), // Or GROK_API_KEY if they rename it later
 		},
 	}
 }

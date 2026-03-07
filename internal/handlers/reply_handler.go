@@ -3,8 +3,10 @@ package handlers
 import (
 	"net/http"
 
+	"splitter/internal/config"
 	"splitter/internal/models"
 	"splitter/internal/repository"
+	"splitter/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -12,12 +14,14 @@ import (
 type ReplyHandler struct {
 	Repo     *repository.ReplyRepository
 	PostRepo *repository.PostRepository
+	cfg      *config.Config
 }
 
-func NewReplyHandler() *ReplyHandler {
+func NewReplyHandler(cfg *config.Config) *ReplyHandler {
 	return &ReplyHandler{
 		Repo:     repository.NewReplyRepository(),
 		PostRepo: repository.NewPostRepository(),
+		cfg:      cfg,
 	}
 }
 
@@ -78,6 +82,9 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create reply"})
 	}
+
+	// Trigger AI bot if mentioned
+	service.CheckAndHandleSplitBot(reply.Content, req.PostID, &reply.ID, h.cfg, h.Repo)
 
 	return c.JSON(http.StatusCreated, reply)
 }
