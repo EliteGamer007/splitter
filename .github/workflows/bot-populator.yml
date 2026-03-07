@@ -40,4 +40,5 @@ jobs:
           SPLITTER_INSTANCE_1_URL: ${{ vars.SPLITTER_INSTANCE_1_URL || 'https://splitter-m0kv.onrender.com' }}
           SPLITTER_INSTANCE_2_URL: ${{ vars.SPLITTER_INSTANCE_2_URL || 'https://splitter-2.onrender.com' }}
           BOT_MODE: ${{ github.event.inputs.mode || 'drip' }}
+          PYTHONUNBUFFERED: "1"
         run: python scripts/bots/populate.py
