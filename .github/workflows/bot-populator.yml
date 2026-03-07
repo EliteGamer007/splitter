@@ -20,6 +20,9 @@ jobs:
   populate:
     runs-on: ubuntu-latest
     timeout-minutes: 360  # 6 hours max for seed mode
+    concurrency:
+      group: py-bot-populator
+      cancel-in-progress: false # Queue it or skip it, don't overlap
 
     steps:
       - name: Checkout repository

@@ -546,10 +546,13 @@ def run_drip_mode(tokens: dict):
     failed = 0
     shuffled = list(BOT_PROFILES)
     random.shuffle(shuffled)
+    
+    # Process only 15 bots per drip run to ensure it finishes well under 15 minutes without overlapping
+    selected_bots = shuffled[:15]
 
-    print(f"\nDRIP MODE: Posting 1 per bot ({len(tokens)} bots)\n")
+    print(f"\nDRIP MODE: Posting for a random subset of {len(selected_bots)} bots (out of {len(tokens)})\n")
 
-    for bot in shuffled:
+    for bot in selected_bots:
         token = tokens.get(bot["username"])
         if not token:
             continue
