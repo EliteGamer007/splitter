@@ -133,7 +133,7 @@ func (r *ReplyRepository) GetByPostID(ctx context.Context, postID string, userDI
 		query = `
 			SELECT r.id, r.post_id, r.parent_id, r.author_did, r.content, r.depth,
 			       r.likes_count, r.direct_reply_count, r.total_reply_count, r.created_at, r.updated_at,
-			       u.username,
+			       COALESCE(u.username, 'unknown'),
 			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = r.id AND actor_did = $2 AND interaction_type = 'like'), false) as liked
 			FROM replies r
 			LEFT JOIN users u ON r.author_did = u.did
@@ -145,7 +145,7 @@ func (r *ReplyRepository) GetByPostID(ctx context.Context, postID string, userDI
 		query = `
 			SELECT r.id, r.post_id, r.parent_id, r.author_did, r.content, r.depth,
 			       r.likes_count, r.direct_reply_count, r.total_reply_count, r.created_at, r.updated_at,
-			       u.username,
+			       COALESCE(u.username, 'unknown'),
 			       false as liked
 			FROM replies r
 			LEFT JOIN users u ON r.author_did = u.did
