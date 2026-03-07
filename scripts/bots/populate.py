@@ -43,10 +43,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Tech #Coding #WebDev #OpenSource #AI #Python #GoLang #JavaScript #DevLife #Programming",
         "prompt": "Write a short casual social media post (1-3 sentences) about software development, programming, or tech news. Include 2-3 hashtags from: {hashtags}. Sound like a real person.",
         "names": [
-            ("techie_tara", "Tara | Tech & Code", "Full-stack dev. Open source enthusiast. Coffee-powered."),
-            ("dev_derek", "Derek | Developer", "Backend engineer. API design nerd. Rust curious."),
-            ("code_clara", "Clara | Code Daily", "Self-taught coder. Python lover. Building side projects."),
-            ("hack_hugo", "Hugo | Hacker News", "Compiler enthusiast. Linux sysadmin. Opinions on everything."),
+            ("techie_tara", "Tara", "Full-stack dev. Open source enthusiast. Coffee-powered."),
+            ("dev_derek", "Derek", "Backend engineer. API design nerd. Rust curious."),
+            ("code_clara", "Clara", "Self-taught coder. Python lover. Building side projects."),
+            ("hack_hugo", "Hugo", "Compiler enthusiast. Linux sysadmin. Opinions on everything."),
         ],
     },
     {
@@ -54,10 +54,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Sports #Football #Basketball #F1 #Cricket #GameDay #Athlete #TeamWork #Championship #Fitness",
         "prompt": "Write a short casual social media post (1-3 sentences) about sports — football, basketball, F1, cricket, or fitness. Include 2-3 hashtags from: {hashtags}. Sound like a passionate fan.",
         "names": [
-            ("sports_sam", "Sam | Sports Fan", "Living for game day. Hot takes guaranteed."),
-            ("goal_guru", "Guru | Football", "Premier League obsessed. Fantasy football addict."),
-            ("hoop_hana", "Hana | Hoops", "Basketball is life. WNBA supporter."),
-            ("lap_liam", "Liam | F1 Fan", "F1 addict. Data-driven race analysis."),
+            ("sports_sam", "Sam", "Living for game day. Hot takes guaranteed."),
+            ("goal_guru", "Guru", "Premier League obsessed. Fantasy football addict."),
+            ("hoop_hana", "Hana", "Basketball is life. WNBA supporter."),
+            ("lap_liam", "Liam", "F1 addict. Data-driven race analysis."),
         ],
     },
     {
@@ -65,10 +65,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Foodie #Cooking #Travel #Recipe #Yummy #Restaurant #FoodPhotography #Wanderlust #StreetFood #HomeCooking",
         "prompt": "Write a short casual social media post (1-3 sentences) about food, cooking, or restaurants. Include 2-3 hashtags from: {hashtags}. Sound like a food lover.",
         "names": [
-            ("foodie_fiona", "Fiona | Food & Travel", "Eating my way through the world one city at a time."),
-            ("chef_chen", "Chen | Home Chef", "Wok master. Noodle whisperer."),
-            ("bake_bella", "Bella | Baker", "Sourdough starter named Kevin. Pastry perfectionist."),
-            ("taco_tony", "Tony | Street Eats", "Tacos are a personality trait. Food truck hunter."),
+            ("foodie_fiona", "Fiona", "Eating my way through the world one city at a time."),
+            ("chef_chen", "Chen", "Wok master. Noodle whisperer."),
+            ("bake_bella", "Bella", "Sourdough starter named Kevin. Pastry perfectionist."),
+            ("taco_tony", "Tony", "Tacos are a personality trait. Food truck hunter."),
         ],
     },
     {
@@ -76,10 +76,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Music #NowPlaying #Concert #DJ #Playlist #NewMusic #HipHop #Rock #EDM #Vibes",
         "prompt": "Write a short casual social media post (1-3 sentences) about music, concerts, or playlists. Include 2-3 hashtags from: {hashtags}. Sound like a real music fan.",
         "names": [
-            ("music_mike", "Mike | Music & Vibes", "If it has a beat I'm in. DJ on weekends."),
-            ("vinyl_vera", "Vera | Vinyl", "Record collector. Analog soul in a digital world."),
-            ("beat_bobby", "Bobby | Beatmaker", "Producing beats in my bedroom. Lo-fi is a lifestyle."),
-            ("riff_rosa", "Rosa | Rock", "Guitar player. 90s grunge enthusiast. Volume to 11."),
+            ("music_mike", "Mike", "If it has a beat I'm in. DJ on weekends."),
+            ("vinyl_vera", "Vera", "Record collector. Analog soul in a digital world."),
+            ("beat_bobby", "Bobby", "Producing beats in my bedroom. Lo-fi is a lifestyle."),
+            ("riff_rosa", "Rosa", "Guitar player. 90s grunge enthusiast. Volume to 11."),
         ],
     },
     {
@@ -87,10 +87,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Gaming #PCGaming #RPG #Streaming #Esports #GamerLife #IndieGames #PlayStation #Nintendo #GameReview",
         "prompt": "Write a short casual social media post (1-3 sentences) about video games, streaming, or esports. Include 2-3 hashtags from: {hashtags}. Sound like a real gamer.",
         "names": [
-            ("gamer_grace", "Grace | Gamer", "PC gamer. RPG addict. Streaming sometimes."),
-            ("pixel_pat", "Pat | Pixel Art", "Retro games forever. SNES > everything."),
-            ("stream_stella", "Stella | Streamer", "Twitch affiliate. Horror game specialist."),
-            ("fps_felix", "Felix | FPS Pro", "Ranked grinder. Aim training daily."),
+            ("gamer_grace", "Grace", "PC gamer. RPG addict. Streaming sometimes."),
+            ("pixel_pat", "Pat", "Retro games forever. SNES > everything."),
+            ("stream_stella", "Stella", "Twitch affiliate. Horror game specialist."),
+            ("fps_felix", "Felix", "Ranked grinder. Aim training daily."),
         ],
     },
     {
@@ -98,10 +98,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Fitness #Gym #Health #Workout #Nutrition #GymLife #HealthyLiving #Gains #Cardio #MealPrep",
         "prompt": "Write a short casual social media post (1-3 sentences) about fitness, workouts, or nutrition. Include 2-3 hashtags from: {hashtags}. Sound like a gym-goer.",
         "names": [
-            ("fitness_frank", "Frank | Fitness", "Gym 6 days a week. Sharing what works."),
-            ("run_riley", "Riley | Runner", "Marathon finisher x3. Chasing PRs."),
-            ("yoga_yuki", "Yuki | Yoga", "Yoga teacher. Breathwork advocate. Inner peace dealer."),
-            ("lift_luna", "Luna | Powerlifter", "Deadlift PR chaser. Strong is beautiful."),
+            ("fitness_frank", "Frank", "Gym 6 days a week. Sharing what works."),
+            ("run_riley", "Riley", "Marathon finisher x3. Chasing PRs."),
+            ("yoga_yuki", "Yuki", "Yoga teacher. Breathwork advocate. Inner peace dealer."),
+            ("lift_luna", "Luna", "Deadlift PR chaser. Strong is beautiful."),
         ],
     },
     {
@@ -109,10 +109,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Art #Design #Illustration #DigitalArt #Creative #ArtLife #Drawing #GraphicDesign #Sketch #Aesthetic",
         "prompt": "Write a short casual social media post (1-3 sentences) about art, illustration, or design. Include 2-3 hashtags from: {hashtags}. Sound like a real artist.",
         "names": [
-            ("art_anna", "Anna | Art & Design", "Digital artist. Color is my language."),
-            ("sketch_suki", "Suki | Sketcher", "Pen and ink daily. Urban sketching addict."),
-            ("ux_uma", "Uma | UX Design", "Designing interfaces. Obsessed with whitespace."),
-            ("paint_pablo", "Pablo | Painter", "Oil on canvas. Impressionism with a modern twist."),
+            ("art_anna", "Anna", "Digital artist. Color is my language."),
+            ("sketch_suki", "Suki", "Pen and ink daily. Urban sketching addict."),
+            ("ux_uma", "Uma", "Designing interfaces. Obsessed with whitespace."),
+            ("paint_pablo", "Pablo", "Oil on canvas. Impressionism with a modern twist."),
         ],
     },
     {
@@ -120,10 +120,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#News #Breaking #WorldNews #Opinion #Economy #Politics #Trending #Discussion #Today #HotTake",
         "prompt": "Write a short casual social media post (1-3 sentences) sharing a fictional opinion about current events or economics. Include 2-3 hashtags from: {hashtags}. Sound like a regular person.",
         "names": [
-            ("news_nick", "Nick | News & Opinions", "Following the world so you don't have to."),
-            ("take_tina", "Tina | Hot Takes", "Opinions nobody asked for. You're welcome."),
-            ("pulse_priya", "Priya | World Pulse", "Geopolitics nerd. Coffee and headlines."),
-            ("econ_eli", "Eli | Economics", "Supply and demand explain everything."),
+            ("news_nick", "Nick", "Following the world so you don't have to."),
+            ("take_tina", "Tina", "Opinions nobody asked for. You're welcome."),
+            ("pulse_priya", "Priya", "Geopolitics nerd. Coffee and headlines."),
+            ("econ_eli", "Eli", "Supply and demand explain everything."),
         ],
     },
     {
@@ -131,10 +131,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Movies #TVShows #Netflix #Cinema #FilmReview #Binge #Streaming #Hollywood #SciFi #Drama",
         "prompt": "Write a short casual social media post (1-3 sentences) about movies or TV shows. Include 2-3 hashtags from: {hashtags}. Sound like someone who just watched something.",
         "names": [
-            ("movie_maria", "Maria | Movies & TV", "Binge-watcher. Film critic in my own head."),
-            ("screen_scott", "Scott | Screenwriter", "Writing scripts nobody will read. Loving it."),
-            ("series_sana", "Sana | SeriesAddict", "Currently watching 7 shows. Help."),
-            ("horror_hank", "Hank | Horror Fan", "Jump scares don't work on me anymore."),
+            ("movie_maria", "Maria", "Binge-watcher. Film critic in my own head."),
+            ("screen_scott", "Scott", "Writing scripts nobody will read. Loving it."),
+            ("series_sana", "Sana", "Currently watching 7 shows. Help."),
+            ("horror_hank", "Hank", "Jump scares don't work on me anymore."),
         ],
     },
     {
@@ -142,10 +142,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Science #Space #Physics #Biology #Research #NASA #STEM #ScienceFacts #Universe #Innovation",
         "prompt": "Write a short casual social media post (1-3 sentences) about science or space. Include 2-3 hashtags from: {hashtags}. Sound enthusiastic and accessible.",
         "names": [
-            ("science_sara", "Sara | Science & Space", "Astrophysics grad. Space nerd."),
-            ("lab_leo", "Leo | Lab Rat", "Biochemist by day. Science memer by night."),
-            ("astro_amara", "Amara | Astronomer", "Telescope in the backyard. Jupiter is my neighbor."),
-            ("bio_benny", "Benny | Biology", "Microbiome enthusiast. Bacteria are friends."),
+            ("science_sara", "Sara", "Astrophysics grad. Space nerd."),
+            ("lab_leo", "Leo", "Biochemist by day. Science memer by night."),
+            ("astro_amara", "Amara", "Telescope in the backyard. Jupiter is my neighbor."),
+            ("bio_benny", "Benny", "Microbiome enthusiast. Bacteria are friends."),
         ],
     },
     {
@@ -153,10 +153,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Crypto #Bitcoin #Blockchain #DeFi #Finance #Investing #Web3 #Ethereum #Trading #HODL",
         "prompt": "Write a short casual social media post (1-3 sentences) about crypto, blockchain, or finance. Include 2-3 hashtags from: {hashtags}. Sound like a regular enthusiast.",
         "names": [
-            ("crypto_carl", "Carl | Crypto", "DeFi maximalist. Not financial advice."),
-            ("chain_charlie", "Charlie | Blockchain", "Building on-chain. Smart contracts are art."),
-            ("trade_tracy", "Tracy | Trader", "Charts and candles. Day trading diary."),
-            ("nft_nadia", "Nadia | Web3", "NFTs, DAOs, and the decentralized future."),
+            ("crypto_carl", "Carl", "DeFi maximalist. Not financial advice."),
+            ("chain_charlie", "Charlie", "Building on-chain. Smart contracts are art."),
+            ("trade_tracy", "Tracy", "Charts and candles. Day trading diary."),
+            ("nft_nadia", "Nadia", "NFTs, DAOs, and the decentralized future."),
         ],
     },
     {
@@ -164,10 +164,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Books #Reading #Writing #BookReview #Fiction #Literature #Bookworm #AmReading #AuthorLife #Library",
         "prompt": "Write a short casual social media post (1-3 sentences) about books or reading. Include 2-3 hashtags from: {hashtags}. Sound like someone who loves books.",
         "names": [
-            ("book_betty", "Betty | Books", "Reader. Writer. Library card collector."),
-            ("page_peter", "Peter | PageTurner", "One more chapter. Always one more chapter."),
-            ("story_su", "Su | Storyteller", "Writing fiction between deadlines."),
-            ("lit_lara", "Lara | Literature", "Classic lit defender. Tolstoy stan."),
+            ("book_betty", "Betty", "Reader. Writer. Library card collector."),
+            ("page_peter", "Peter", "One more chapter. Always one more chapter."),
+            ("story_su", "Su", "Writing fiction between deadlines."),
+            ("lit_lara", "Lara", "Classic lit defender. Tolstoy stan."),
         ],
     },
     {
@@ -175,10 +175,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Pets #DogsOfSplitter #CatsOfSplitter #Animals #Wildlife #PetLife #DogLover #CatLover #Cute #Adopt",
         "prompt": "Write a short casual social media post (1-3 sentences) about pets or animals. Include 2-3 hashtags from: {hashtags}. Sound like someone who adores their pets.",
         "names": [
-            ("pet_paul", "Paul | Pets", "Dog dad x3. Wildlife photographer."),
-            ("paws_penny", "Penny | Paws", "Rescue advocate. 2 dogs 1 cat household."),
-            ("meow_mia", "Mia | Cat Mom", "My cat runs this house. I just pay rent."),
-            ("bark_boris", "Boris | Dog Life", "Golden retriever energy in human form."),
+            ("pet_paul", "Paul", "Dog dad x3. Wildlife photographer."),
+            ("paws_penny", "Penny", "Rescue advocate. 2 dogs 1 cat household."),
+            ("meow_mia", "Mia", "My cat runs this house. I just pay rent."),
+            ("bark_boris", "Boris", "Golden retriever energy in human form."),
         ],
     },
     {
@@ -186,10 +186,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Startup #Entrepreneur #Business #SaaS #Productivity #BuildInPublic #Hustle #Growth #Founder #MVP",
         "prompt": "Write a short casual social media post (1-3 sentences) about startups or entrepreneurship. Include 2-3 hashtags from: {hashtags}. Sound like a real founder.",
         "names": [
-            ("startup_steve", "Steve | Startups", "Serial entrepreneur. Building in public."),
-            ("saas_sarah", "Sarah | SaaS", "Building B2B tools. MRR is the scoreboard."),
-            ("pitch_pete", "Pete | Pitch Deck", "Investor relations. Startup ecosystem guru."),
-            ("grow_gina", "Gina | Growth", "Growth hacker. A/B test everything."),
+            ("startup_steve", "Steve", "Serial entrepreneur. Building in public."),
+            ("saas_sarah", "Sarah", "Building B2B tools. MRR is the scoreboard."),
+            ("pitch_pete", "Pete", "Investor relations. Startup ecosystem guru."),
+            ("grow_gina", "Gina", "Growth hacker. A/B test everything."),
         ],
     },
     {
@@ -197,10 +197,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Memes #Funny #Humor #LOL #Viral #InternetCulture #Relatable #Jokes #Mood #TooReal",
         "prompt": "Write a short funny or sarcastic social media post (1-2 sentences) about daily life or internet culture. Include 2-3 hashtags from: {hashtags}. Be genuinely witty.",
         "names": [
-            ("meme_lord_max", "Max | Memes", "Professional time waster. Internet historian."),
-            ("lol_lisa", "Lisa | LOL", "Turning my anxiety into comedy gold."),
-            ("joke_jake", "Jake | Jokes", "Dad joke dealer. No refunds."),
-            ("vibe_check", "Vibe | Check", "Failed the vibe check and proud of it."),
+            ("meme_lord_max", "Max", "Professional time waster. Internet historian."),
+            ("lol_lisa", "Lisa", "Turning my anxiety into comedy gold."),
+            ("joke_jake", "Jake", "Dad joke dealer. No refunds."),
+            ("vibe_check", "Vibe", "Failed the vibe check and proud of it."),
         ],
     },
     {
@@ -208,10 +208,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Environment #Climate #Sustainability #Nature #GoGreen #EcoFriendly #ClimateAction #ZeroWaste #Planet #Trees",
         "prompt": "Write a short casual social media post (1-3 sentences) about sustainability or nature. Include 2-3 hashtags from: {hashtags}. Sound passionate but not preachy.",
         "names": [
-            ("eco_emma", "Emma | Environment", "Climate activist. Zero-waste journey."),
-            ("green_greg", "Greg | GoGreen", "Solar panels on the roof. Compost in the yard."),
-            ("tree_tasha", "Tasha | TreeHugger", "Planted 200 trees this year. Not stopping."),
-            ("ocean_omar", "Omar | OceanLover", "Beach cleanups every Saturday. Surf the rest."),
+            ("eco_emma", "Emma", "Climate activist. Zero-waste journey."),
+            ("green_greg", "Greg", "Solar panels on the roof. Compost in the yard."),
+            ("tree_tasha", "Tasha", "Planted 200 trees this year. Not stopping."),
+            ("ocean_omar", "Omar", "Beach cleanups every Saturday. Surf the rest."),
         ],
     },
     {
@@ -219,10 +219,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Photography #PhotoOfTheDay #Landscape #StreetPhotography #Camera #GoldenHour #Lightroom #NaturePhotography #Portrait #Shutterbug",
         "prompt": "Write a short casual social media post (1-3 sentences) about photography. Include 2-3 hashtags from: {hashtags}. Sound like a photographer.",
         "names": [
-            ("photo_pete", "Pete | Photography", "Chasing golden hour. Street & landscape."),
-            ("lens_leah", "Leah | Lens", "Mirrorless convert. 35mm everything."),
-            ("snap_sid", "Sid | Snapshots", "Phone photography can be art too."),
-            ("focus_fran", "Fran | Focus", "Portrait specialist. Bokeh obsessed."),
+            ("photo_pete", "Pete", "Chasing golden hour. Street & landscape."),
+            ("lens_leah", "Leah", "Mirrorless convert. 35mm everything."),
+            ("snap_sid", "Sid", "Phone photography can be art too."),
+            ("focus_fran", "Fran", "Portrait specialist. Bokeh obsessed."),
         ],
     },
     {
@@ -230,10 +230,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Education #Learning #Teaching #Students #EdTech #OnlineLearning #Knowledge #StudyTips #Teacher #MOOC",
         "prompt": "Write a short casual social media post (1-3 sentences) about education or learning. Include 2-3 hashtags from: {hashtags}. Sound like an educator or student.",
         "names": [
-            ("edu_elena", "Elena | Education", "Teacher by day. Lifelong learner always."),
-            ("study_stan", "Stan | StudyGram", "Finals week is a lifestyle. Not a good one."),
-            ("prof_pam", "Pam | Professor", "Research papers and red pens."),
-            ("learn_lenny", "Lenny | Learner", "Online courses addict. 47 certificates."),
+            ("edu_elena", "Elena", "Teacher by day. Lifelong learner always."),
+            ("study_stan", "Stan", "Finals week is a lifestyle. Not a good one."),
+            ("prof_pam", "Pam", "Research papers and red pens."),
+            ("learn_lenny", "Lenny", "Online courses addict. 47 certificates."),
         ],
     },
     {
@@ -241,10 +241,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Fashion #Style #OOTD #Thrifting #Trends #StreetStyle #Outfit #FashionInspo #Wardrobe #Vintage",
         "prompt": "Write a short casual social media post (1-3 sentences) about fashion or style. Include 2-3 hashtags from: {hashtags}. Sound like someone sharing their style.",
         "names": [
-            ("fashion_faye", "Faye | Fashion", "Thrift queen. Street style diary."),
-            ("drip_drew", "Drew | Drip", "Sneakerhead. Streetwear collector."),
-            ("chic_chloe", "Chloe | Chic", "Minimalist wardrobe. Maximum impact."),
-            ("retro_ray", "Ray | Retro", "Vintage fits only. Born in the wrong decade."),
+            ("fashion_faye", "Faye", "Thrift queen. Street style diary."),
+            ("drip_drew", "Drew", "Sneakerhead. Streetwear collector."),
+            ("chic_chloe", "Chloe", "Minimalist wardrobe. Maximum impact."),
+            ("retro_ray", "Ray", "Vintage fits only. Born in the wrong decade."),
         ],
     },
     {
@@ -252,10 +252,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#DIY #Crafts #Maker #Woodworking #Electronics #Handmade #BuildStuff #Upcycle #Workshop #Create",
         "prompt": "Write a short casual social media post (1-3 sentences) about DIY projects or crafting. Include 2-3 hashtags from: {hashtags}. Sound like a maker.",
         "names": [
-            ("diy_dana", "Dana | DIY", "If I can build it, I will."),
-            ("maker_matt", "Matt | Maker", "3D printer goes brrr. Arduino projects weekly."),
-            ("craft_cora", "Cora | Crafts", "Knitting, sewing, and chaos."),
-            ("fix_finn", "Finn | FixIt", "Right to repair advocate. Fixed 3 things today."),
+            ("diy_dana", "Dana", "If I can build it, I will."),
+            ("maker_matt", "Matt", "3D printer goes brrr. Arduino projects weekly."),
+            ("craft_cora", "Cora", "Knitting, sewing, and chaos."),
+            ("fix_finn", "Finn", "Right to repair advocate. Fixed 3 things today."),
         ],
     },
     {
@@ -263,10 +263,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Travel #Wanderlust #Adventure #Backpacking #TravelPhotography #Explore #Vacation #WorldTravel #Nomad #RoadTrip",
         "prompt": "Write a short casual social media post (1-3 sentences) about travel or adventure. Include 2-3 hashtags from: {hashtags}. Sound like a traveler.",
         "names": [
-            ("travel_tom", "Tom | Traveler", "40 countries and counting. Passport always ready."),
-            ("nomad_nina", "Nina | Digital Nomad", "Working from Bali. Wifi is my lifeline."),
-            ("trek_tim", "Tim | Trekker", "Mountain trails on weekends. Office trails on weekdays."),
-            ("wander_wendy", "Wendy | Wanderer", "Solo traveler. Hostel hopper. Story collector."),
+            ("travel_tom", "Tom", "40 countries and counting. Passport always ready."),
+            ("nomad_nina", "Nina", "Working from Bali. Wifi is my lifeline."),
+            ("trek_tim", "Tim", "Mountain trails on weekends. Office trails on weekdays."),
+            ("wander_wendy", "Wendy", "Solo traveler. Hostel hopper. Story collector."),
         ],
     },
     {
@@ -274,10 +274,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#MentalHealth #Wellbeing #SelfCare #Mindfulness #Anxiety #Therapy #Wellness #Healing #MindBody #BeKind",
         "prompt": "Write a short supportive social media post (1-3 sentences) about mental health or self-care. Include 2-3 hashtags from: {hashtags}. Sound genuine and warm.",
         "names": [
-            ("mind_maya", "Maya | Mental Health", "Therapy advocate. It's okay to not be okay."),
-            ("calm_cam", "Cam | Calm", "Meditation daily. Journaling nightly."),
-            ("heal_helen", "Helen | Healing", "Recovery is not linear. Keep going."),
-            ("zen_zara", "Zara | Zen", "Breathe in. Breathe out. Repeat."),
+            ("mind_maya", "Maya", "Therapy advocate. It's okay to not be okay."),
+            ("calm_cam", "Cam", "Meditation daily. Journaling nightly."),
+            ("heal_helen", "Helen", "Recovery is not linear. Keep going."),
+            ("zen_zara", "Zara", "Breathe in. Breathe out. Repeat."),
         ],
     },
     {
@@ -285,10 +285,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Cars #Automotive #EV #Tesla #CarLife #Mechanic #Racing #CarMod #Supercar #Garage",
         "prompt": "Write a short casual social media post (1-3 sentences) about cars, EVs, or automotive culture. Include 2-3 hashtags from: {hashtags}. Sound like a car enthusiast.",
         "names": [
-            ("auto_alex", "Alex | Automotive", "Gearhead since birth. JDM forever."),
-            ("ev_eva", "Eva | Electric", "EV convert. Range anxiety is real tho."),
-            ("turbo_tyler", "Tyler | Turbo", "Turbocharged everything. Boost is life."),
-            ("garage_gabe", "Gabe | Garage", "Weekend mechanic. Oil-stained and happy."),
+            ("auto_alex", "Alex", "Gearhead since birth. JDM forever."),
+            ("ev_eva", "Eva", "EV convert. Range anxiety is real tho."),
+            ("turbo_tyler", "Tyler", "Turbocharged everything. Boost is life."),
+            ("garage_gabe", "Gabe", "Weekend mechanic. Oil-stained and happy."),
         ],
     },
     {
@@ -296,10 +296,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#History #HistoryFacts #Ancient #Medieval #WorldHistory #OnThisDay #Heritage #HistoryBuff #Archaeology #Museum",
         "prompt": "Write a short casual social media post (1-3 sentences) sharing an interesting (fictional) history fact or opinion. Include 2-3 hashtags from: {hashtags}. Sound like a history enthusiast.",
         "names": [
-            ("hist_hector", "Hector | History", "History doesn't repeat but it rhymes."),
-            ("past_patty", "Patty | ThePast", "Medieval history enthusiast. Castles are my thing."),
-            ("era_eric", "Eric | Eras", "Ancient Rome could have had wi-fi. Probably."),
-            ("relic_ruth", "Ruth | Relics", "Museum visits every month. Archaeology nerd."),
+            ("hist_hector", "Hector", "History doesn't repeat but it rhymes."),
+            ("past_patty", "Patty", "Medieval history enthusiast. Castles are my thing."),
+            ("era_eric", "Eric", "Ancient Rome could have had wi-fi. Probably."),
+            ("relic_ruth", "Ruth", "Museum visits every month. Archaeology nerd."),
         ],
     },
     {
@@ -307,10 +307,10 @@ TOPIC_TEMPLATES = [
         "hashtags": "#Anime #Manga #Otaku #Weeb #AnimeFan #JapanCulture #Cosplay #AnimeMemes #Shonen #StudioGhibli",
         "prompt": "Write a short casual social media post (1-3 sentences) about anime, manga, or Japanese pop culture. Include 2-3 hashtags from: {hashtags}. Sound like a real anime fan.",
         "names": [
-            ("anime_aki", "Aki | Anime", "Seasonal anime tracker. MyAnimeList is my diary."),
-            ("manga_mei", "Mei | Manga", "Physical manga collector. Shelf space is a myth."),
-            ("cosplay_kai", "Kai | Cosplay", "Convention season is my Super Bowl."),
-            ("otaku_ollie", "Ollie | Otaku", "Studio Ghibli marathons heal the soul."),
+            ("anime_aki", "Aki", "Seasonal anime tracker. MyAnimeList is my diary."),
+            ("manga_mei", "Mei", "Physical manga collector. Shelf space is a myth."),
+            ("cosplay_kai", "Kai", "Convention season is my Super Bowl."),
+            ("otaku_ollie", "Ollie", "Studio Ghibli marathons heal the soul."),
         ],
     },
 ]
