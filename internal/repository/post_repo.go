@@ -602,3 +602,198 @@ func (r *PostRepository) GetFederationMeta(ctx context.Context, postID string) (
 
 	return &meta, nil
 }
+
+// TrendingHashtag represents a hashtag with its post count
+type TrendingHashtag struct {
+	Tag   string `json:"tag"`
+	Count int    `json:"count"`
+}
+
+// GetTrendingHashtags returns the most used hashtags from the last 24 hours
+func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]TrendingHashtag, error) {
+	query := `
+		SELECT tag, COUNT(*) as cnt
+		FROM (
+			SELECT LOWER(match[1]) as tag
+			FROM posts,
+			     LATERAL regexp_matches(content, '#([A-Za-z0-9_]+)', 'g') AS match
+			WHERE deleted_at IS NULL
+			  AND created_at > NOW() - INTERVAL '24 hours'
+			  AND visibility = 'public'
+			  AND (expires_at IS NULL OR expires_at > NOW())
+		) hashtags
+		GROUP BY tag
+		ORDER BY cnt DESC, tag ASC
+		LIMIT $1
+	`
+
+	rows, err := db.GetDB().Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get trending hashtags: %w", err)
+	}
+	defer rows.Close()
+
+	var trending []TrendingHashtag
+	for rows.Next() {
+		var h TrendingHashtag
+		if err := rows.Scan(&h.Tag, &h.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan trending hashtag: %w", err)
+		}
+		trending = append(trending, h)
+	}
+
+	if trending == nil {
+		trending = []TrendingHashtag{}
+	}
+
+	return trending, nil
+}
+
+// GetPostsByHashtag returns posts containing a specific hashtag
+func (r *PostRepository) GetPostsByHashtag(ctx context.Context, tag string, userDID string, limit, offset int) ([]*models.Post, error) {
+	pattern := `#` + tag + `\b`
+
+	var query string
+	var args []interface{}
+
+	if userDID != "" {
+		query = `
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+			       p.created_at, p.updated_at, p.expires_at,
+			       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'like'), false) as liked_by_user,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
+			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = p.id AND actor_did = $1 AND interaction_type = 'repost'), false) as reposted_by_user,
+			       p.direct_reply_count, p.total_reply_count,
+			       m.id, m.media_url, m.media_type, m.created_at
+			FROM posts p
+			LEFT JOIN users u ON p.author_did = u.did
+			LEFT JOIN media m ON p.id = m.post_id
+			WHERE p.content ~* $2
+			  AND p.deleted_at IS NULL
+			  AND p.visibility = 'public'
+			  AND (p.expires_at IS NULL OR p.expires_at > NOW())
+			ORDER BY p.created_at DESC
+			LIMIT $3 OFFSET $4
+		`
+		args = []interface{}{userDID, pattern, limit, offset}
+	} else {
+		query = `
+			SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
+			       p.created_at, p.updated_at, p.expires_at,
+			       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
+			       false as liked_by_user,
+			       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'repost'), 0) as repost_count,
+			       false as reposted_by_user,
+			       p.direct_reply_count, p.total_reply_count,
+			       m.id, m.media_url, m.media_type, m.created_at
+			FROM posts p
+			LEFT JOIN users u ON p.author_did = u.did
+			LEFT JOIN media m ON p.id = m.post_id
+			WHERE p.content ~* $1
+			  AND p.deleted_at IS NULL
+			  AND p.visibility = 'public'
+			  AND (p.expires_at IS NULL OR p.expires_at > NOW())
+			ORDER BY p.created_at DESC
+			LIMIT $2 OFFSET $3
+		`
+		args = []interface{}{pattern, limit, offset}
+	}
+
+	rows, err := db.GetDB().Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get posts by hashtag: %w", err)
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		var post models.Post
+		var mediaID, mediaURL, mediaType *string
+		var mediaCreatedAt *time.Time
+
+		if err := rows.Scan(
+			&post.ID,
+			&post.AuthorDID,
+			&post.Content,
+			&post.Visibility,
+			&post.IsRemote,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&post.ExpiresAt,
+			&post.Username,
+			&post.AvatarURL,
+			&post.LikeCount,
+			&post.Liked,
+			&post.RepostCount,
+			&post.Reposted,
+			&post.DirectReplyCount,
+			&post.TotalReplyCount,
+			&mediaID,
+			&mediaURL,
+			&mediaType,
+			&mediaCreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan post: %w", err)
+		}
+		if mediaID != nil {
+			post.Media = []models.Media{{
+				ID:        *mediaID,
+				PostID:    post.ID,
+				MediaURL:  *mediaURL,
+				MediaType: *mediaType,
+				CreatedAt: *mediaCreatedAt,
+			}}
+		}
+		posts = append(posts, &post)
+	}
+
+	if posts == nil {
+		posts = []*models.Post{}
+	}
+
+	return posts, nil
+}
+
+// SearchHashtags searches for hashtags matching a query
+func (r *PostRepository) SearchHashtags(ctx context.Context, query string, limit int) ([]TrendingHashtag, error) {
+	sqlQuery := `
+		SELECT tag, COUNT(*) as cnt
+		FROM (
+			SELECT LOWER(match[1]) as tag
+			FROM posts,
+			     LATERAL regexp_matches(content, '#([A-Za-z0-9_]+)', 'g') AS match
+			WHERE deleted_at IS NULL
+			  AND visibility = 'public'
+			  AND (expires_at IS NULL OR expires_at > NOW())
+		) hashtags
+		WHERE tag ILIKE $1
+		GROUP BY tag
+		ORDER BY cnt DESC, tag ASC
+		LIMIT $2
+	`
+
+	searchPattern := "%" + query + "%"
+	rows, err := db.GetDB().Query(ctx, sqlQuery, searchPattern, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search hashtags: %w", err)
+	}
+	defer rows.Close()
+
+	var results []TrendingHashtag
+	for rows.Next() {
+		var h TrendingHashtag
+		if err := rows.Scan(&h.Tag, &h.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan hashtag: %w", err)
+		}
+		results = append(results, h)
+	}
+
+	if results == nil {
+		results = []TrendingHashtag{}
+	}
+
+	return results, nil
+}

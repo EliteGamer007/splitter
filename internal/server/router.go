@@ -44,6 +44,7 @@ func NewServer(cfg *config.Config) *Server {
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler(cfg)
+	hashtagHandler := handlers.NewHashtagHandler(postRepo)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)
@@ -90,7 +91,7 @@ func NewServer(cfg *config.Config) *Server {
 	e.Static("/uploads", "uploads")
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, hashtagHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
 
 	return &Server{
 		echo: e,
@@ -111,6 +112,7 @@ func setupRoutes(
 	adminHandler *handlers.AdminHandler,
 	messageHandler *handlers.MessageHandler,
 	replyHandler *handlers.ReplyHandler,
+	hashtagHandler *handlers.HashtagHandler,
 	webfingerHandler *handlers.WebFingerHandler,
 	actorHandler *handlers.ActorHandler,
 	inboxHandler *handlers.InboxHandler,
@@ -212,6 +214,13 @@ func setupRoutes(
 
 	// Replies
 	posts.GET("/:id/replies", replyHandler.GetReplies)
+
+	// Hashtag routes (public, with optional auth for user context)
+	hashtags := api.Group("/hashtags")
+	hashtags.Use(middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
+	hashtags.GET("/trending", hashtagHandler.GetTrendingHashtags)
+	hashtags.GET("/search", hashtagHandler.SearchHashtags)
+	hashtags.GET("/tag/:tag", hashtagHandler.GetPostsByHashtag)
 
 	// Search users (authenticated)
 	usersAuth.GET("/search", adminHandler.SearchUsers)
