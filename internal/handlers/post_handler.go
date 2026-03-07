@@ -135,7 +135,7 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 			// Deliver to followers
 			federation.DeliverToFollowers(activity, did)
 		}()
-		} else {
+	} else {
 		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
 

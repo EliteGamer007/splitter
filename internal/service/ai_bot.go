@@ -104,7 +104,7 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 		// Remove @split from the text for a cleaner prompt
 		re := regexp.MustCompile(`(?i)@split\b`)
 		promptText := strings.TrimSpace(re.ReplaceAllString(originalContent, ""))
-		
+
 		if promptText == "" {
 			promptText = "The user mentioned you without saying anything else. Greet them."
 		}
@@ -124,7 +124,7 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 		}
 
 		authorDID := "did:key:bot_split"
-		
+
 		ctx := context.Background()
 		_, err = replyRepo.Create(ctx, authorDID, replyCreate, 1)
 		if err != nil {
