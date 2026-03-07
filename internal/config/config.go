@@ -107,7 +107,7 @@ func Load() *Config {
 			CircuitFailureThreshold:   getEnvAsInt("WORKER_CIRCUIT_FAILURE_THRESHOLD", 5),
 		},
 		Bot: BotConfig{
-			ApiKey: getEnv("SPLIT_BOT_API_KEY", ""), // Or GROK_API_KEY if they rename it later
+			ApiKey: getEnvWithFallback("SPLIT_BOT_API_KEY", "GEMINI_API_KEY"),
 		},
 	}
 }
@@ -118,6 +118,14 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvWithFallback tries the primary key, then falls back to a secondary key
+func getEnvWithFallback(primary, fallback string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(fallback)
 }
 
 func getEnvAsInt(key string, defaultValue int) int {
