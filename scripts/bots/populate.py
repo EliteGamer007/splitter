@@ -1,5 +1,5 @@
 """
-Splitter Bot — Populates the app with AI-generated posts from multiple bot accounts.
+Splitter Bot — Populates the app with AI-generated posts from 100 bot accounts.
 Uses Google Gemini API (free tier) for content generation.
 
 Usage:
@@ -8,7 +8,7 @@ Usage:
   - Or let GitHub Actions run it on a schedule.
 
 Modes (set via BOT_MODE env var):
-  - "seed"   : Bulk-create ~4000 posts across all bots (one-time baseline).
+  - "seed"   : Bulk-create ~1000 posts per run (10 per bot x 100 bots). Run multiple times.
   - "drip"   : Post one per bot, every invocation (for scheduled cron runs).
 """
 
@@ -17,7 +17,6 @@ import sys
 import time
 import random
 import requests
-import json
 
 # ---------------------------------------------------------------------------
 # Configuration from environment
@@ -28,216 +27,313 @@ INSTANCE_2_URL = os.environ.get("SPLITTER_INSTANCE_2_URL", "https://splitter-2.o
 BOT_MODE = os.environ.get("BOT_MODE", "drip")  # "seed" or "drip"
 BOT_PASSWORD = os.environ.get("BOT_PASSWORD", "BotPass#2026!")
 
-# How many posts per bot in seed mode (total = SEED_POSTS_PER_BOT * number_of_bots)
-SEED_POSTS_PER_BOT = 200
-# Delay between posts (seconds) — stay gentle on free-tier Render
-POST_DELAY = 12  # ~12s between posts
+# Seed mode: 10 posts per bot x 100 bots = 1000 posts per run. Run 4x for 4000.
+SEED_POSTS_PER_BOT = 10
+# Delay between posts (seconds)
+POST_DELAY = 10
 
 # ---------------------------------------------------------------------------
-# Bot personas — each bot has a theme, hashtags, and prompt style
+# 25 topic categories — each has 4 bot personas = 100 bots total.
 # ---------------------------------------------------------------------------
-BOT_PROFILES = [
+TOPIC_TEMPLATES = [
     {
-        "username": "techie_tara",
-        "email": "techie_tara@splitter.bot",
-        "display_name": "Tara | Tech & Code",
-        "bio": "Full-stack dev. Open source enthusiast. Coffee-powered.",
-        "instance": 1,
-        "topics": ["programming", "webdev", "opensource", "AI", "python", "golang", "javascript", "rust"],
-        "hashtags": ["#Tech", "#Coding", "#WebDev", "#OpenSource", "#AI", "#Python", "#GoLang", "#JavaScript", "#DevLife", "#Programming"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about software development, programming, or tech news. Include 2-3 relevant hashtags from this list: #Tech #Coding #WebDev #OpenSource #AI #Python #GoLang #JavaScript #DevLife #Programming. Sound like a real person, not a corporate account. Vary the tone — sometimes excited, sometimes reflective, sometimes asking a question."
+        "category": "tech",
+        "hashtags": "#Tech #Coding #WebDev #OpenSource #AI #Python #GoLang #JavaScript #DevLife #Programming",
+        "prompt": "Write a short casual social media post (1-3 sentences) about software development, programming, or tech news. Include 2-3 hashtags from: {hashtags}. Sound like a real person.",
+        "names": [
+            ("techie_tara", "Tara | Tech & Code", "Full-stack dev. Open source enthusiast. Coffee-powered."),
+            ("dev_derek", "Derek | Developer", "Backend engineer. API design nerd. Rust curious."),
+            ("code_clara", "Clara | Code Daily", "Self-taught coder. Python lover. Building side projects."),
+            ("hack_hugo", "Hugo | Hacker News", "Compiler enthusiast. Linux sysadmin. Opinions on everything."),
+        ],
     },
     {
-        "username": "sports_sam",
-        "email": "sports_sam@splitter.bot",
-        "display_name": "Sam | Sports Fan",
-        "bio": "Living for game day. Football, basketball, F1. Hot takes guaranteed.",
-        "instance": 1,
-        "topics": ["football", "basketball", "F1", "cricket", "sports"],
-        "hashtags": ["#Sports", "#Football", "#Basketball", "#F1", "#Cricket", "#GameDay", "#FitnessGoals", "#Athlete", "#TeamWork", "#Championship"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about sports — could be football, basketball, F1, cricket, or fitness. Include 2-3 relevant hashtags from this list: #Sports #Football #Basketball #F1 #Cricket #GameDay #FitnessGoals #Athlete #TeamWork #Championship. Sound like a passionate fan, not a news reporter."
+        "category": "sports",
+        "hashtags": "#Sports #Football #Basketball #F1 #Cricket #GameDay #Athlete #TeamWork #Championship #Fitness",
+        "prompt": "Write a short casual social media post (1-3 sentences) about sports — football, basketball, F1, cricket, or fitness. Include 2-3 hashtags from: {hashtags}. Sound like a passionate fan.",
+        "names": [
+            ("sports_sam", "Sam | Sports Fan", "Living for game day. Hot takes guaranteed."),
+            ("goal_guru", "Guru | Football", "Premier League obsessed. Fantasy football addict."),
+            ("hoop_hana", "Hana | Hoops", "Basketball is life. WNBA supporter."),
+            ("lap_liam", "Liam | F1 Fan", "F1 addict. Data-driven race analysis."),
+        ],
     },
     {
-        "username": "foodie_fiona",
-        "email": "foodie_fiona@splitter.bot",
-        "display_name": "Fiona | Food & Travel",
-        "bio": "Eating my way through the world one city at a time.",
-        "instance": 1,
-        "topics": ["food", "cooking", "travel", "restaurants", "recipes"],
-        "hashtags": ["#Foodie", "#Cooking", "#Travel", "#Recipe", "#Yummy", "#Restaurant", "#FoodPhotography", "#Wanderlust", "#StreetFood", "#HomeCooking"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about food, cooking, a restaurant experience, or travel. Include 2-3 relevant hashtags from this list: #Foodie #Cooking #Travel #Recipe #Yummy #Restaurant #FoodPhotography #Wanderlust #StreetFood #HomeCooking. Sound like a real food lover sharing their experience."
+        "category": "food",
+        "hashtags": "#Foodie #Cooking #Travel #Recipe #Yummy #Restaurant #FoodPhotography #Wanderlust #StreetFood #HomeCooking",
+        "prompt": "Write a short casual social media post (1-3 sentences) about food, cooking, or restaurants. Include 2-3 hashtags from: {hashtags}. Sound like a food lover.",
+        "names": [
+            ("foodie_fiona", "Fiona | Food & Travel", "Eating my way through the world one city at a time."),
+            ("chef_chen", "Chen | Home Chef", "Wok master. Noodle whisperer."),
+            ("bake_bella", "Bella | Baker", "Sourdough starter named Kevin. Pastry perfectionist."),
+            ("taco_tony", "Tony | Street Eats", "Tacos are a personality trait. Food truck hunter."),
+        ],
     },
     {
-        "username": "music_mike",
-        "email": "music_mike@splitter.bot",
-        "display_name": "Mike | Music & Vibes",
-        "bio": "If it has a beat, I'm in. DJ on weekends.",
-        "instance": 2,
-        "topics": ["music", "concerts", "DJing", "playlists", "albums"],
-        "hashtags": ["#Music", "#NowPlaying", "#Concert", "#DJ", "#Playlist", "#NewMusic", "#HipHop", "#Rock", "#EDM", "#Vibes"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about music — could be a new song, a concert, DJing, or a playlist recommendation. Include 2-3 relevant hashtags from this list: #Music #NowPlaying #Concert #DJ #Playlist #NewMusic #HipHop #Rock #EDM #Vibes. Sound like a real music fan."
+        "category": "music",
+        "hashtags": "#Music #NowPlaying #Concert #DJ #Playlist #NewMusic #HipHop #Rock #EDM #Vibes",
+        "prompt": "Write a short casual social media post (1-3 sentences) about music, concerts, or playlists. Include 2-3 hashtags from: {hashtags}. Sound like a real music fan.",
+        "names": [
+            ("music_mike", "Mike | Music & Vibes", "If it has a beat I'm in. DJ on weekends."),
+            ("vinyl_vera", "Vera | Vinyl", "Record collector. Analog soul in a digital world."),
+            ("beat_bobby", "Bobby | Beatmaker", "Producing beats in my bedroom. Lo-fi is a lifestyle."),
+            ("riff_rosa", "Rosa | Rock", "Guitar player. 90s grunge enthusiast. Volume to 11."),
+        ],
     },
     {
-        "username": "gamer_grace",
-        "email": "gamer_grace@splitter.bot",
-        "display_name": "Grace | Gamer",
-        "bio": "PC gamer. RPG addict. Streaming sometimes.",
-        "instance": 2,
-        "topics": ["gaming", "PC", "RPG", "streaming", "esports"],
-        "hashtags": ["#Gaming", "#PCGaming", "#RPG", "#Streaming", "#Esports", "#GamerLife", "#IndieGames", "#PlayStation", "#Nintendo", "#GameReview"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about video games — could be a game review, a gaming moment, streaming, or esports. Include 2-3 relevant hashtags from this list: #Gaming #PCGaming #RPG #Streaming #Esports #GamerLife #IndieGames #PlayStation #Nintendo #GameReview. Sound like a real gamer."
+        "category": "gaming",
+        "hashtags": "#Gaming #PCGaming #RPG #Streaming #Esports #GamerLife #IndieGames #PlayStation #Nintendo #GameReview",
+        "prompt": "Write a short casual social media post (1-3 sentences) about video games, streaming, or esports. Include 2-3 hashtags from: {hashtags}. Sound like a real gamer.",
+        "names": [
+            ("gamer_grace", "Grace | Gamer", "PC gamer. RPG addict. Streaming sometimes."),
+            ("pixel_pat", "Pat | Pixel Art", "Retro games forever. SNES > everything."),
+            ("stream_stella", "Stella | Streamer", "Twitch affiliate. Horror game specialist."),
+            ("fps_felix", "Felix | FPS Pro", "Ranked grinder. Aim training daily."),
+        ],
     },
     {
-        "username": "fitness_frank",
-        "email": "fitness_frank@splitter.bot",
-        "display_name": "Frank | Fitness & Health",
-        "bio": "Gym 6 days a week. Sharing what works.",
-        "instance": 1,
-        "topics": ["fitness", "gym", "health", "nutrition", "workout"],
-        "hashtags": ["#Fitness", "#Gym", "#Health", "#Workout", "#Nutrition", "#GymLife", "#HealthyLiving", "#Gains", "#Cardio", "#MealPrep"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about fitness, gym workouts, nutrition, or healthy living. Include 2-3 relevant hashtags from this list: #Fitness #Gym #Health #Workout #Nutrition #GymLife #HealthyLiving #Gains #Cardio #MealPrep. Sound like a real gym-goer sharing tips or experiences."
+        "category": "fitness",
+        "hashtags": "#Fitness #Gym #Health #Workout #Nutrition #GymLife #HealthyLiving #Gains #Cardio #MealPrep",
+        "prompt": "Write a short casual social media post (1-3 sentences) about fitness, workouts, or nutrition. Include 2-3 hashtags from: {hashtags}. Sound like a gym-goer.",
+        "names": [
+            ("fitness_frank", "Frank | Fitness", "Gym 6 days a week. Sharing what works."),
+            ("run_riley", "Riley | Runner", "Marathon finisher x3. Chasing PRs."),
+            ("yoga_yuki", "Yuki | Yoga", "Yoga teacher. Breathwork advocate. Inner peace dealer."),
+            ("lift_luna", "Luna | Powerlifter", "Deadlift PR chaser. Strong is beautiful."),
+        ],
     },
     {
-        "username": "art_anna",
-        "email": "art_anna@splitter.bot",
-        "display_name": "Anna | Art & Design",
-        "bio": "Digital artist. Illustrator. Color is my language.",
-        "instance": 2,
-        "topics": ["art", "design", "illustration", "digital art", "creativity"],
-        "hashtags": ["#Art", "#Design", "#Illustration", "#DigitalArt", "#Creative", "#ArtLife", "#Drawing", "#GraphicDesign", "#Sketch", "#Aesthetic"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about art, digital illustration, design, or creativity. Include 2-3 relevant hashtags from this list: #Art #Design #Illustration #DigitalArt #Creative #ArtLife #Drawing #GraphicDesign #Sketch #Aesthetic. Sound like a real artist sharing their process or thoughts."
+        "category": "art",
+        "hashtags": "#Art #Design #Illustration #DigitalArt #Creative #ArtLife #Drawing #GraphicDesign #Sketch #Aesthetic",
+        "prompt": "Write a short casual social media post (1-3 sentences) about art, illustration, or design. Include 2-3 hashtags from: {hashtags}. Sound like a real artist.",
+        "names": [
+            ("art_anna", "Anna | Art & Design", "Digital artist. Color is my language."),
+            ("sketch_suki", "Suki | Sketcher", "Pen and ink daily. Urban sketching addict."),
+            ("ux_uma", "Uma | UX Design", "Designing interfaces. Obsessed with whitespace."),
+            ("paint_pablo", "Pablo | Painter", "Oil on canvas. Impressionism with a modern twist."),
+        ],
     },
     {
-        "username": "news_nick",
-        "email": "news_nick@splitter.bot",
-        "display_name": "Nick | News & Opinions",
-        "bio": "Following the world so you don't have to. Hot takes daily.",
-        "instance": 1,
-        "topics": ["news", "politics", "economy", "world", "opinion"],
-        "hashtags": ["#News", "#Breaking", "#WorldNews", "#Opinion", "#Economy", "#Politics", "#Trending", "#Discussion", "#Today", "#HotTake"],
-        "prompt": "Write a short casual social media post (1-3 sentences) sharing a fictional but realistic-sounding opinion about current events, economics, or world affairs. Include 2-3 relevant hashtags from this list: #News #Breaking #WorldNews #Opinion #Economy #Politics #Trending #Discussion #Today #HotTake. Sound like a regular person sharing their take, not a news anchor."
+        "category": "news",
+        "hashtags": "#News #Breaking #WorldNews #Opinion #Economy #Politics #Trending #Discussion #Today #HotTake",
+        "prompt": "Write a short casual social media post (1-3 sentences) sharing a fictional opinion about current events or economics. Include 2-3 hashtags from: {hashtags}. Sound like a regular person.",
+        "names": [
+            ("news_nick", "Nick | News & Opinions", "Following the world so you don't have to."),
+            ("take_tina", "Tina | Hot Takes", "Opinions nobody asked for. You're welcome."),
+            ("pulse_priya", "Priya | World Pulse", "Geopolitics nerd. Coffee and headlines."),
+            ("econ_eli", "Eli | Economics", "Supply and demand explain everything."),
+        ],
     },
     {
-        "username": "movie_maria",
-        "email": "movie_maria@splitter.bot",
-        "display_name": "Maria | Movies & TV",
-        "bio": "Binge-watcher. Film critic in my own head.",
-        "instance": 2,
-        "topics": ["movies", "TV shows", "Netflix", "cinema", "reviews"],
-        "hashtags": ["#Movies", "#TVShows", "#Netflix", "#Cinema", "#FilmReview", "#Binge", "#Streaming", "#Hollywood", "#SciFi", "#Drama"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about movies, TV shows, streaming, or cinema. Include 2-3 relevant hashtags from this list: #Movies #TVShows #Netflix #Cinema #FilmReview #Binge #Streaming #Hollywood #SciFi #Drama. Sound like someone who just finished watching something and wants to talk about it."
+        "category": "movies",
+        "hashtags": "#Movies #TVShows #Netflix #Cinema #FilmReview #Binge #Streaming #Hollywood #SciFi #Drama",
+        "prompt": "Write a short casual social media post (1-3 sentences) about movies or TV shows. Include 2-3 hashtags from: {hashtags}. Sound like someone who just watched something.",
+        "names": [
+            ("movie_maria", "Maria | Movies & TV", "Binge-watcher. Film critic in my own head."),
+            ("screen_scott", "Scott | Screenwriter", "Writing scripts nobody will read. Loving it."),
+            ("series_sana", "Sana | SeriesAddict", "Currently watching 7 shows. Help."),
+            ("horror_hank", "Hank | Horror Fan", "Jump scares don't work on me anymore."),
+        ],
     },
     {
-        "username": "science_sara",
-        "email": "science_sara@splitter.bot",
-        "display_name": "Sara | Science & Space",
-        "bio": "Astrophysics grad. Space nerd. Making science fun.",
-        "instance": 1,
-        "topics": ["science", "space", "physics", "biology", "research"],
-        "hashtags": ["#Science", "#Space", "#Physics", "#Biology", "#Research", "#NASA", "#STEM", "#ScienceFacts", "#Universe", "#Innovation"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about science, space exploration, physics, biology, or a cool research finding. Include 2-3 relevant hashtags from this list: #Science #Space #Physics #Biology #Research #NASA #STEM #ScienceFacts #Universe #Innovation. Sound enthusiastic and accessible, like a science communicator."
+        "category": "science",
+        "hashtags": "#Science #Space #Physics #Biology #Research #NASA #STEM #ScienceFacts #Universe #Innovation",
+        "prompt": "Write a short casual social media post (1-3 sentences) about science or space. Include 2-3 hashtags from: {hashtags}. Sound enthusiastic and accessible.",
+        "names": [
+            ("science_sara", "Sara | Science & Space", "Astrophysics grad. Space nerd."),
+            ("lab_leo", "Leo | Lab Rat", "Biochemist by day. Science memer by night."),
+            ("astro_amara", "Amara | Astronomer", "Telescope in the backyard. Jupiter is my neighbor."),
+            ("bio_benny", "Benny | Biology", "Microbiome enthusiast. Bacteria are friends."),
+        ],
     },
     {
-        "username": "crypto_carl",
-        "email": "crypto_carl@splitter.bot",
-        "display_name": "Carl | Crypto & Finance",
-        "bio": "DeFi maximalist. Not financial advice.",
-        "instance": 2,
-        "topics": ["crypto", "blockchain", "finance", "investing", "DeFi"],
-        "hashtags": ["#Crypto", "#Bitcoin", "#Blockchain", "#DeFi", "#Finance", "#Investing", "#Web3", "#Ethereum", "#Trading", "#HODL"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about cryptocurrency, blockchain, DeFi, or personal finance. Include 2-3 relevant hashtags from this list: #Crypto #Bitcoin #Blockchain #DeFi #Finance #Investing #Web3 #Ethereum #Trading #HODL. Sound like a regular crypto enthusiast, not a shill."
+        "category": "crypto",
+        "hashtags": "#Crypto #Bitcoin #Blockchain #DeFi #Finance #Investing #Web3 #Ethereum #Trading #HODL",
+        "prompt": "Write a short casual social media post (1-3 sentences) about crypto, blockchain, or finance. Include 2-3 hashtags from: {hashtags}. Sound like a regular enthusiast.",
+        "names": [
+            ("crypto_carl", "Carl | Crypto", "DeFi maximalist. Not financial advice."),
+            ("chain_charlie", "Charlie | Blockchain", "Building on-chain. Smart contracts are art."),
+            ("trade_tracy", "Tracy | Trader", "Charts and candles. Day trading diary."),
+            ("nft_nadia", "Nadia | Web3", "NFTs, DAOs, and the decentralized future."),
+        ],
     },
     {
-        "username": "book_betty",
-        "email": "book_betty@splitter.bot",
-        "display_name": "Betty | Books & Writing",
-        "bio": "Reader. Writer. Library card collector.",
-        "instance": 1,
-        "topics": ["books", "reading", "writing", "literature", "fiction"],
-        "hashtags": ["#Books", "#Reading", "#Writing", "#BookReview", "#Fiction", "#Literature", "#Bookworm", "#AmReading", "#AuthorLife", "#Library"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about books, reading, writing, or literature. Include 2-3 relevant hashtags from this list: #Books #Reading #Writing #BookReview #Fiction #Literature #Bookworm #AmReading #AuthorLife #Library. Sound like someone who genuinely loves books."
+        "category": "books",
+        "hashtags": "#Books #Reading #Writing #BookReview #Fiction #Literature #Bookworm #AmReading #AuthorLife #Library",
+        "prompt": "Write a short casual social media post (1-3 sentences) about books or reading. Include 2-3 hashtags from: {hashtags}. Sound like someone who loves books.",
+        "names": [
+            ("book_betty", "Betty | Books", "Reader. Writer. Library card collector."),
+            ("page_peter", "Peter | PageTurner", "One more chapter. Always one more chapter."),
+            ("story_su", "Su | Storyteller", "Writing fiction between deadlines."),
+            ("lit_lara", "Lara | Literature", "Classic lit defender. Tolstoy stan."),
+        ],
     },
     {
-        "username": "pet_paul",
-        "email": "pet_paul@splitter.bot",
-        "display_name": "Paul | Pets & Animals",
-        "bio": "Dog dad x3. Cat tolerator. Wildlife photographer.",
-        "instance": 2,
-        "topics": ["pets", "dogs", "cats", "animals", "wildlife"],
-        "hashtags": ["#Pets", "#DogsOfSplitter", "#CatsOfSplitter", "#Animals", "#Wildlife", "#PetLife", "#DogLover", "#CatLover", "#Cute", "#Adopt"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about pets, dogs, cats, animals, or wildlife. Include 2-3 relevant hashtags from this list: #Pets #DogsOfSplitter #CatsOfSplitter #Animals #Wildlife #PetLife #DogLover #CatLover #Cute #Adopt. Sound like someone who adores their pets."
+        "category": "pets",
+        "hashtags": "#Pets #DogsOfSplitter #CatsOfSplitter #Animals #Wildlife #PetLife #DogLover #CatLover #Cute #Adopt",
+        "prompt": "Write a short casual social media post (1-3 sentences) about pets or animals. Include 2-3 hashtags from: {hashtags}. Sound like someone who adores their pets.",
+        "names": [
+            ("pet_paul", "Paul | Pets", "Dog dad x3. Wildlife photographer."),
+            ("paws_penny", "Penny | Paws", "Rescue advocate. 2 dogs 1 cat household."),
+            ("meow_mia", "Mia | Cat Mom", "My cat runs this house. I just pay rent."),
+            ("bark_boris", "Boris | Dog Life", "Golden retriever energy in human form."),
+        ],
     },
     {
-        "username": "startup_steve",
-        "email": "startup_steve@splitter.bot",
-        "display_name": "Steve | Startups & Hustle",
-        "bio": "Serial entrepreneur. Building in public. Shipping fast.",
-        "instance": 1,
-        "topics": ["startups", "entrepreneurship", "business", "SaaS", "productivity"],
-        "hashtags": ["#Startup", "#Entrepreneur", "#Business", "#SaaS", "#Productivity", "#BuildInPublic", "#Hustle", "#Growth", "#Founder", "#MVP"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about startups, entrepreneurship, building products, or productivity tips. Include 2-3 relevant hashtags from this list: #Startup #Entrepreneur #Business #SaaS #Productivity #BuildInPublic #Hustle #Growth #Founder #MVP. Sound like a real founder sharing their journey."
+        "category": "startups",
+        "hashtags": "#Startup #Entrepreneur #Business #SaaS #Productivity #BuildInPublic #Hustle #Growth #Founder #MVP",
+        "prompt": "Write a short casual social media post (1-3 sentences) about startups or entrepreneurship. Include 2-3 hashtags from: {hashtags}. Sound like a real founder.",
+        "names": [
+            ("startup_steve", "Steve | Startups", "Serial entrepreneur. Building in public."),
+            ("saas_sarah", "Sarah | SaaS", "Building B2B tools. MRR is the scoreboard."),
+            ("pitch_pete", "Pete | Pitch Deck", "Investor relations. Startup ecosystem guru."),
+            ("grow_gina", "Gina | Growth", "Growth hacker. A/B test everything."),
+        ],
     },
     {
-        "username": "meme_lord_max",
-        "email": "meme_lord_max@splitter.bot",
-        "display_name": "Max | Memes & Humor",
-        "bio": "Professional time waster. Internet historian.",
-        "instance": 2,
-        "topics": ["memes", "humor", "internet", "jokes", "viral"],
-        "hashtags": ["#Memes", "#Funny", "#Humor", "#LOL", "#Viral", "#InternetCulture", "#Relatable", "#Jokes", "#Mood", "#TooReal"],
-        "prompt": "Write a short funny or sarcastic social media post (1-2 sentences) — could be an observation about daily life, internet culture, or a relatable situation. Include 2-3 relevant hashtags from this list: #Memes #Funny #Humor #LOL #Viral #InternetCulture #Relatable #Jokes #Mood #TooReal. Be genuinely witty, not cringe."
+        "category": "memes",
+        "hashtags": "#Memes #Funny #Humor #LOL #Viral #InternetCulture #Relatable #Jokes #Mood #TooReal",
+        "prompt": "Write a short funny or sarcastic social media post (1-2 sentences) about daily life or internet culture. Include 2-3 hashtags from: {hashtags}. Be genuinely witty.",
+        "names": [
+            ("meme_lord_max", "Max | Memes", "Professional time waster. Internet historian."),
+            ("lol_lisa", "Lisa | LOL", "Turning my anxiety into comedy gold."),
+            ("joke_jake", "Jake | Jokes", "Dad joke dealer. No refunds."),
+            ("vibe_check", "Vibe | Check", "Failed the vibe check and proud of it."),
+        ],
     },
     {
-        "username": "eco_emma",
-        "email": "eco_emma@splitter.bot",
-        "display_name": "Emma | Environment",
-        "bio": "Climate activist. Zero-waste journey. Trees > everything.",
-        "instance": 1,
-        "topics": ["environment", "climate", "sustainability", "nature", "green"],
-        "hashtags": ["#Environment", "#Climate", "#Sustainability", "#Nature", "#GoGreen", "#EcoFriendly", "#ClimateAction", "#ZeroWaste", "#Planet", "#Trees"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about environmental issues, sustainability, nature, or eco-friendly living. Include 2-3 relevant hashtags from this list: #Environment #Climate #Sustainability #Nature #GoGreen #EcoFriendly #ClimateAction #ZeroWaste #Planet #Trees. Sound passionate but not preachy."
+        "category": "environment",
+        "hashtags": "#Environment #Climate #Sustainability #Nature #GoGreen #EcoFriendly #ClimateAction #ZeroWaste #Planet #Trees",
+        "prompt": "Write a short casual social media post (1-3 sentences) about sustainability or nature. Include 2-3 hashtags from: {hashtags}. Sound passionate but not preachy.",
+        "names": [
+            ("eco_emma", "Emma | Environment", "Climate activist. Zero-waste journey."),
+            ("green_greg", "Greg | GoGreen", "Solar panels on the roof. Compost in the yard."),
+            ("tree_tasha", "Tasha | TreeHugger", "Planted 200 trees this year. Not stopping."),
+            ("ocean_omar", "Omar | OceanLover", "Beach cleanups every Saturday. Surf the rest."),
+        ],
     },
     {
-        "username": "photo_pete",
-        "email": "photo_pete@splitter.bot",
-        "display_name": "Pete | Photography",
-        "bio": "Chasing golden hour. Street & landscape photographer.",
-        "instance": 2,
-        "topics": ["photography", "cameras", "landscape", "street photography", "editing"],
-        "hashtags": ["#Photography", "#PhotoOfTheDay", "#Landscape", "#StreetPhotography", "#Camera", "#GoldenHour", "#Lightroom", "#NaturePhotography", "#Portrait", "#Shutterbug"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about photography, cameras, editing photos, or a shooting experience. Include 2-3 relevant hashtags from this list: #Photography #PhotoOfTheDay #Landscape #StreetPhotography #Camera #GoldenHour #Lightroom #NaturePhotography #Portrait #Shutterbug. Sound like a photographer sharing their work or thoughts."
+        "category": "photography",
+        "hashtags": "#Photography #PhotoOfTheDay #Landscape #StreetPhotography #Camera #GoldenHour #Lightroom #NaturePhotography #Portrait #Shutterbug",
+        "prompt": "Write a short casual social media post (1-3 sentences) about photography. Include 2-3 hashtags from: {hashtags}. Sound like a photographer.",
+        "names": [
+            ("photo_pete", "Pete | Photography", "Chasing golden hour. Street & landscape."),
+            ("lens_leah", "Leah | Lens", "Mirrorless convert. 35mm everything."),
+            ("snap_sid", "Sid | Snapshots", "Phone photography can be art too."),
+            ("focus_fran", "Fran | Focus", "Portrait specialist. Bokeh obsessed."),
+        ],
     },
     {
-        "username": "edu_elena",
-        "email": "edu_elena@splitter.bot",
-        "display_name": "Elena | Education",
-        "bio": "Teacher by day. Lifelong learner always.",
-        "instance": 1,
-        "topics": ["education", "learning", "teaching", "students", "online courses"],
-        "hashtags": ["#Education", "#Learning", "#Teaching", "#Students", "#EdTech", "#OnlineLearning", "#Knowledge", "#StudyTips", "#Teacher", "#MOOC"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about education, teaching, learning, or study tips. Include 2-3 relevant hashtags from this list: #Education #Learning #Teaching #Students #EdTech #OnlineLearning #Knowledge #StudyTips #Teacher #MOOC. Sound like a real educator or student."
+        "category": "education",
+        "hashtags": "#Education #Learning #Teaching #Students #EdTech #OnlineLearning #Knowledge #StudyTips #Teacher #MOOC",
+        "prompt": "Write a short casual social media post (1-3 sentences) about education or learning. Include 2-3 hashtags from: {hashtags}. Sound like an educator or student.",
+        "names": [
+            ("edu_elena", "Elena | Education", "Teacher by day. Lifelong learner always."),
+            ("study_stan", "Stan | StudyGram", "Finals week is a lifestyle. Not a good one."),
+            ("prof_pam", "Pam | Professor", "Research papers and red pens."),
+            ("learn_lenny", "Lenny | Learner", "Online courses addict. 47 certificates."),
+        ],
     },
     {
-        "username": "fashion_faye",
-        "email": "fashion_faye@splitter.bot",
-        "display_name": "Faye | Fashion & Style",
-        "bio": "Thrift queen. Street style diary.",
-        "instance": 2,
-        "topics": ["fashion", "style", "outfits", "thrifting", "trends"],
-        "hashtags": ["#Fashion", "#Style", "#OOTD", "#Thrifting", "#Trends", "#StreetStyle", "#Outfit", "#FashionInspo", "#Wardrobe", "#Vintage"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about fashion, style, outfits, thrifting, or trends. Include 2-3 relevant hashtags from this list: #Fashion #Style #OOTD #Thrifting #Trends #StreetStyle #Outfit #FashionInspo #Wardrobe #Vintage. Sound like someone sharing their personal style."
+        "category": "fashion",
+        "hashtags": "#Fashion #Style #OOTD #Thrifting #Trends #StreetStyle #Outfit #FashionInspo #Wardrobe #Vintage",
+        "prompt": "Write a short casual social media post (1-3 sentences) about fashion or style. Include 2-3 hashtags from: {hashtags}. Sound like someone sharing their style.",
+        "names": [
+            ("fashion_faye", "Faye | Fashion", "Thrift queen. Street style diary."),
+            ("drip_drew", "Drew | Drip", "Sneakerhead. Streetwear collector."),
+            ("chic_chloe", "Chloe | Chic", "Minimalist wardrobe. Maximum impact."),
+            ("retro_ray", "Ray | Retro", "Vintage fits only. Born in the wrong decade."),
+        ],
     },
     {
-        "username": "diy_dana",
-        "email": "diy_dana@splitter.bot",
-        "display_name": "Dana | DIY & Crafts",
-        "bio": "If I can build it, I will. Woodworking + electronics.",
-        "instance": 1,
-        "topics": ["DIY", "crafts", "woodworking", "electronics", "maker"],
-        "hashtags": ["#DIY", "#Crafts", "#Maker", "#Woodworking", "#Electronics", "#Handmade", "#BuildStuff", "#Upcycle", "#Workshop", "#Create"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about a DIY project, crafting, woodworking, electronics tinkering, or making things. Include 2-3 relevant hashtags from this list: #DIY #Crafts #Maker #Woodworking #Electronics #Handmade #BuildStuff #Upcycle #Workshop #Create. Sound like someone excited about building things."
+        "category": "diy",
+        "hashtags": "#DIY #Crafts #Maker #Woodworking #Electronics #Handmade #BuildStuff #Upcycle #Workshop #Create",
+        "prompt": "Write a short casual social media post (1-3 sentences) about DIY projects or crafting. Include 2-3 hashtags from: {hashtags}. Sound like a maker.",
+        "names": [
+            ("diy_dana", "Dana | DIY", "If I can build it, I will."),
+            ("maker_matt", "Matt | Maker", "3D printer goes brrr. Arduino projects weekly."),
+            ("craft_cora", "Cora | Crafts", "Knitting, sewing, and chaos."),
+            ("fix_finn", "Finn | FixIt", "Right to repair advocate. Fixed 3 things today."),
+        ],
+    },
+    {
+        "category": "travel",
+        "hashtags": "#Travel #Wanderlust #Adventure #Backpacking #TravelPhotography #Explore #Vacation #WorldTravel #Nomad #RoadTrip",
+        "prompt": "Write a short casual social media post (1-3 sentences) about travel or adventure. Include 2-3 hashtags from: {hashtags}. Sound like a traveler.",
+        "names": [
+            ("travel_tom", "Tom | Traveler", "40 countries and counting. Passport always ready."),
+            ("nomad_nina", "Nina | Digital Nomad", "Working from Bali. Wifi is my lifeline."),
+            ("trek_tim", "Tim | Trekker", "Mountain trails on weekends. Office trails on weekdays."),
+            ("wander_wendy", "Wendy | Wanderer", "Solo traveler. Hostel hopper. Story collector."),
+        ],
+    },
+    {
+        "category": "mental_health",
+        "hashtags": "#MentalHealth #Wellbeing #SelfCare #Mindfulness #Anxiety #Therapy #Wellness #Healing #MindBody #BeKind",
+        "prompt": "Write a short supportive social media post (1-3 sentences) about mental health or self-care. Include 2-3 hashtags from: {hashtags}. Sound genuine and warm.",
+        "names": [
+            ("mind_maya", "Maya | Mental Health", "Therapy advocate. It's okay to not be okay."),
+            ("calm_cam", "Cam | Calm", "Meditation daily. Journaling nightly."),
+            ("heal_helen", "Helen | Healing", "Recovery is not linear. Keep going."),
+            ("zen_zara", "Zara | Zen", "Breathe in. Breathe out. Repeat."),
+        ],
+    },
+    {
+        "category": "cars",
+        "hashtags": "#Cars #Automotive #EV #Tesla #CarLife #Mechanic #Racing #CarMod #Supercar #Garage",
+        "prompt": "Write a short casual social media post (1-3 sentences) about cars, EVs, or automotive culture. Include 2-3 hashtags from: {hashtags}. Sound like a car enthusiast.",
+        "names": [
+            ("auto_alex", "Alex | Automotive", "Gearhead since birth. JDM forever."),
+            ("ev_eva", "Eva | Electric", "EV convert. Range anxiety is real tho."),
+            ("turbo_tyler", "Tyler | Turbo", "Turbocharged everything. Boost is life."),
+            ("garage_gabe", "Gabe | Garage", "Weekend mechanic. Oil-stained and happy."),
+        ],
+    },
+    {
+        "category": "history",
+        "hashtags": "#History #HistoryFacts #Ancient #Medieval #WorldHistory #OnThisDay #Heritage #HistoryBuff #Archaeology #Museum",
+        "prompt": "Write a short casual social media post (1-3 sentences) sharing an interesting (fictional) history fact or opinion. Include 2-3 hashtags from: {hashtags}. Sound like a history enthusiast.",
+        "names": [
+            ("hist_hector", "Hector | History", "History doesn't repeat but it rhymes."),
+            ("past_patty", "Patty | ThePast", "Medieval history enthusiast. Castles are my thing."),
+            ("era_eric", "Eric | Eras", "Ancient Rome could have had wi-fi. Probably."),
+            ("relic_ruth", "Ruth | Relics", "Museum visits every month. Archaeology nerd."),
+        ],
+    },
+    {
+        "category": "anime",
+        "hashtags": "#Anime #Manga #Otaku #Weeb #AnimeFan #JapanCulture #Cosplay #AnimeMemes #Shonen #StudioGhibli",
+        "prompt": "Write a short casual social media post (1-3 sentences) about anime, manga, or Japanese pop culture. Include 2-3 hashtags from: {hashtags}. Sound like a real anime fan.",
+        "names": [
+            ("anime_aki", "Aki | Anime", "Seasonal anime tracker. MyAnimeList is my diary."),
+            ("manga_mei", "Mei | Manga", "Physical manga collector. Shelf space is a myth."),
+            ("cosplay_kai", "Kai | Cosplay", "Convention season is my Super Bowl."),
+            ("otaku_ollie", "Ollie | Otaku", "Studio Ghibli marathons heal the soul."),
+        ],
     },
 ]
+
+
+def generate_bot_profiles():
+    """Generate 100 bot profiles from the 25 topic templates (4 bots each)."""
+    profiles = []
+    for i, topic in enumerate(TOPIC_TEMPLATES):
+        for j, (username, display_name, bio) in enumerate(topic["names"]):
+            instance = 1 if (i + j) % 2 == 0 else 2
+            prompt = topic["prompt"].replace("{hashtags}", topic["hashtags"])
+            profiles.append({
+                "username": username,
+                "email": f"{username}@splitter.bot",
+                "display_name": display_name,
+                "bio": bio,
+                "instance": instance,
+                "hashtags": topic["hashtags"],
+                "prompt": prompt,
+            })
+    return profiles
+
+
+BOT_PROFILES = generate_bot_profiles()
 
 # ---------------------------------------------------------------------------
 # Gemini API helper (uses REST directly — no SDK needed)
@@ -248,8 +344,7 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0
 def generate_post_text(prompt: str) -> str:
     """Call Gemini API to generate a single post."""
     if not GEMINI_API_KEY:
-        # Fallback: pick a random pre-written post if no API key
-        return random_fallback_post(prompt)
+        return random_fallback_post()
 
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -269,29 +364,35 @@ def generate_post_text(prompt: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
-        # Clean up: remove surrounding quotes if Gemini wraps it
         text = text.strip().strip('"').strip("'")
         return text
     except Exception as e:
         print(f"  [Gemini Error] {e} — using fallback")
-        return random_fallback_post(prompt)
+        return random_fallback_post()
 
 
-def random_fallback_post(prompt: str) -> str:
+FALLBACK_TEMPLATES = [
+    "Just another day in the grind! What's everyone working on? #Trending #Splitter",
+    "Hot take: the best code is the code you don't write. #Tech #Coding #DevLife",
+    "Anyone else feel like time moves differently on weekends? #Relatable #Mood",
+    "New week, new goals. Let's get it! #Motivation #Hustle #Growth",
+    "The internet never sleeps and neither do I apparently. #LOL #InternetCulture",
+    "Just discovered something amazing. Can't wait to share more! #Trending #News",
+    "Coffee count today: 4. Productivity count: debatable. #DevLife #Coding #Coffee",
+    "Weekend plans: absolutely nothing and I'm excited about it. #Mood #Relatable #Vibes",
+    "Learning something new every day. That's the whole point right? #Learning #Growth",
+    "This community is growing fast! Love seeing all the activity here. #Splitter #Community",
+    "Sometimes you just need to log off and touch grass. #MentalHealth #SelfCare #Mood",
+    "You ever solve a bug and feel like a superhero? That was me today. #DevLife #Coding",
+    "My favorite algorithm is the one that gets food delivered to my door. #Foodie #Tech",
+    "Reading a good book is the original streaming. No buffering required. #Books #Reading",
+    "Nature doesn't need an update. It just works. #Nature #Environment #GoGreen",
+]
+
+
+def random_fallback_post() -> str:
     """If Gemini is unavailable, generate a simple templated post."""
-    templates = [
-        "Just another day in the grind! What's everyone working on? #Trending #Splitter",
-        "Hot take: the best code is the code you don't write. #Tech #Coding #DevLife",
-        "Anyone else feel like time moves differently on weekends? #Relatable #Mood",
-        "New week, new goals. Let's get it! #Motivation #Hustle #Growth",
-        "The internet never sleeps and neither do I apparently. #LOL #InternetCulture",
-        "Just discovered something amazing. Can't wait to share more! #Trending #News",
-        "Coffee count today: 4. Productivity count: debatable. #DevLife #Coding #Coffee",
-        "Weekend plans: absolutely nothing and I'm excited about it. #Mood #Relatable #Vibes",
-        "Learning something new every day. That's the whole point right? #Learning #Growth",
-        "This community is growing fast! Love seeing all the activity here. #Splitter #Community",
-    ]
-    return random.choice(templates)
+    return random.choice(FALLBACK_TEMPLATES)
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +419,6 @@ def register_bot(bot: dict) -> str | None:
             print(f"  [+] Registered {bot['username']} on instance {bot['instance']}")
             return resp.json().get("token")
         elif resp.status_code == 409 or "already" in resp.text.lower():
-            # Already exists — just login
             return login_bot(bot)
         else:
             print(f"  [!] Register failed for {bot['username']}: {resp.status_code} {resp.text[:200]}")
@@ -374,21 +474,21 @@ def authenticate_all_bots() -> dict:
             tokens[bot["username"]] = token
         else:
             print(f"  [SKIP] Could not authenticate {bot['username']}")
-        time.sleep(1)  # Don't hammer the API during auth
+        time.sleep(0.5)
     return tokens
 
 
 def run_seed_mode(tokens: dict):
-    """Bulk-create posts: SEED_POSTS_PER_BOT per bot."""
+    """Bulk-create posts: SEED_POSTS_PER_BOT per bot. 10 x 100 = 1000 per run."""
     total = 0
     failed = 0
     target = SEED_POSTS_PER_BOT * len(tokens)
     print(f"\n{'='*60}")
     print(f"SEED MODE: Generating ~{target} posts across {len(tokens)} bots")
+    print(f"({SEED_POSTS_PER_BOT} posts/bot x {len(tokens)} bots)")
     print(f"{'='*60}\n")
 
     for round_num in range(SEED_POSTS_PER_BOT):
-        # Shuffle bots each round for variety
         shuffled = list(BOT_PROFILES)
         random.shuffle(shuffled)
         for bot in shuffled:
@@ -404,7 +504,8 @@ def run_seed_mode(tokens: dict):
             success = create_post(bot, token, content)
             if success:
                 total += 1
-                print(f"  [{total}/{target}] @{bot['username']}: {content[:80]}...")
+                if total % 50 == 0 or total <= 5:
+                    print(f"  [{total}/{target}] @{bot['username']}: {content[:80]}...")
             else:
                 failed += 1
 
@@ -453,10 +554,9 @@ def main():
     print(f"Splitter Bot Populator — Mode: {BOT_MODE}")
     print(f"Instance 1: {INSTANCE_1_URL}")
     print(f"Instance 2: {INSTANCE_2_URL}")
-    print(f"Bots: {len(BOT_PROFILES)}")
+    print(f"Total bots: {len(BOT_PROFILES)}")
     print()
 
-    # Step 1: Authenticate all bots
     tokens = authenticate_all_bots()
     print(f"\nAuthenticated {len(tokens)}/{len(BOT_PROFILES)} bots\n")
 
@@ -464,7 +564,6 @@ def main():
         print("ERROR: No bots could be authenticated. Exiting.")
         sys.exit(1)
 
-    # Step 2: Run the selected mode
     if BOT_MODE == "seed":
         run_seed_mode(tokens)
     else:
