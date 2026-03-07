@@ -132,7 +132,7 @@ func ensureSplitBotUser(cfg *config.Config) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, instance_domain, display_name, role, did, public_key, bio)
 		VALUES ($1, $2, $3, $4, $5, 'user', $6, $7, $8)
-		ON CONFLICT (username) DO NOTHING
+		ON CONFLICT (did) DO NOTHING
 	`
 
 	_, err = db.GetDB().Exec(ctx, query,
