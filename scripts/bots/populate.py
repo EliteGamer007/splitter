@@ -8,7 +8,7 @@ Usage:
   - Or let GitHub Actions run it on a schedule.
 
 Modes (set via BOT_MODE env var):
-  - "seed"   : Bulk-create ~1000 posts per run (10 per bot x 100 bots). Run multiple times.
+  - "seed"   : Bulk-create ~500 posts per run (5 per bot x 100 bots). Run multiple times.
   - "drip"   : Post one per bot, every invocation (for scheduled cron runs).
 """
 
@@ -27,10 +27,12 @@ INSTANCE_2_URL = os.environ.get("SPLITTER_INSTANCE_2_URL", "https://splitter-2.o
 BOT_MODE = os.environ.get("BOT_MODE", "drip")  # "seed" or "drip"
 BOT_PASSWORD = os.environ.get("BOT_PASSWORD", "BotPass#2026!")
 
-# Seed mode: 10 posts per bot x 100 bots = 1000 posts per run. Run 4x for 4000.
-SEED_POSTS_PER_BOT = 10
-# Delay between posts (seconds)
-POST_DELAY = 10
+# Seed mode: 5 posts per bot x 100 bots = 500 posts per run. Run 8x for 4000.
+SEED_POSTS_PER_BOT = 5
+# Delay between posts (seconds) — keeps us under Gemini free-tier 15 RPM
+POST_DELAY = 5
+# Extra delay after each Gemini API call (seconds)
+GEMINI_COOLDOWN = 4
 
 # ---------------------------------------------------------------------------
 # 25 topic categories — each has 4 bot personas = 100 bots total.
@@ -341,8 +343,8 @@ BOT_PROFILES = generate_bot_profiles()
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 
-def generate_post_text(prompt: str) -> str:
-    """Call Gemini API to generate a single post."""
+def generate_post_text(prompt: str, max_retries: int = 3) -> str:
+    """Call Gemini API to generate a single post, with retry on 429."""
     if not GEMINI_API_KEY:
         return random_fallback_post()
 
@@ -354,21 +356,33 @@ def generate_post_text(prompt: str) -> str:
             "maxOutputTokens": 150,
         },
     }
-    try:
-        resp = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-            headers=headers,
-            json=payload,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-        text = text.strip().strip('"').strip("'")
-        return text
-    except Exception as e:
-        print(f"  [Gemini Error] {e} — using fallback")
-        return random_fallback_post()
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(
+                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            if resp.status_code == 429:
+                wait = 30 * (attempt + 1)  # 30s, 60s, 90s backoff
+                print(f"  [Gemini 429] Rate limited — waiting {wait}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            text = text.strip().strip('"').strip("'")
+            # Throttle: wait after each successful Gemini call
+            time.sleep(GEMINI_COOLDOWN)
+            return text
+        except Exception as e:
+            if attempt < max_retries - 1 and "429" in str(e):
+                time.sleep(30 * (attempt + 1))
+                continue
+            print(f"  [Gemini Error] {e} — using fallback")
+            return random_fallback_post()
+    return random_fallback_post()
 
 
 FALLBACK_TEMPLATES = [
@@ -448,9 +462,13 @@ def create_post(bot: dict, token: str, content: str) -> bool:
     """Create a post using multipart/form-data. Returns True on success."""
     url = f"{get_instance_url(bot['instance'])}/api/v1/posts"
     headers = {"Authorization": f"Bearer {token}"}
-    form_data = {"content": content, "visibility": "public"}
+    # Use 'files' param to force multipart/form-data encoding (required by Echo)
+    multipart_fields = {
+        "content": (None, content),
+        "visibility": (None, "public"),
+    }
     try:
-        resp = requests.post(url, headers=headers, data=form_data, timeout=30)
+        resp = requests.post(url, headers=headers, files=multipart_fields, timeout=30)
         if resp.status_code in (200, 201):
             return True
         else:
@@ -479,7 +497,7 @@ def authenticate_all_bots() -> dict:
 
 
 def run_seed_mode(tokens: dict):
-    """Bulk-create posts: SEED_POSTS_PER_BOT per bot. 10 x 100 = 1000 per run."""
+    """Bulk-create posts: SEED_POSTS_PER_BOT per bot. 5 x 100 = 500 per run."""
     total = 0
     failed = 0
     target = SEED_POSTS_PER_BOT * len(tokens)
@@ -489,9 +507,10 @@ def run_seed_mode(tokens: dict):
     print(f"{'='*60}\n")
 
     for round_num in range(SEED_POSTS_PER_BOT):
+        print(f"\n--- Round {round_num+1}/{SEED_POSTS_PER_BOT} ---")
         shuffled = list(BOT_PROFILES)
         random.shuffle(shuffled)
-        for bot in shuffled:
+        for i, bot in enumerate(shuffled):
             token = tokens.get(bot["username"])
             if not token:
                 continue
@@ -504,12 +523,17 @@ def run_seed_mode(tokens: dict):
             success = create_post(bot, token, content)
             if success:
                 total += 1
-                if total % 50 == 0 or total <= 5:
+                if total % 25 == 0 or total <= 5:
                     print(f"  [{total}/{target}] @{bot['username']}: {content[:80]}...")
             else:
                 failed += 1
 
             time.sleep(POST_DELAY)
+
+        # Cooldown between rounds to let rate limits reset
+        if round_num < SEED_POSTS_PER_BOT - 1:
+            print(f"  Round {round_num+1} done. Cooling down 30s...")
+            time.sleep(30)
 
     print(f"\n{'='*60}")
     print(f"SEED COMPLETE: {total} posts created, {failed} failures")
