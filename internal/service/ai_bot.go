@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"splitter/internal/config"
 	"splitter/internal/models"
@@ -101,6 +102,10 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 	log.Printf("[SplitBot] Mention detected! Triggering AI... (PostID: %s)", postID)
 
 	go func() {
+		// Wait 7 seconds to let the API breathe before calling Gemini
+		log.Printf("[SplitBot] Waiting 7 seconds before calling Gemini...")
+		time.Sleep(7 * time.Second)
+
 		// Remove @split from the text for a cleaner prompt
 		re := regexp.MustCompile(`(?i)@split\b`)
 		promptText := strings.TrimSpace(re.ReplaceAllString(originalContent, ""))
@@ -111,10 +116,13 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 
 		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
 
+		log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
 		replyStr, err := AskGemini(apiKey, systemPrompt)
 		if err != nil {
-			log.Printf("[SplitBot] Gemini call failed: %v", err)
-			replyStr = "Sorry, my circuits are a bit overloaded right now. 🤖💤"
+			log.Printf("[SplitBot] ERROR - Gemini call failed: %v", err)
+			replyStr = fmt.Sprintf("⚠️ SplitBot error: %v", err)
+		} else {
+			log.Printf("[SplitBot] Gemini responded successfully: %s", replyStr[:min(len(replyStr), 50)])
 		}
 
 		replyCreate := &models.ReplyCreate{
