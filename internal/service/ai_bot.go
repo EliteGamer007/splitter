@@ -17,7 +17,7 @@ import (
 	"splitter/internal/repository"
 )
 
-const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s"
+const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=%s"
 
 // --- Gemini Structs ---
 type geminiRequest struct {
@@ -44,14 +44,14 @@ type openAIMessage struct {
 	Content string `json:"content"`
 }
 
-// AskOpenAI calls the standard OpenAI API with a prompt
-func AskOpenAI(apiKey, prompt string) (string, error) {
+// AskOpenAI calls a standard OpenAI-compatible REST API (OpenAI, Groq, local Ollama)
+func AskOpenAI(apiKey, prompt, endpoint, model string) (string, error) {
 	if apiKey == "" {
 		return "", fmt.Errorf("missing API key")
 	}
 
 	reqBody := openAIRequest{
-		Model: "gpt-4o-mini", // Cost-effective model for bots
+		Model: model, // Dynamically use GPT-4, Llama-3, etc.
 		Messages: []openAIMessage{
 			{Role: "system", Content: "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging."},
 			{Role: "user", Content: prompt},
@@ -63,7 +63,7 @@ func AskOpenAI(apiKey, prompt string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return "", err
 	}
@@ -181,11 +181,19 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 	var replyStr string
 	var err error
 
-	// Automatically decide between OpenAI and Gemini
+	// Automatically decide between OpenAI, Groq, and Gemini
 	if strings.HasPrefix(apiKey, "sk-") {
 		// It's an OpenAI key (sk-...)
 		log.Printf("[SplitBot] Detected OpenAI key, calling GPT-4o-mini...")
-		replyStr, err = AskOpenAI(apiKey, promptText)
+		replyStr, err = AskOpenAI(apiKey, promptText, "https://api.openai.com/v1/chat/completions", "gpt-4o-mini")
+	} else if strings.HasPrefix(apiKey, "gsk_") {
+		// It's a Groq Key (gsk_...) - Lightning fast free Meta Llama 3
+		log.Printf("[SplitBot] Detected Groq key, calling Llama 3 API...")
+		replyStr, err = AskOpenAI(apiKey, promptText, "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile")
+	} else if strings.HasPrefix(apiKey, "http") {
+		// Experimental Local Ollama Support (pass Ngrok URL instead of key)
+		log.Printf("[SplitBot] Detected Local URL, calling Ollama API...")
+		replyStr, err = AskOpenAI("ollama", promptText, apiKey+"/v1/chat/completions", "llama3.2")
 	} else {
 		// Fallback to Gemini
 		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText

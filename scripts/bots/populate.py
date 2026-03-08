@@ -340,7 +340,7 @@ BOT_PROFILES = generate_bot_profiles()
 # ---------------------------------------------------------------------------
 # Gemini API helper (uses REST directly — no SDK needed)
 # ---------------------------------------------------------------------------
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
 
 
 def generate_post_text(prompt: str, max_retries: int = 3) -> str:
