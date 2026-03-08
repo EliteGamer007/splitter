@@ -109,30 +109,295 @@ NAMES_AND_BIOS = [
 ]
 
 def generate_bot_profiles():
-    """Generate bot profiles by mixing up random names and bios."""
+    """Generate 100 bot profiles dynamically."""
     profiles = []
     import random
-    
-    # We want 100 bots generated dynamically
     for i in range(100):
         base_name_tuple = NAMES_AND_BIOS[i % len(NAMES_AND_BIOS)]
-        # For duplicates, add a random number suffix to username and display
         suffix = str(random.randint(10, 999)) if i >= len(NAMES_AND_BIOS) else ""
-        
         username = base_name_tuple[0] + suffix
         display = base_name_tuple[1] + ("" if not suffix else f" {suffix}")
         bio = base_name_tuple[2]
-        
-        # Distribute them across instance 1 and 2
         instance = 1 if i % 2 == 0 else 2
+        
+        # Pick a random template and resolve the hashtags in the prompt string
+        template = random.choice(TOPIC_TEMPLATES)
+        chosen_hashtags = " ".join(random.sample(template["hashtags"], min(2, len(template["hashtags"]))))
+        resolved_prompt = template["prompt"].replace("{hashtags}", chosen_hashtags)
         
         profiles.append({
             "username": username,
             "email": f"{username}@bot.local",
             "display_name": display,
             "bio": bio,
-            "instance": instance
+            "instance": instance,
+            "category": template["category"],
+            "prompt": resolved_prompt
         })
     return profiles
 
 
+BOT_PROFILES = generate_bot_profiles()
+
+# ---------------------------------------------------------------------------
+# Gemini API helper (uses REST directly — no SDK needed)
+# ---------------------------------------------------------------------------
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+
+
+def generate_post_text(prompt: str, max_retries: int = 3) -> str:
+    """Call Gemini API to generate a single post, with retry on 429."""
+    if not GEMINI_API_KEY:
+        return random_fallback_post()
+
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 1.0,
+            "maxOutputTokens": 150,
+        },
+    }
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(
+                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            if resp.status_code == 429:
+                wait = 30 * (attempt + 1)  # 30s, 60s, 90s backoff
+                print(f"  [Gemini 429] Rate limited — waiting {wait}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            text = text.strip().strip('"').strip("'")
+            # Throttle: wait after each successful Gemini call
+            time.sleep(GEMINI_COOLDOWN)
+            return text
+        except Exception as e:
+            if attempt < max_retries - 1 and "429" in str(e):
+                time.sleep(30 * (attempt + 1))
+                continue
+            print(f"  [Gemini Error] {e} — using fallback")
+            return random_fallback_post()
+    return random_fallback_post()
+
+
+FALLBACK_TEMPLATES = [
+    "Just another day in the grind! What's everyone working on? #Trending #Splitter",
+    "Hot take: the best code is the code you don't write. #Tech #Coding #DevLife",
+    "Anyone else feel like time moves differently on weekends? #Relatable #Mood",
+    "New week, new goals. Let's get it! #Motivation #Hustle #Growth",
+    "The internet never sleeps and neither do I apparently. #LOL #InternetCulture",
+    "Just discovered something amazing. Can't wait to share more! #Trending #News",
+    "Coffee count today: 4. Productivity count: debatable. #DevLife #Coding #Coffee",
+    "Weekend plans: absolutely nothing and I'm excited about it. #Mood #Relatable #Vibes",
+    "Learning something new every day. That's the whole point right? #Learning #Growth",
+    "This community is growing fast! Love seeing all the activity here. #Splitter #Community",
+    "Sometimes you just need to log off and touch grass. #MentalHealth #SelfCare #Mood",
+    "You ever solve a bug and feel like a superhero? That was me today. #DevLife #Coding",
+    "My favorite algorithm is the one that gets food delivered to my door. #Foodie #Tech",
+    "Reading a good book is the original streaming. No buffering required. #Books #Reading",
+    "Nature doesn't need an update. It just works. #Nature #Environment #GoGreen",
+]
+
+
+def random_fallback_post() -> str:
+    """If Gemini is unavailable, generate a simple templated post."""
+    return random.choice(FALLBACK_TEMPLATES)
+
+
+# ---------------------------------------------------------------------------
+# Splitter API helpers
+# ---------------------------------------------------------------------------
+
+def get_instance_url(instance_num: int) -> str:
+    return INSTANCE_1_URL if instance_num == 1 else INSTANCE_2_URL
+
+
+def register_bot(bot: dict) -> str | None:
+    """Register a bot account. Returns JWT token or None."""
+    url = f"{get_instance_url(bot['instance'])}/api/v1/auth/register"
+    payload = {
+        "username": bot["username"],
+        "email": bot["email"],
+        "password": BOT_PASSWORD,
+        "display_name": bot["display_name"],
+        "bio": bot["bio"],
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+        if resp.status_code == 201:
+            print(f"  [+] Registered {bot['username']} on instance {bot['instance']}")
+            return resp.json().get("token")
+        elif resp.status_code == 409 or "already" in resp.text.lower():
+            return login_bot(bot)
+        else:
+            print(f"  [!] Register failed for {bot['username']}: {resp.status_code} {resp.text[:200]}")
+            return login_bot(bot)
+    except Exception as e:
+        print(f"  [!] Register error for {bot['username']}: {e}")
+        return None
+
+
+def login_bot(bot: dict) -> str | None:
+    """Login a bot account. Returns JWT token or None."""
+    url = f"{get_instance_url(bot['instance'])}/api/v1/auth/login"
+    payload = {"username": bot["username"], "password": BOT_PASSWORD}
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+        if resp.status_code == 200:
+            return resp.json().get("token")
+        else:
+            print(f"  [!] Login failed for {bot['username']}: {resp.status_code} {resp.text[:200]}")
+            return None
+    except Exception as e:
+        print(f"  [!] Login error for {bot['username']}: {e}")
+        return None
+
+
+def create_post(bot: dict, token: str, content: str) -> bool:
+    """Create a post using multipart/form-data. Returns True on success."""
+    url = f"{get_instance_url(bot['instance'])}/api/v1/posts"
+    headers = {"Authorization": f"Bearer {token}"}
+    # Use 'files' param to force multipart/form-data encoding (required by Echo)
+    multipart_fields = {
+        "content": (None, content),
+        "visibility": (None, "public"),
+    }
+    try:
+        resp = requests.post(url, headers=headers, files=multipart_fields, timeout=30)
+        if resp.status_code in (200, 201):
+            return True
+        else:
+            print(f"  [!] Post failed for {bot['username']}: {resp.status_code} {resp.text[:200]}")
+            return False
+    except Exception as e:
+        print(f"  [!] Post error for {bot['username']}: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Main logic
+# ---------------------------------------------------------------------------
+
+def authenticate_all_bots() -> dict:
+    """Register/login all bots and return {username: token} map."""
+    tokens = {}
+    for bot in BOT_PROFILES:
+        token = register_bot(bot)
+        if token:
+            tokens[bot["username"]] = token
+        else:
+            print(f"  [SKIP] Could not authenticate {bot['username']}")
+        time.sleep(0.5)
+    return tokens
+
+
+def run_seed_mode(tokens: dict):
+    """Bulk-create posts: SEED_POSTS_PER_BOT per bot. 5 x 100 = 500 per run."""
+    total = 0
+    failed = 0
+    target = SEED_POSTS_PER_BOT * len(tokens)
+    print(f"\n{'='*60}")
+    print(f"SEED MODE: Generating ~{target} posts across {len(tokens)} bots")
+    print(f"({SEED_POSTS_PER_BOT} posts/bot x {len(tokens)} bots)")
+    print(f"{'='*60}\n")
+
+    for round_num in range(SEED_POSTS_PER_BOT):
+        print(f"\n--- Round {round_num+1}/{SEED_POSTS_PER_BOT} ---")
+        shuffled = list(BOT_PROFILES)
+        random.shuffle(shuffled)
+        for i, bot in enumerate(shuffled):
+            token = tokens.get(bot["username"])
+            if not token:
+                continue
+
+            content = generate_post_text(bot["prompt"])
+            if not content:
+                failed += 1
+                continue
+
+            success = create_post(bot, token, content)
+            if success:
+                total += 1
+                if total % 25 == 0 or total <= 5:
+                    print(f"  [{total}/{target}] @{bot['username']}: {content[:80]}...")
+            else:
+                failed += 1
+
+            time.sleep(POST_DELAY)
+
+        # Cooldown between rounds to let rate limits reset
+        if round_num < SEED_POSTS_PER_BOT - 1:
+            print(f"  Round {round_num+1} done. Cooling down 30s...")
+            time.sleep(30)
+
+    print(f"\n{'='*60}")
+    print(f"SEED COMPLETE: {total} posts created, {failed} failures")
+    print(f"{'='*60}")
+
+
+def run_drip_mode(tokens: dict):
+    """Post once per bot — designed for cron/scheduled invocations."""
+    total = 0
+    failed = 0
+    shuffled = list(BOT_PROFILES)
+    random.shuffle(shuffled)
+    
+    # Process only 15 bots per drip run to ensure it finishes well under 15 minutes without overlapping
+    selected_bots = shuffled[:15]
+
+    print(f"\nDRIP MODE: Posting for a random subset of {len(selected_bots)} bots (out of {len(tokens)})\n")
+
+    for bot in selected_bots:
+        token = tokens.get(bot["username"])
+        if not token:
+            continue
+
+        content = generate_post_text(bot["prompt"])
+        if not content:
+            failed += 1
+            continue
+
+        success = create_post(bot, token, content)
+        if success:
+            total += 1
+            print(f"  @{bot['username']}: {content[:80]}...")
+        else:
+            failed += 1
+
+        time.sleep(POST_DELAY)
+
+    print(f"\nDRIP COMPLETE: {total} posts created, {failed} failures")
+
+
+def main():
+    if not GEMINI_API_KEY:
+        print("[WARNING] GEMINI_API_KEY not set — using fallback templates (no AI generation)")
+
+    print(f"Splitter Bot Populator — Mode: {BOT_MODE}")
+    print(f"Instance 1: {INSTANCE_1_URL}")
+    print(f"Instance 2: {INSTANCE_2_URL}")
+    print(f"Total bots: {len(BOT_PROFILES)}")
+    print()
+
+    tokens = authenticate_all_bots()
+    print(f"\nAuthenticated {len(tokens)}/{len(BOT_PROFILES)} bots\n")
+
+    if not tokens:
+        print("ERROR: No bots could be authenticated. Exiting.")
+        sys.exit(1)
+
+    if BOT_MODE == "seed":
+        run_seed_mode(tokens)
+    else:
+        run_drip_mode(tokens)
+
+
+if __name__ == "__main__":
+    main()
