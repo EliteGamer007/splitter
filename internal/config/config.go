@@ -25,6 +25,7 @@ type Config struct {
 	JWT        JWTConfig
 	Federation FederationConfig
 	Worker     WorkerConfig
+	Bot        BotConfig
 }
 
 // DatabaseConfig holds database-related configuration
@@ -67,6 +68,11 @@ type WorkerConfig struct {
 	CircuitFailureThreshold   int
 }
 
+// BotConfig holds configuration for the Split AI reply bot
+type BotConfig struct {
+	ApiKey string
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -100,6 +106,9 @@ func Load() *Config {
 			MaxRetryCount:             getEnvAsInt("WORKER_MAX_RETRY_COUNT", 6),
 			CircuitFailureThreshold:   getEnvAsInt("WORKER_CIRCUIT_FAILURE_THRESHOLD", 5),
 		},
+		Bot: BotConfig{
+			ApiKey: getEnvWithFallback("SPLIT_BOT_API_KEY", "GEMINI_API_KEY"),
+		},
 	}
 }
 
@@ -109,6 +118,14 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvWithFallback tries the primary key, then falls back to a secondary key
+func getEnvWithFallback(primary, fallback string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(fallback)
 }
 
 func getEnvAsInt(key string, defaultValue int) int {

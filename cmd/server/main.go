@@ -41,6 +41,9 @@ func main() {
 	// Ensure admin user exists
 	ensureAdminUser() // Silent check, no logging needed
 
+	// Ensure Split bot user exists
+	ensureSplitBotUser(cfg)
+
 	// Initialize and start server
 	federation.ConfigureDeliveryPolicy(
 		cfg.Worker.MaxRetryCount,
@@ -109,6 +112,44 @@ func ensureAdminUser() error {
 
 	log.Println("Admin user created successfully (username: admin, password: splitteradmin)")
 	return nil
+}
+
+// ensureSplitBotUser creates the split bot user if it doesn't exist
+func ensureSplitBotUser(cfg *config.Config) error {
+	ctx := context.Background()
+	userRepo := repository.NewUserRepository()
+
+	existingBot, _, _ := userRepo.GetByUsername(ctx, "split")
+	if existingBot != nil {
+		return nil
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("splitbotpass!"), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		INSERT INTO users (username, email, password_hash, instance_domain, display_name, role, did, public_key, bio)
+		VALUES ($1, $2, $3, $4, $5, 'user', $6, $7, $8)
+		ON CONFLICT (did) DO NOTHING
+	`
+
+	_, err = db.GetDB().Exec(ctx, query,
+		"split",
+		"split@bot.local",
+		string(passwordHash),
+		cfg.Federation.Domain,
+		"Split AI",
+		"did:key:bot_split",
+		"bot_key",
+		"I am Split, the AI assistant! Mention @split in a post to talk to me. 🤖",
+	)
+
+	if err == nil {
+		log.Println("[SplitBot] Auto-created 'split' user account.")
+	}
+	return err
 }
 
 // runWorkerLoops runs the federation background worker loops (retry + reputation)

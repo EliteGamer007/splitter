@@ -1,0 +1,47 @@
+name: Bot Populator
+
+on:
+  # Drip mode: runs every 15 minutes, posts 1 per bot each time
+  schedule:
+    - cron: "*/15 * * * *"
+  # Manual trigger with mode selection
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Bot mode: 'seed' for bulk 4000+ posts, 'drip' for 1 per bot"
+        required: true
+        default: "drip"
+        type: choice
+        options:
+          - drip
+          - seed
+
+jobs:
+  populate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max for seed mode
+    concurrency:
+      group: py-bot-populator
+      cancel-in-progress: false # Queue it or skip it, don't overlap
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run bot populator
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BOT_PASSWORD: ${{ secrets.BOT_PASSWORD }}
+          SPLITTER_INSTANCE_1_URL: ${{ vars.SPLITTER_INSTANCE_1_URL || 'https://splitter-m0kv.onrender.com' }}
+          SPLITTER_INSTANCE_2_URL: ${{ vars.SPLITTER_INSTANCE_2_URL || 'https://splitter-2.onrender.com' }}
+          BOT_MODE: ${{ github.event.inputs.mode || 'drip' }}
+          PYTHONUNBUFFERED: "1"
+        run: python scripts/bots/populate.py
