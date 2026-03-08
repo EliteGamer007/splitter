@@ -45,6 +45,8 @@ func NewServer(cfg *config.Config) *Server {
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler(cfg)
 	hashtagHandler := handlers.NewHashtagHandler(postRepo)
+	storyRepo := repository.NewStoryRepository()
+	storyHandler := handlers.NewStoryHandler(storyRepo)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)
@@ -91,7 +93,7 @@ func NewServer(cfg *config.Config) *Server {
 	e.Static("/uploads", "uploads")
 
 	// Routes
-	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, hashtagHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler)
+	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, hashtagHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler, storyHandler)
 
 	return &Server{
 		echo: e,
@@ -118,6 +120,7 @@ func setupRoutes(
 	inboxHandler *handlers.InboxHandler,
 	outboxHandler *handlers.OutboxHandler,
 	federationHandler *handlers.FederationHandler,
+	storyHandler *handlers.StoryHandler,
 ) {
 	// API v1 group
 	api := e.Group("/api/v1")
@@ -287,6 +290,20 @@ func setupRoutes(
 	fedAuth := api.Group("/federation")
 	fedAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	fedAuth.POST("/follow", federationHandler.FollowRemoteUser) // Follow remote user
+
+	// ============================================================
+	// STORY ROUTES
+	// ============================================================
+
+	// Public story media endpoint
+	api.GET("/stories/:id/media", storyHandler.GetStoryMedia)
+
+	// Authenticated story routes
+	storiesAuth := api.Group("/stories")
+	storiesAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	storiesAuth.POST("", storyHandler.CreateStory)       // Upload a story
+	storiesAuth.GET("/feed", storyHandler.GetStoryFeed)   // Get stories feed
+	storiesAuth.DELETE("/:id", storyHandler.DeleteStory)  // Delete own story
 }
 
 // Start starts the HTTP server

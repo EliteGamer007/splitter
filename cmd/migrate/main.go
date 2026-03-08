@@ -81,6 +81,18 @@ func main() {
 		`CREATE INDEX IF NOT EXISTS idx_posts_in_reply_to_uri ON posts(in_reply_to_uri) WHERE in_reply_to_uri IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_connections_source ON federation_connections(source_domain);`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_connections_target ON federation_connections(target_domain);`,
+		// Story feature
+		`CREATE TABLE IF NOT EXISTS stories (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			author_did TEXT NOT NULL,
+			media_data BYTEA NOT NULL,
+			media_type TEXT NOT NULL,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			expires_at TIMESTAMPTZ DEFAULT (now() + interval '24 hours')
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_stories_author_did ON stories(author_did);`,
+		`CREATE INDEX IF NOT EXISTS idx_stories_expires_at ON stories(expires_at);`,
+		`CREATE INDEX IF NOT EXISTS idx_stories_author_expires ON stories(author_did, expires_at DESC);`,
 	}
 
 	for _, query := range queries {
