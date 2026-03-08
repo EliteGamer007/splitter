@@ -651,7 +651,8 @@ func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]
 
 // GetPostsByHashtag returns posts containing a specific hashtag
 func (r *PostRepository) GetPostsByHashtag(ctx context.Context, tag string, userDID string, limit, offset int) ([]*models.Post, error) {
-	pattern := `#` + tag + `\b`
+	// In PostgreSQL POSIX regex, \y is the word boundary marker, not \b
+	pattern := `#` + tag + `\y`
 
 	var query string
 	var args []interface{}
