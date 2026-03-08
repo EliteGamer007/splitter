@@ -19,6 +19,7 @@ import (
 
 const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s"
 
+// --- Gemini Structs ---
 type geminiRequest struct {
 	Contents         []geminiContent `json:"contents"`
 	GenerationConfig map[string]any  `json:"generationConfig,omitempty"`
@@ -30,6 +31,74 @@ type geminiContent struct {
 
 type geminiPart struct {
 	Text string `json:"text"`
+}
+
+// --- OpenAI Structs ---
+type openAIRequest struct {
+	Model    string          `json:"model"`
+	Messages []openAIMessage `json:"messages"`
+}
+
+type openAIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// AskOpenAI calls the standard OpenAI API with a prompt
+func AskOpenAI(apiKey, prompt string) (string, error) {
+	if apiKey == "" {
+		return "", fmt.Errorf("missing API key")
+	}
+
+	reqBody := openAIRequest{
+		Model: "gpt-4o-mini", // Cost-effective model for bots
+		Messages: []openAIMessage{
+			{Role: "system", Content: "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging."},
+			{Role: "user", Content: prompt},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("OpenAI API error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if len(result.Choices) > 0 {
+		return strings.TrimSpace(result.Choices[0].Message.Content), nil
+	}
+
+	return "I couldn't process that request, sorry!", nil
 }
 
 // AskGemini calls the Google Gemini API with a prompt
@@ -114,15 +183,27 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 			promptText = "The user mentioned you without saying anything else. Greet them."
 		}
 
-		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
+		var replyStr string
+		var err error
 
-		log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
-		replyStr, err := AskGemini(apiKey, systemPrompt)
+		// Automatically decide between OpenAI and Gemini
+		if strings.HasPrefix(apiKey, "sk-") {
+			// It's an OpenAI key (sk-...)
+			log.Printf("[SplitBot] Detected OpenAI key, calling GPT-4o-mini...")
+			replyStr, err = AskOpenAI(apiKey, promptText)
+		} else {
+			// Fallback to Gemini
+			systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
+			
+			log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
+			replyStr, err = AskGemini(apiKey, systemPrompt)
+		}
+
 		if err != nil {
-			log.Printf("[SplitBot] ERROR - Gemini call failed: %v", err)
+			log.Printf("[SplitBot] ERROR - AI call failed: %v", err)
 			replyStr = fmt.Sprintf("⚠️ SplitBot error: %v", err)
 		} else {
-			log.Printf("[SplitBot] Gemini responded successfully: %s", replyStr[:min(len(replyStr), 50)])
+			log.Printf("[SplitBot] AI responded successfully: %s", replyStr[:min(len(replyStr), 50)])
 		}
 
 		replyCreate := &models.ReplyCreate{
