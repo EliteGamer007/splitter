@@ -23,9 +23,11 @@ A federated social media application with **password-based** and **DID (Decentra
 
 ## Overview
 
-Splitter supports two authentication methods:
-- **Password Login** — Standard username/email + password (primary method)
-- **DID Authentication** — Ed25519 cryptographic keypairs for advanced/federated users
+Splitter is a full-stack federated social media application. It includes:
+- **Authentication**: Password login & DID (Decentralized Identity) cryptographic keypairs.
+- **Social Features**: Posts, intricate threading/replies, dynamic hashtag extraction, and real-time trending tabs.
+- **AI Integration**: A built-in reply bot (`@split`) that intelligently answers mentions synchronously using either Gemini API or OpenAI API.
+- **Automation**: GitHub Actions chron jobs that run python scripts to seamlessly populate the network with simulated users and topical text.
 
 ## Tech Stack
 
@@ -33,8 +35,9 @@ Splitter supports two authentication methods:
 |-----------|-----------|
 | Backend | Go 1.21+ / Echo v4 |
 | Database | PostgreSQL 15 (Neon Cloud) |
-| Frontend | Next.js / React |
+| Frontend | Next.js / React (Vercel) |
 | Auth | bcrypt + JWT / Ed25519 DID |
+| AI / Bots | Gemini 1.5 Flash / GPT-4o-mini / Python Actions |
 | ORM | pgx/v5 |
 
 ## Project Structure
