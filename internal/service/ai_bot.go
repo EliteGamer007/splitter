@@ -17,7 +17,7 @@ import (
 	"splitter/internal/repository"
 )
 
-const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s"
+const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s"
 
 // --- Gemini Structs ---
 type geminiRequest struct {
@@ -170,56 +170,50 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 
 	log.Printf("[SplitBot] Mention detected! Triggering AI... (PostID: %s)", postID)
 
-	go func() {
-		// Wait 7 seconds to let the API breathe before calling Gemini
-		log.Printf("[SplitBot] Waiting 7 seconds before calling Gemini...")
-		time.Sleep(7 * time.Second)
+	// Remove @split from the text for a cleaner prompt
+	re := regexp.MustCompile(`(?i)@split\b`)
+	promptText := strings.TrimSpace(re.ReplaceAllString(originalContent, ""))
 
-		// Remove @split from the text for a cleaner prompt
-		re := regexp.MustCompile(`(?i)@split\b`)
-		promptText := strings.TrimSpace(re.ReplaceAllString(originalContent, ""))
+	if promptText == "" {
+		promptText = "The user mentioned you without saying anything else. Greet them."
+	}
 
-		if promptText == "" {
-			promptText = "The user mentioned you without saying anything else. Greet them."
-		}
+	var replyStr string
+	var err error
 
-		var replyStr string
-		var err error
+	// Automatically decide between OpenAI and Gemini
+	if strings.HasPrefix(apiKey, "sk-") {
+		// It's an OpenAI key (sk-...)
+		log.Printf("[SplitBot] Detected OpenAI key, calling GPT-4o-mini...")
+		replyStr, err = AskOpenAI(apiKey, promptText)
+	} else {
+		// Fallback to Gemini
+		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
+		
+		log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
+		replyStr, err = AskGemini(apiKey, systemPrompt)
+	}
 
-		// Automatically decide between OpenAI and Gemini
-		if strings.HasPrefix(apiKey, "sk-") {
-			// It's an OpenAI key (sk-...)
-			log.Printf("[SplitBot] Detected OpenAI key, calling GPT-4o-mini...")
-			replyStr, err = AskOpenAI(apiKey, promptText)
-		} else {
-			// Fallback to Gemini
-			systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
-			
-			log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
-			replyStr, err = AskGemini(apiKey, systemPrompt)
-		}
+	if err != nil {
+		log.Printf("[SplitBot] ERROR - AI call failed: %v", err)
+		replyStr = fmt.Sprintf("⚠️ SplitBot error: %v", err)
+	} else {
+		log.Printf("[SplitBot] AI responded successfully: %s", replyStr[:min(len(replyStr), 50)])
+	}
 
-		if err != nil {
-			log.Printf("[SplitBot] ERROR - AI call failed: %v", err)
-			replyStr = fmt.Sprintf("⚠️ SplitBot error: %v", err)
-		} else {
-			log.Printf("[SplitBot] AI responded successfully: %s", replyStr[:min(len(replyStr), 50)])
-		}
+	replyCreate := &models.ReplyCreate{
+		PostID:   postID,
+		ParentID: parentID,
+		Content:  replyStr,
+	}
 
-		replyCreate := &models.ReplyCreate{
-			PostID:   postID,
-			ParentID: parentID,
-			Content:  replyStr,
-		}
+	authorDID := "did:key:bot_split"
 
-		authorDID := "did:key:bot_split"
-
-		ctx := context.Background()
-		_, err = replyRepo.Create(ctx, authorDID, replyCreate, 1)
-		if err != nil {
-			log.Printf("[SplitBot] Failed to save AI reply to DB: %v", err)
-			return
-		}
-		log.Printf("[SplitBot] Successfully responded to post/reply %s", postID)
-	}()
+	ctx := context.Background()
+	_, err = replyRepo.Create(ctx, authorDID, replyCreate, 1)
+	if err != nil {
+		log.Printf("[SplitBot] Failed to save AI reply to DB: %v", err)
+		return
+	}
+	log.Printf("[SplitBot] Successfully responded to post/reply %s", postID)
 }
