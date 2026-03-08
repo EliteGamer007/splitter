@@ -197,7 +197,7 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 	} else {
 		// Fallback to Gemini
 		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
-		
+
 		log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
 		replyStr, err = AskGemini(apiKey, systemPrompt)
 	}

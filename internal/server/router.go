@@ -302,8 +302,8 @@ func setupRoutes(
 	storiesAuth := api.Group("/stories")
 	storiesAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	storiesAuth.POST("", storyHandler.CreateStory)       // Upload a story
-	storiesAuth.GET("/feed", storyHandler.GetStoryFeed)   // Get stories feed
-	storiesAuth.DELETE("/:id", storyHandler.DeleteStory)  // Delete own story
+	storiesAuth.GET("/feed", storyHandler.GetStoryFeed)  // Get stories feed
+	storiesAuth.DELETE("/:id", storyHandler.DeleteStory) // Delete own story
 }
 
 // Start starts the HTTP server
