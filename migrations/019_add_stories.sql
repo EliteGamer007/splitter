@@ -1,18 +1,13 @@
--- Migration 019: Add stories table for Instagram-like story feature
--- Stories are images visible to followers for 24 hours
+-- Migration 019: Create stories table
 
 CREATE TABLE IF NOT EXISTS stories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    author_did TEXT NOT NULL,
-    media_data BYTEA NOT NULL,
-    media_type TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    expires_at TIMESTAMPTZ DEFAULT (now() + interval '24 hours')
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    media_url TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes for efficient feed queries
-CREATE INDEX IF NOT EXISTS idx_stories_author_did ON stories(author_did);
-CREATE INDEX IF NOT EXISTS idx_stories_expires_at ON stories(expires_at);
-CREATE INDEX IF NOT EXISTS idx_stories_author_expires ON stories(author_did, expires_at DESC);
-
-COMMENT ON TABLE stories IS 'Instagram-like stories: images visible to followers for 24 hours';
+CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id);
+CREATE INDEX IF NOT EXISTS idx_stories_expiry ON stories(expires_at);

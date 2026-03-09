@@ -1,122 +1,178 @@
 package handlers
 
 import (
-	"fmt"
+	"context"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
-	"splitter/internal/repository"
+	"splitter/internal/models"
 	"splitter/internal/service"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
-// StoryHandler handles story-related requests
 type StoryHandler struct {
-	storyRepo *repository.StoryRepository
+	service *service.StoryService
 }
 
-// NewStoryHandler creates a new StoryHandler
-func NewStoryHandler(storyRepo *repository.StoryRepository) *StoryHandler {
-	return &StoryHandler{storyRepo: storyRepo}
+func NewStoryHandler(svc *service.StoryService) *StoryHandler {
+	return &StoryHandler{service: svc}
 }
 
-// CreateStory uploads a new story image
 func (h *StoryHandler) CreateStory(c echo.Context) error {
-	did, ok := c.Get("did").(string)
-	if !ok || did == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Unauthorized",
-		})
+	userIDStr, ok := c.Get("user_id").(string)
+	if !ok || userIDStr == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 	}
 
-	file, err := c.FormFile("file")
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Image file is required",
-		})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid user ID format"})
 	}
 
-	// Validate and read image (5MB limit, same as posts)
-	mediaData, mediaType, err := service.ReadAndValidateImage(file, 5*1024*1024)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("Invalid image: %v", err),
-		})
+	var req struct {
+		MediaURL string `json:"media_url"`
 	}
 
-	story, err := h.storyRepo.Create(c.Request().Context(), did, mediaData, mediaType)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create story",
-		})
+	var mediaURL string
+
+	if err := c.Bind(&req); err == nil && req.MediaURL != "" {
+		mediaURL = req.MediaURL
+	} else {
+
+		file, err := c.FormFile("file")
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "invalid request body",
+			})
+		}
+
+		src, err := file.Open()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to open uploaded file"})
+		}
+		defer src.Close()
+
+		if err := os.MkdirAll("./uploads", os.ModePerm); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create uploads directory"})
+		}
+
+		filename := uuid.New().String() + filepath.Ext(file.Filename)
+		path := "./uploads/" + filename
+
+		dst, err := os.Create(path)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save file"})
+		}
+		defer dst.Close()
+
+		if _, err = io.Copy(dst, src); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to copy file contents"})
+		}
+
+		mediaURL = "/media/" + filename
 	}
 
-	return c.JSON(http.StatusCreated, story)
+	if err := h.service.CreateStory(c.Request().Context(), userID, mediaURL); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create story"})
+	}
+
+	return c.JSON(http.StatusCreated, map[string]string{"status": "story created"})
 }
 
-// GetStoryFeed returns stories from followed users + own stories, grouped by user
-func (h *StoryHandler) GetStoryFeed(c echo.Context) error {
-	did, ok := c.Get("did").(string)
-	if !ok || did == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Unauthorized",
-		})
+func (h *StoryHandler) GetStories(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	userIDStr, ok := c.Get("user_id").(string)
+	if ok && userIDStr != "" {
+		if viewerID, err := uuid.Parse(userIDStr); err == nil {
+			ctx = context.WithValue(ctx, "viewer_id", viewerID)
+		}
 	}
 
-	storyUsers, err := h.storyRepo.GetFeedForUser(c.Request().Context(), did)
+	stories, err := h.service.GetStories(ctx)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to retrieve stories",
-		})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch stories"})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"stories": storyUsers,
-	})
+	if stories == nil {
+		stories = make([]models.Story, 0)
+	}
+
+	return c.JSON(http.StatusOK, stories)
 }
 
-// GetStoryMedia serves the binary image content for a story
-func (h *StoryHandler) GetStoryMedia(c echo.Context) error {
-	storyID := c.Param("id")
-	if storyID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid story ID",
-		})
-	}
-
-	mediaData, mediaType, err := h.storyRepo.GetMediaContent(c.Request().Context(), storyID)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{
-			"error": "Story not found or expired",
-		})
-	}
-
-	return c.Blob(http.StatusOK, mediaType, mediaData)
-}
-
-// DeleteStory removes a story (author only)
 func (h *StoryHandler) DeleteStory(c echo.Context) error {
-	did, ok := c.Get("did").(string)
-	if !ok || did == "" {
+	userIDStr, ok := c.Get("user_id").(string)
+	if !ok || userIDStr == "" {
 		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Unauthorized",
+			"error": "unauthorized",
 		})
 	}
 
-	storyID := c.Param("id")
-	if storyID == "" {
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid story ID",
+			"error": "invalid user id",
 		})
 	}
 
-	if err := h.storyRepo.Delete(c.Request().Context(), storyID, did); err != nil {
+	storyIDStr := c.Param("id")
+
+	storyID, err := uuid.Parse(storyIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "invalid story id",
+		})
+	}
+
+	err = h.service.DeleteStory(c.Request().Context(), storyID, userID)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to delete story",
+			"error": "failed to delete story",
 		})
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
-		"message": "Story deleted successfully",
+		"status": "story deleted",
+	})
+}
+
+func (h *StoryHandler) ViewStory(c echo.Context) error {
+	userIDStr, ok := c.Get("user_id").(string)
+	if !ok || userIDStr == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "unauthorized",
+		})
+	}
+
+	viewerID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "invalid user id",
+		})
+	}
+
+	storyIDStr := c.Param("id")
+
+	storyID, err := uuid.Parse(storyIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "invalid story id",
+		})
+	}
+
+	err = h.service.RecordStoryView(c.Request().Context(), storyID, viewerID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to record story view",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"status": "view recorded",
 	})
 }

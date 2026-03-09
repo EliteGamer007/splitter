@@ -2,23 +2,22 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
-// Story represents a single story image uploaded by a user
-type Story struct {
-	ID        string    `json:"id"`
-	AuthorDID string    `json:"author_did"`
-	MediaURL  string    `json:"media_url"`
-	MediaType string    `json:"media_type"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
+type Author struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	Avatar   string    `json:"avatar"`
 }
 
-// StoryUser represents a user who has active stories, with their stories grouped
-type StoryUser struct {
-	AuthorDID   string  `json:"author_did"`
-	Username    string  `json:"username"`
-	DisplayName string  `json:"display_name"`
-	AvatarURL   string  `json:"avatar_url"`
-	Stories     []Story `json:"stories"`
+type Story struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	MediaURL  string    `json:"media_url"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Seen      bool      `json:"seen"`
+	Author    Author    `json:"author"`
 }

@@ -10,6 +10,8 @@ import (
 	"splitter/internal/handlers"
 	"splitter/internal/middleware"
 	"splitter/internal/repository"
+	"splitter/internal/service"
+	"splitter/internal/worker"
 
 	govalidator "github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -33,6 +35,7 @@ func NewServer(cfg *config.Config) *Server {
 	followRepo := repository.NewFollowRepository()
 	interactionRepo := repository.NewInteractionRepository()
 	messageRepo := repository.NewMessageRepository()
+	storyRepo := repository.NewStoryRepository()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, cfg)
@@ -45,8 +48,16 @@ func NewServer(cfg *config.Config) *Server {
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler(cfg)
 	hashtagHandler := handlers.NewHashtagHandler(postRepo)
+<<<<<<< HEAD
 	storyRepo := repository.NewStoryRepository()
 	storyHandler := handlers.NewStoryHandler(storyRepo)
+=======
+	storyService := service.NewStoryService(storyRepo)
+	storyHandler := handlers.NewStoryHandler(storyService)
+
+	// Start story cleanup worker
+	worker.StartStoryCleanup(storyRepo)
+>>>>>>> 6c96a37 (Implemented the backend for Story)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)
@@ -91,6 +102,8 @@ func NewServer(cfg *config.Config) *Server {
 
 	// Static routes (legacy uploads fallback)
 	e.Static("/uploads", "uploads")
+	// Media routes for stories
+	e.Static("/media", "./uploads")
 
 	// Routes
 	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, hashtagHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler, storyHandler)
@@ -173,6 +186,29 @@ func setupRoutes(
 
 	// Media routes
 	api.GET("/media/:id/content", mediaHandler.GetMediaContent)
+
+	// Story routes
+	story := api.Group("/stories")
+	story.GET(
+		"",
+		storyHandler.GetStories,
+		middleware.OptionalAuthMiddleware(cfg.JWT.Secret),
+	)
+	story.POST(
+		"",
+		storyHandler.CreateStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
+	story.DELETE(
+		"/:id",
+		storyHandler.DeleteStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
+	story.POST(
+		"/:id/view",
+		storyHandler.ViewStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
 
 	// Post routes
 	posts := api.Group("/posts")
