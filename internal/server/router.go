@@ -48,16 +48,12 @@ func NewServer(cfg *config.Config) *Server {
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
 	replyHandler := handlers.NewReplyHandler(cfg)
 	hashtagHandler := handlers.NewHashtagHandler(postRepo)
-<<<<<<< HEAD
-	storyRepo := repository.NewStoryRepository()
-	storyHandler := handlers.NewStoryHandler(storyRepo)
-=======
+
 	storyService := service.NewStoryService(storyRepo)
 	storyHandler := handlers.NewStoryHandler(storyService)
 
 	// Start story cleanup worker
 	worker.StartStoryCleanup(storyRepo)
->>>>>>> 6c96a37 (Implemented the backend for Story)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)
@@ -187,29 +183,6 @@ func setupRoutes(
 	// Media routes
 	api.GET("/media/:id/content", mediaHandler.GetMediaContent)
 
-	// Story routes
-	story := api.Group("/stories")
-	story.GET(
-		"",
-		storyHandler.GetStories,
-		middleware.OptionalAuthMiddleware(cfg.JWT.Secret),
-	)
-	story.POST(
-		"",
-		storyHandler.CreateStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
-	story.DELETE(
-		"/:id",
-		storyHandler.DeleteStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
-	story.POST(
-		"/:id/view",
-		storyHandler.ViewStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
-
 	// Post routes
 	posts := api.Group("/posts")
 	posts.Use(middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
@@ -331,15 +304,31 @@ func setupRoutes(
 	// STORY ROUTES
 	// ============================================================
 
-	// Public story media endpoint
-	api.GET("/stories/:id/media", storyHandler.GetStoryMedia)
+	stories := api.Group("/stories")
 
-	// Authenticated story routes
-	storiesAuth := api.Group("/stories")
-	storiesAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
-	storiesAuth.POST("", storyHandler.CreateStory)       // Upload a story
-	storiesAuth.GET("/feed", storyHandler.GetStoryFeed)  // Get stories feed
-	storiesAuth.DELETE("/:id", storyHandler.DeleteStory) // Delete own story
+	stories.GET(
+		"",
+		storyHandler.GetStories,
+		middleware.OptionalAuthMiddleware(cfg.JWT.Secret),
+	)
+
+	stories.POST(
+		"",
+		storyHandler.CreateStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
+
+	stories.DELETE(
+		"/:id",
+		storyHandler.DeleteStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
+
+	stories.POST(
+		"/:id/view",
+		storyHandler.ViewStory,
+		middleware.AuthMiddleware(cfg.JWT.Secret),
+	)
 }
 
 // Start starts the HTTP server
