@@ -304,31 +304,25 @@ func setupRoutes(
 	// STORY ROUTES
 	// ============================================================
 
-	stories := api.Group("/stories")
+	// Story routes
+	story := api.Group("/stories")
 
-	stories.GET(
-		"",
-		storyHandler.GetStories,
-		middleware.OptionalAuthMiddleware(cfg.JWT.Secret),
-	)
+	story.GET("", storyHandler.GetStories, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 
-	stories.POST(
-		"",
-		storyHandler.CreateStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
+	// Fetch story feed
+	story.GET("/feed", storyHandler.GetStoryFeed, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 
-	stories.DELETE(
-		"/:id",
-		storyHandler.DeleteStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
+	// Upload story
+	story.POST("", storyHandler.CreateStory, middleware.AuthMiddleware(cfg.JWT.Secret))
 
-	stories.POST(
-		"/:id/view",
-		storyHandler.ViewStory,
-		middleware.AuthMiddleware(cfg.JWT.Secret),
-	)
+	// Delete story
+	story.DELETE("/:id", storyHandler.DeleteStory, middleware.AuthMiddleware(cfg.JWT.Secret))
+
+	// Record story view
+	story.POST("/:id/view", storyHandler.ViewStory, middleware.AuthMiddleware(cfg.JWT.Secret))
+
+	// Serve story media
+	api.GET("/stories/:id/media", storyHandler.GetStoryMedia)
 }
 
 // Start starts the HTTP server

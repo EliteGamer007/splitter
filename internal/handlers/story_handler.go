@@ -176,3 +176,31 @@ func (h *StoryHandler) ViewStory(c echo.Context) error {
 		"status": "view recorded",
 	})
 }
+
+func (h *StoryHandler) GetStoryFeed(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	stories, err := h.service.GetStoryFeed(ctx)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"stories": stories,
+	})
+}
+
+func (h *StoryHandler) GetStoryMedia(c echo.Context) error {
+	id := c.Param("id")
+
+	media, contentType, err := h.service.GetStoryMedia(c.Request().Context(), id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "story media not found",
+		})
+	}
+
+	return c.Blob(http.StatusOK, contentType, media)
+}

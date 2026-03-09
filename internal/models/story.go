@@ -21,3 +21,10 @@ type Story struct {
 	Seen      bool      `json:"seen"`
 	Author    Author    `json:"author"`
 }
+
+type StoryUser struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Avatar   string    `json:"avatar"`
+	Stories  []Story   `json:"stories"`
+}

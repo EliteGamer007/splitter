@@ -2,6 +2,9 @@ package repository
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"strings"
 
 	"splitter/internal/db"
 	"splitter/internal/models"
@@ -97,4 +100,98 @@ func (r *StoryRepository) RecordStoryView(ctx context.Context, storyID uuid.UUID
 	`
 	_, err := db.GetDB().Exec(ctx, query, storyID, viewerID)
 	return err
+}
+
+func (r *StoryRepository) GetStoryFeed(ctx context.Context) ([]models.StoryUser, error) {
+	viewerID, ok := ctx.Value("viewer_id").(uuid.UUID)
+	var query string
+	var rows pgx.Rows
+	var err error
+
+	if ok && viewerID != uuid.Nil {
+		query = `
+			SELECT s.id, s.user_id, s.media_url, s.created_at, s.expires_at, 
+			       EXISTS (
+			           SELECT 1 FROM story_views sv 
+			           WHERE sv.story_id = s.id AND sv.viewer_id = $1
+			       ) AS seen,
+			       u.username, COALESCE(u.avatar_url, '') AS avatar
+			FROM stories s
+			JOIN users u ON u.id = s.user_id
+			WHERE s.expires_at > NOW()
+			ORDER BY s.created_at DESC
+		`
+		rows, err = db.GetDB().Query(ctx, query, viewerID)
+	} else {
+		query = `
+			SELECT s.id, s.user_id, s.media_url, s.created_at, s.expires_at, false as seen,
+			       u.username, COALESCE(u.avatar_url, '') AS avatar
+			FROM stories s
+			JOIN users u ON u.id = s.user_id
+			WHERE s.expires_at > NOW()
+			ORDER BY s.created_at DESC
+		`
+		rows, err = db.GetDB().Query(ctx, query)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userMap := make(map[uuid.UUID]*models.StoryUser)
+	var userOrder []uuid.UUID
+
+	for rows.Next() {
+		var s models.Story
+		var username, avatar string
+		if err := rows.Scan(&s.ID, &s.UserID, &s.MediaURL, &s.CreatedAt, &s.ExpiresAt, &s.Seen,
+			&username, &avatar); err != nil {
+			return nil, err
+		}
+
+		s.Author = models.Author{
+			ID:       s.UserID,
+			Username: username,
+			Avatar:   avatar,
+		}
+
+		if _, exists := userMap[s.UserID]; !exists {
+			userMap[s.UserID] = &models.StoryUser{
+				UserID:   s.UserID,
+				Username: username,
+				Avatar:   avatar,
+				Stories:  []models.Story{},
+			}
+			userOrder = append(userOrder, s.UserID)
+		}
+		userMap[s.UserID].Stories = append(userMap[s.UserID].Stories, s)
+	}
+
+	var feed []models.StoryUser
+	for _, uid := range userOrder {
+		feed = append(feed, *userMap[uid])
+	}
+
+	return feed, nil
+}
+
+func (r *StoryRepository) GetStoryMedia(ctx context.Context, id string) ([]byte, string, error) {
+	query := "SELECT media_url FROM stories WHERE id = $1"
+	var mediaURL string
+	err := db.GetDB().QueryRow(ctx, query, id).Scan(&mediaURL)
+	if err != nil {
+		return nil, "", err
+	}
+
+	fileName := strings.TrimPrefix(mediaURL, "/media/")
+	filePath := "./uploads/" + fileName
+
+	bytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	contentType := http.DetectContentType(bytes)
+	return bytes, contentType, nil
 }

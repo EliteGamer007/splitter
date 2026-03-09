@@ -41,3 +41,11 @@ func (s *StoryService) DeleteStory(ctx context.Context, storyID uuid.UUID, userI
 func (s *StoryService) RecordStoryView(ctx context.Context, storyID uuid.UUID, viewerID uuid.UUID) error {
 	return s.repo.RecordStoryView(ctx, storyID, viewerID)
 }
+
+func (s *StoryService) GetStoryFeed(ctx context.Context) ([]models.StoryUser, error) {
+	return s.repo.GetStoryFeed(ctx)
+}
+
+func (s *StoryService) GetStoryMedia(ctx context.Context, id string) ([]byte, string, error) {
+	return s.repo.GetStoryMedia(ctx, id)
+}
