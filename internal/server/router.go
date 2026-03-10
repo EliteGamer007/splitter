@@ -278,10 +278,10 @@ func setupRoutes(
 	admin.GET("/federation/reputation", adminHandler.GetInstanceReputation)
 	admin.GET("/federation/network", adminHandler.GetFederationNetwork)
 	admin.GET("/messaging-security", adminHandler.GetMessagingSecurity)
-	admin.GET("/ai-actions", adminHandler.GetAIActionsQueue)         // AI-auto-removed content
-	admin.GET("/appeals", adminHandler.GetAppeals)                   // User appeals queue
-	admin.POST("/appeals/:id/resolve", adminHandler.ResolveAppeal)   // Resolve an appeal
-	admin.POST("/users/:id/ban", adminHandler.BanUser)               // Permanently ban user
+	admin.GET("/ai-actions", adminHandler.GetAIActionsQueue)       // AI-auto-removed content
+	admin.GET("/appeals", adminHandler.GetAppeals)                 // User appeals queue
+	admin.POST("/appeals/:id/resolve", adminHandler.ResolveAppeal) // Resolve an appeal
+	admin.POST("/users/:id/ban", adminHandler.BanUser)             // Permanently ban user
 
 	// ============================================================
 	// FEDERATION ROUTES

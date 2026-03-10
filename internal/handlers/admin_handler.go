@@ -1288,9 +1288,9 @@ func (h *AdminHandler) GetAIActionsQueue(c echo.Context) error {
 	for rows.Next() {
 		var (
 			id, postID, content, authorID, username, instanceDomain string
-			reason, aiReason                                         string
-			createdAt, aiScreenedAt                                  time.Time
-			hasAppeal                                                bool
+			reason, aiReason                                        string
+			createdAt, aiScreenedAt                                 time.Time
+			hasAppeal                                               bool
 		)
 		if scanErr := rows.Scan(&id, &postID, &content, &authorID, &username, &instanceDomain, &reason, &aiReason, &createdAt, &aiScreenedAt, &hasAppeal); scanErr != nil {
 			continue
