@@ -38,50 +38,57 @@ GEMINI_COOLDOWN = 4
 # 25 topic categories — each has 4 bot personas = 100 bots total.
 # ---------------------------------------------------------------------------
 TOPIC_TEMPLATES = [
+    # ── Splitter / Federation / Decentralization (~55-60% of posts) ──
     {
-        "category": "splitter_evangelist",
-        "hashtags": ["#Splitter", "#Federation", "#Web3", "#FutureOfSocial"],
-        "prompt": "Write a short casual social media post (1-3 sentences) praising Splitter, the new federated app we are on. Mention decentralization or no algorithms. Include 1-2 hashtags like {hashtags}."
+        "category": "splitter_hype",
+        "hashtags": ["#Splitter", "#Federation", "#FutureOfSocial", "#NoAlgorithms"],
+        "prompt": "Write a short casual social media post (1-3 sentences) from someone who just discovered Splitter and is blown away by the decentralized, no-algorithm feed. Vary your tone randomly between excited, chill, nerdy, or sarcastic. Include 1-2 hashtags like {hashtags}. Never start with 'Just'."
     },
     {
-        "category": "splitter_support",
-        "hashtags": ["#SplitterApp", "#TechSupport", "#Federation"],
-        "prompt": "Write a short casual social media post (1-2 sentences) about how smooth the Splitter UI is, or seeing live trending hashtags here. Include 1-2 hashtags like {hashtags}."
+        "category": "splitter_vs_bigtech",
+        "hashtags": ["#Splitter", "#ByeTwitter", "#Decentralization", "#Web3"],
+        "prompt": "Write a short casual social media post (1-2 sentences) comparing Splitter positively to mainstream social media (Twitter, Instagram, etc). Be witty or thoughtful. Include 1-2 hashtags like {hashtags}. Don't be preachy."
     },
     {
-        "category": "crypto_decentralization",
-        "hashtags": ["#Crypto", "#Blockchain", "#DeFi", "#Decentralization"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about decentralization and taking back control of data. Include 1-2 hashtags like {hashtags}."
+        "category": "federation_technical",
+        "hashtags": ["#Federation", "#OpenProtocol", "#Splitter", "#SelfHosting"],
+        "prompt": "Write a short casual social media post (1-3 sentences) from a developer or techie excited about federation, open protocols, or self-hosting social media. Sound knowledgeable but approachable. Include 1-2 hashtags like {hashtags}."
     },
     {
-        "category": "generic_tech",
-        "hashtags": ["#Programming", "#AI", "#Coding", "#Developer"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about coding, learning a new technology, or building software. Don't mention specific apps. Include 1-2 hashtags like {hashtags}."
+        "category": "splitter_feature_love",
+        "hashtags": ["#SplitterApp", "#Trending", "#E2E", "#Federation"],
+        "prompt": "Write a short casual social media post (1-2 sentences) praising a specific Splitter feature like trending hashtags, E2E encrypted DMs, the clean UI, or the AI bot. Pick ONE feature and be specific. Include 1-2 hashtags like {hashtags}."
     },
     {
-        "category": "generic_life_1",
-        "hashtags": ["#WeekendVibes", "#Coffee", "#DailyGrind"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about enjoying a coffee, morning routines, or weekend plans. Sound like a regular person posting an update. Include 1 hashtag like {hashtags}."
+        "category": "crypto_privacy",
+        "hashtags": ["#Crypto", "#Privacy", "#DeFi", "#Decentralization", "#Web3"],
+        "prompt": "Write a short casual social media post (1-3 sentences) about data privacy, owning your own data, or why centralized platforms are problematic. Sound passionate but not conspiratorial. Include 1-2 hashtags like {hashtags}."
     },
     {
-        "category": "generic_life_2",
-        "hashtags": ["#Foodie", "#Cooking", "#LunchBreak"],
-        "prompt": "Write a short casual social media post (1-2 sentences) about trying a new recipe, eating good food, or a lunch break. Sound like a regular person. Include 1 hashtag like {hashtags}."
+        "category": "splitter_community",
+        "hashtags": ["#Splitter", "#Community", "#Fediverse", "#NewHere"],
+        "prompt": "Write a short casual social media post (1-2 sentences) about how friendly or refreshing the Splitter community feels compared to toxic mainstream platforms. Be genuine. Include 1-2 hashtags like {hashtags}."
+    },
+    # ── Generic / Everyday (~40-45% of posts) ──
+    {
+        "category": "dev_life",
+        "hashtags": ["#Programming", "#AI", "#Coding", "#Developer", "#BuildInPublic"],
+        "prompt": "Write a short casual social media post (1-3 sentences) about a coding win, debugging frustration, learning a new language, or shipping a side project. Be relatable. Vary between triumphant, exhausted, or humorous. Include 1-2 hashtags like {hashtags}."
     },
     {
-        "category": "generic_entertainment",
-        "hashtags": ["#Gaming", "#Movies", "#NowWatching", "#Music"],
-        "prompt": "Write a short casual social media post (1-3 sentences) about watching a good movie, listening to music, or playing a video game. Include 1-2 hashtags like {hashtags}."
+        "category": "daily_life",
+        "hashtags": ["#WeekendVibes", "#Coffee", "#DailyGrind", "#MorningRoutine", "#Chill"],
+        "prompt": "Write a short casual social media post (1-3 sentences) about your morning, coffee, weather, small daily wins, or weekend plans. Sound like a real person. Vary between happy, tired, reflective, or sarcastic. Include 1 hashtag like {hashtags}."
     },
     {
-        "category": "generic_thoughts",
-        "hashtags": ["#RandomThoughts", "#Mood", "#JustThinking"],
-        "prompt": "Write a short casual social media post (1-2 sentences) sharing a random shower thought, minor observation about life, or a sudden realization. Include 1-2 hashtags like {hashtags}."
+        "category": "food_and_hobbies",
+        "hashtags": ["#Foodie", "#Cooking", "#Gaming", "#Music", "#Movies"],
+        "prompt": "Write a short casual social media post (1-2 sentences) about food you ate, a game you played, a song stuck in your head, or a movie you watched. Be specific with a detail. Include 1 hashtag like {hashtags}."
     },
     {
-        "category": "generic_nature",
-        "hashtags": ["#Nature", "#Outdoors", "#Walking", "#Sunlight"],
-        "prompt": "Write a short casual social media post (1-2 sentences) about going for a walk, enjoying the weather, or spending time outdoors. Include 1-2 hashtags like {hashtags}."
+        "category": "random_thoughts",
+        "hashtags": ["#RandomThoughts", "#Mood", "#ShowerThoughts", "#Unpopular"],
+        "prompt": "Write a unique shower thought, hot take, funny observation, or mini-rant in 1-2 sentences that sounds like something someone would actually tweet. Be original and avoid cliches. Include 1 hashtag like {hashtags}."
     }
 ]
 
@@ -154,7 +161,9 @@ def generate_post_text(prompt: str, max_retries: int = 3) -> str:
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 1.0,
+            "temperature": 1.2,
+            "topP": 0.95,
+            "topK": 40,
             "maxOutputTokens": 150,
         },
     }
@@ -284,6 +293,24 @@ def create_post(bot: dict, token: str, content: str) -> bool:
 # ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
+# Dynamic prompt builder — picks a fresh template each call for variety
+# ---------------------------------------------------------------------------
+TONE_MODIFIERS = [
+    "Be enthusiastic.", "Be chill and laid-back.", "Be slightly sarcastic.",
+    "Be thoughtful and reflective.", "Be funny.", "Use gen-z slang.",
+    "Be straightforward.", "Be nerdy.", "Keep it mysterious.",
+    "Sound tired but happy.", "Be optimistic.", "Be philosophical.",
+]
+
+def fresh_prompt():
+    """Build a unique prompt each time by picking a random template + random tone."""
+    template = random.choice(TOPIC_TEMPLATES)
+    chosen_tags = " ".join(random.sample(template["hashtags"], min(2, len(template["hashtags"]))))
+    base = template["prompt"].replace("{hashtags}", chosen_tags)
+    tone = random.choice(TONE_MODIFIERS)
+    return f"{base} {tone} Do NOT start with 'Just'. Be unique — never repeat common phrases."
+
+# ---------------------------------------------------------------------------
 
 def authenticate_all_bots() -> dict:
     """Register/login all bots and return {username: token} map."""
@@ -317,7 +344,7 @@ def run_seed_mode(tokens: dict):
             if not token:
                 continue
 
-            content = generate_post_text(bot["prompt"])
+            content = generate_post_text(fresh_prompt())
             if not content:
                 failed += 1
                 continue
@@ -359,7 +386,7 @@ def run_drip_mode(tokens: dict):
         if not token:
             continue
 
-        content = generate_post_text(bot["prompt"])
+        content = generate_post_text(fresh_prompt())
         if not content:
             failed += 1
             continue
