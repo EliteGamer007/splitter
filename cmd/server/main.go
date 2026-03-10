@@ -42,6 +42,27 @@ func main() {
 	// Ensure migration 023 is applied (remote actor encryption key for E2E DMs)
 	db.GetDB().Exec(context.Background(), "ALTER TABLE remote_actors ADD COLUMN IF NOT EXISTS encryption_public_key TEXT;")
 
+	// Ensure encryption_public_key column exists on users table (may already exist from master schema)
+	db.GetDB().Exec(context.Background(), "ALTER TABLE users ADD COLUMN IF NOT EXISTS encryption_public_key TEXT DEFAULT '';")
+
+	// One-time reset: clear all broken/mismatched encryption keys so every user
+	// gets a fresh key pair on next login.  The flag row prevents this from
+	// running more than once.
+	db.GetDB().Exec(context.Background(), "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())")
+	resetTag := "e2e_key_reset_v1"
+	var exists bool
+	err := db.GetDB().QueryRow(context.Background(),
+		"SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)", resetTag).Scan(&exists)
+	if err != nil || !exists {
+		log.Println("[E2E] Resetting all encryption_public_key values to force fresh key generation...")
+		db.GetDB().Exec(context.Background(), "UPDATE users SET encryption_public_key = '' WHERE encryption_public_key IS NOT NULL AND encryption_public_key != ''")
+		db.GetDB().Exec(context.Background(), "UPDATE remote_actors SET encryption_public_key = '' WHERE encryption_public_key IS NOT NULL AND encryption_public_key != ''")
+		// Record that we ran this so it never runs again
+		db.GetDB().Exec(context.Background(),
+			"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING", resetTag)
+		log.Println("[E2E] All encryption keys cleared. Users will get fresh keys on next login.")
+	}
+
 	// Ensure admin user exists
 	ensureAdminUser(cfg) // Silent check, no logging needed
 
