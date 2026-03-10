@@ -550,7 +550,7 @@ func (h *FederationHandler) GetPublicUserList(c echo.Context) error {
 		}
 	}
 
-	users, _, err := h.userRepo.GetAllUsers(ctx, limit, 0)
+	users, total, err := h.userRepo.GetAllUsers(ctx, limit, 0)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "failed to get users",
@@ -581,7 +581,7 @@ func (h *FederationHandler) GetPublicUserList(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"users":  publicUsers,
-		"total":  len(publicUsers),
+		"total":  total,
 		"domain": h.cfg.Federation.Domain,
 	})
 }

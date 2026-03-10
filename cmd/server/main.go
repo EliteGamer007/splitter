@@ -69,30 +69,31 @@ func main() {
 	}
 }
 
-// ensureAdminUser creates the admin user if it doesn't exist
+// ensureAdminUser creates the admin user if it doesn't exist, and always keeps
+// the password and role in sync so login works after a fresh deploy.
 func ensureAdminUser() error {
 	ctx := context.Background()
 	userRepo := repository.NewUserRepository()
 
-	// Check if admin already exists
-	existingAdmin, _, _ := userRepo.GetByUsername(ctx, "admin")
-	if existingAdmin != nil {
-		// Silently ensure admin role is set
-		updateQuery := `UPDATE users SET role = 'admin' WHERE username = 'admin'`
-		db.GetDB().Exec(ctx, updateQuery)
-		return nil
-	}
-
-	// Create admin user with password "splitteradmin"
+	// Always regenerate hash so the known password is correct on every startup
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte("splitteradmin"), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
+	// Check if admin already exists
+	existingAdmin, _, _ := userRepo.GetByUsername(ctx, "admin")
+	if existingAdmin != nil {
+		// Ensure admin role and password are both correct
+		updateQuery := `UPDATE users SET role = 'admin', password_hash = $1 WHERE username = 'admin'`
+		db.GetDB().Exec(ctx, updateQuery, string(passwordHash))
+		return nil
+	}
+
 	query := `
 		INSERT INTO users (username, email, password_hash, instance_domain, display_name, role, did, public_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (email) DO UPDATE SET role = 'admin'
+		ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = EXCLUDED.password_hash
 	`
 
 	_, err = db.GetDB().Exec(ctx, query,
