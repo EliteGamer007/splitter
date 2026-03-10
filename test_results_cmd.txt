@@ -1,0 +1,112 @@
+2026/03/10 12:54:29 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+.env loaded successfully
+2026/03/10 12:54:31 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:54:32 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:54:32 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:54:32 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:54:32.7938937+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62429","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":689946700,"latency_human":"689.9467ms","bytes_in":101,"bytes_out":807}
+{"time":"2026-03-10T12:54:33.2707329+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62429","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":332061800,"latency_human":"332.0618ms","bytes_in":61,"bytes_out":807}
+{"time":"2026-03-10T12:54:33.5153878+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62429","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":243609800,"latency_human":"243.6098ms","bytes_in":60,"bytes_out":41}
+2026/03/10 12:54:38 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:54:38 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:54:38 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:54:38 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:54:39.6888447+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":804004500,"latency_human":"804.0045ms","bytes_in":224,"bytes_out":864}
+2026/03/10 12:54:40 Key rotated successfully for user a7f8a181-1155-4dec-817a-f44695d32b31 (DID: did:splitter:krhappy_8842490004948_8842490001067)
+{"time":"2026-03-10T12:54:40.894042+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":1205197300,"latency_human":"1.2051973s","bytes_in":221,"bytes_out":146}
+2026/03/10 12:54:40 [Federation] DeliverToFollowers: authorDID=did:splitter:krhappy_8842490004948_8842490001067, domain=splitter-1
+2026/03/10 12:54:41 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:54:41 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T12:54:41.9635852+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"GET","uri":"/api/v1/auth/key-history","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":868614200,"latency_human":"868.6142ms","bytes_in":0,"bytes_out":366}
+{"time":"2026-03-10T12:54:42.4847591+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":520598800,"latency_human":"520.5988ms","bytes_in":227,"bytes_out":871}
+2026/03/10 12:54:43 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+2026/03/10 12:54:43 Key rotated successfully for user 84ceaa7c-9583-4437-a43f-327dbe837602 (DID: did:splitter:krreplay_9641603004926_9641603004203)
+2026/03/10 12:54:43 [Federation] DeliverToFollowers: authorDID=did:splitter:krreplay_9641603004926_9641603004203, domain=splitter-1
+{"time":"2026-03-10T12:54:43.2395259+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":753498900,"latency_human":"753.4989ms","bytes_in":222,"bytes_out":147}
+2026/03/10 12:54:43 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:54:43 [Federation] Delivering to 1 unique inboxes
+2026/03/10 12:54:43 RotateKey DB error for user 84ceaa7c-9583-4437-a43f-327dbe837602: failed to record key rotation: ERROR: duplicate key value violates unique constraint "key_rotations_nonce_key" (SQLSTATE 23505)
+{"time":"2026-03-10T12:54:43.5937885+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":409,"error":"","latency":351400400,"latency_human":"351.4004ms","bytes_in":222,"bytes_out":97}
+{"time":"2026-03-10T12:54:44.1404465+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":546083700,"latency_human":"546.0837ms","bytes_in":230,"bytes_out":878}
+{"time":"2026-03-10T12:54:44.3509297+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":209138600,"latency_human":"209.1386ms","bytes_in":223,"bytes_out":64}
+{"time":"2026-03-10T12:54:44.6746202+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":321067600,"latency_human":"321.0676ms","bytes_in":227,"bytes_out":871}
+{"time":"2026-03-10T12:54:44.8381278+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":162928400,"latency_human":"162.9284ms","bytes_in":222,"bytes_out":90}
+{"time":"2026-03-10T12:54:45.1455459+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":305591600,"latency_human":"305.5916ms","bytes_in":109,"bytes_out":834}
+{"time":"2026-03-10T12:54:45.3347565+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62435","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":400,"error":"","latency":188533400,"latency_human":"188.5334ms","bytes_in":222,"bytes_out":94}
+2026/03/10 12:54:45 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+--- FAIL: TestKeyRotation (11.82s)
+    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    --- FAIL: TestKeyRotation/Password-Only_User_-_No_Public_Key (0.50s)
+        key_rotation_test.go:256: Password-only user: expected 404, got 400
+2026/03/10 12:54:48 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:54:52 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:54:52 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:54:52 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:54:52.6868515+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":632321100,"latency_human":"632.3211ms","bytes_in":107,"bytes_out":834}
+{"time":"2026-03-10T12:54:53.0021783+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":310002300,"latency_human":"310.0023ms","bytes_in":105,"bytes_out":827}
+{"time":"2026-03-10T12:54:53.4849953+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/auth/devices/request","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":480341200,"latency_human":"480.3412ms","bytes_in":102,"bytes_out":455}
+{"time":"2026-03-10T12:54:53.7330492+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/auth/devices/request","user_agent":"Go-http-client/1.1","status":202,"error":"","latency":247511500,"latency_human":"247.5115ms","bytes_in":99,"bytes_out":361}
+{"time":"2026-03-10T12:54:54.1253256+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/auth/devices/phone-34622003714/approve","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":389781200,"latency_human":"389.7812ms","bytes_in":44,"bytes_out":455}
+{"time":"2026-03-10T12:54:54.6888067+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"GET","uri":"/api/v1/auth/devices","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":561578600,"latency_human":"561.5786ms","bytes_in":0,"bytes_out":842}
+{"time":"2026-03-10T12:54:54.9730342+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"GET","uri":"/api/v1/dids/did:splitter:alice_dev_538125008195-b40d2a07e9f21fac/device-keys","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":283163900,"latency_human":"283.1639ms","bytes_in":0,"bytes_out":292}
+{"time":"2026-03-10T12:54:56.3453398+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62450","method":"POST","uri":"/api/v1/messages/send","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1371391300,"latency_human":"1.3713913s","bytes_in":207,"bytes_out":1244}
+2026/03/10 12:54:59 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:54:59 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:54:59 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:54:59 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:55:00.0008679+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":610169800,"latency_human":"610.1698ms","bytes_in":111,"bytes_out":847}
+{"time":"2026-03-10T12:55:00.2250935+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":224225600,"latency_human":"224.2256ms","bytes_in":65,"bytes_out":847}
+{"time":"2026-03-10T12:55:00.5786726+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":353579100,"latency_human":"353.5791ms","bytes_in":107,"bytes_out":834}
+{"time":"2026-03-10T12:55:00.709565+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":130892400,"latency_human":"130.8924ms","bytes_in":63,"bytes_out":834}
+{"time":"2026-03-10T12:55:03.9782982+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/messages/sync","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":3266724500,"latency_human":"3.2667245s","bytes_in":212,"bytes_out":644}
+{"time":"2026-03-10T12:55:04.8887942+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:62898","method":"POST","uri":"/api/v1/messages/sync","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":709488500,"latency_human":"709.4885ms","bytes_in":212,"bytes_out":645}
+2026/03/10 12:55:07 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:55:07 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:55:07 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:55:07 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:55:08.1052652+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60553","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":531570900,"latency_human":"531.5709ms","bytes_in":98,"bytes_out":805}
+2026/03/10 12:55:08 [Federation] Post created by did:splitter:post_5722601007222-512beaaec622b04b, triggering delivery...
+{"time":"2026-03-10T12:55:08.5336078+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60553","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":427121500,"latency_human":"427.1215ms","bytes_in":332,"bytes_out":344}
+2026/03/10 12:55:08 [Federation] Building Create activity for http://localhost:8000/ap/users/post_5722601007222 (post 6952d41a-175e-48ba-9a16-f8780510d484)
+2026/03/10 12:55:08 [Federation] DeliverToFollowers: authorDID=did:splitter:post_5722601007222-512beaaec622b04b, domain=splitter-1
+2026/03/10 12:55:08 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:55:09 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T12:55:09.4392893+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60553","method":"GET","uri":"/api/v1/posts/6952d41a-175e-48ba-9a16-f8780510d484","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":180696600,"latency_human":"180.6966ms","bytes_in":0,"bytes_out":376}
+{"time":"2026-03-10T12:55:09.6052755+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60553","method":"GET","uri":"/api/v1/posts/public","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":163908300,"latency_human":"163.9083ms","bytes_in":0,"bytes_out":378}
+2026/03/10 12:55:10 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+2026/03/10 12:55:12 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:55:12 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:55:12 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:55:12 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:55:12.8961939+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60561","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":568896000,"latency_human":"568.896ms","bytes_in":108,"bytes_out":841}
+2026/03/10 12:55:13 [Federation] Post created by did:splitter:ephemeral_3260425006093-eb5fbf8eb1dc2000, triggering delivery...
+{"time":"2026-03-10T12:55:13.3599518+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60561","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":461744700,"latency_human":"461.7447ms","bytes_in":459,"bytes_out":395}
+2026/03/10 12:55:13 [Federation] Building Create activity for http://localhost:8000/ap/users/ephemeral_3260425006093 (post cfe11010-bdd6-4726-a7a6-79b17e5786e4)
+2026/03/10 12:55:13 [Federation] DeliverToFollowers: authorDID=did:splitter:ephemeral_3260425006093-eb5fbf8eb1dc2000, domain=splitter-1
+2026/03/10 12:55:13 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:55:13 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T12:55:14.220355+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60561","method":"GET","uri":"/api/v1/posts/cfe11010-bdd6-4726-a7a6-79b17e5786e4","user_agent":"Go-http-client/1.1","status":404,"error":"","latency":180840900,"latency_human":"180.8409ms","bytes_in":0,"bytes_out":27}
+{"time":"2026-03-10T12:55:14.8834774+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60561","method":"GET","uri":"/api/v1/posts/public","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":159287300,"latency_human":"159.2873ms","bytes_in":0,"bytes_out":5}
+2026/03/10 12:55:14 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+2026/03/10 12:55:17 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:55:17 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:55:17 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:55:17 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T12:55:18.1522552+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60569","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":529134000,"latency_human":"529.134ms","bytes_in":105,"bytes_out":819}
+{"time":"2026-03-10T12:55:18.4326147+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60569","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":280359500,"latency_human":"280.3595ms","bytes_in":105,"bytes_out":821}
+2026/03/10 12:55:18 [Federation] Post created by did:splitter:replyA_6215181003994-bfe0ff215e53f03a, triggering delivery...
+{"time":"2026-03-10T12:55:18.9348235+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60569","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":501542000,"latency_human":"501.542ms","bytes_in":316,"bytes_out":330}
+2026/03/10 12:55:19 [Federation] Building Create activity for http://localhost:8000/ap/users/replyA_6215181003994 (post c5ea392e-0a80-44bc-8f80-a981ccd03c9e)
+2026/03/10 12:55:19 [Federation] DeliverToFollowers: authorDID=did:splitter:replyA_6215181003994-bfe0ff215e53f03a, domain=splitter-1
+2026/03/10 12:55:19 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:55:19 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T12:55:20.3183498+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60569","method":"POST","uri":"/api/v1/posts/c5ea392e-0a80-44bc-8f80-a981ccd03c9e/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1381953700,"latency_human":"1.3819537s","bytes_in":318,"bytes_out":318}
+2026/03/10 12:55:20 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+{"time":"2026-03-10T12:55:20.9511598+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:60569","method":"POST","uri":"/api/v1/posts/c5ea392e-0a80-44bc-8f80-a981ccd03c9e/replies","user_agent":"Go-http-client/1.1","status":500,"error":"","latency":474950700,"latency_human":"474.9507ms","bytes_in":348,"bytes_out":35}
+--- FAIL: TestReplyFlow (6.07s)
+    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    --- FAIL: TestReplyFlow/Create_Nested_Reply (0.48s)
+        replies_test.go:120: Nested reply failed: status 500
+FAIL
+FAIL	splitter/tests/integration	53.010s
+FAIL

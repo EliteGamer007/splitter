@@ -444,10 +444,42 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 		})
 	}
 
+	// Check timestamp expiration (5 minute window)
+	if req.Timestamp == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "timestamp is required",
+		})
+	}
+	now := time.Now().Unix()
+	if now-req.Timestamp > 300 || req.Timestamp-now > 300 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Request timestamp is stale or too far in the future",
+		})
+	}
+
 	// Use a nonce derived from the new key to record rotation (replay safety kept)
 	rotationNonce := req.Nonce
 	if rotationNonce == "" {
 		rotationNonce = req.NewPublicKey // fallback unique identifier
+	}
+
+	// Verify the signature is valid. The client must sign: "{new_public_key}|{nonce}|{timestamp}"
+	// using their CURRENT (old) active private key.
+	if req.Signature == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "signature is required",
+		})
+	}
+
+	// Reconstruct the message that was signed
+	msg := fmt.Sprintf("%s|%s|%d", req.NewPublicKey, rotationNonce, req.Timestamp)
+
+	// Verify using the old public key
+	err = auth.VerifyEd25519Signature(user.PublicKey, msg, req.Signature)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{
+			"error": "Invalid signature. Rotation request must be signed by the current active key.",
+		})
 	}
 
 	// Perform the rotation atomically
@@ -457,6 +489,12 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 	}
 	if err := h.userRepo.RotateKey(c.Request().Context(), userID, user.PublicKey, req.NewPublicKey, rotationNonce, rotationReason); err != nil {
 		log.Printf("RotateKey DB error for user %s: %v", userID, err)
+		// Check if it's a unique constraint violation on the nonce
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"key_rotations_nonce_key\"") {
+			return c.JSON(http.StatusConflict, map[string]string{
+				"error": "Nonce has already been used for rotation. Request rejected to prevent replay attack.",
+			})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to rotate key",
 		})

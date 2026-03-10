@@ -1,0 +1,15 @@
+﻿2026/03/10 22:29:24 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+=== RUN   TestEd25519KeyGeneration
+--- PASS: TestEd25519KeyGeneration (0.00s)
+=== RUN   TestEd25519SignVerify
+--- PASS: TestEd25519SignVerify (0.00s)
+=== RUN   TestEd25519RejectWrongKey
+--- PASS: TestEd25519RejectWrongKey (0.00s)
+=== RUN   TestEd25519RejectTamperedMessage
+--- PASS: TestEd25519RejectTamperedMessage (0.00s)
+=== RUN   TestBase64RoundTrip
+--- PASS: TestBase64RoundTrip (0.00s)
+=== RUN   TestEd25519KeyRotationFlow
+--- PASS: TestEd25519KeyRotationFlow (0.00s)
+PASS
+ok  	splitter/tests/check_encryption_keys	0.517s

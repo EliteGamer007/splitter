@@ -163,3 +163,33 @@ Status: PASS
 Execution Time: 1.0983745s
 Timestamp: 2026-03-10 06:20:16
 
+TestName: TestDatabaseConnectionLogged
+Status: PASS
+Execution Time: 960.4893ms
+Timestamp: 2026-03-10 16:35:15
+
+TestName: TestSchemaChecksLogged
+Status: PASS
+Execution Time: 8.9739516s
+Timestamp: 2026-03-10 16:35:24
+
+TestName: TestDatabaseTransactionRollback
+Status: PASS
+Execution Time: 1.1733186s
+Timestamp: 2026-03-10 16:35:25
+
+TestName: TestDatabaseConnectionLogged
+Status: PASS
+Execution Time: 639.6208ms
+Timestamp: 2026-03-10 17:09:17
+
+TestName: TestSchemaChecksLogged
+Status: PASS
+Execution Time: 1.7794839s
+Timestamp: 2026-03-10 17:09:19
+
+TestName: TestDatabaseTransactionRollback
+Status: PASS
+Execution Time: 891.8621ms
+Timestamp: 2026-03-10 17:09:20
+

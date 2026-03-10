@@ -1,0 +1,159 @@
+﻿2026/03/10 11:07:20 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+.env loaded successfully
+=== RUN   TestAuthFlow
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:07:23 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:07:24 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:07:24 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:07:24 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+=== RUN   TestAuthFlow/Register_User
+{"time":"2026-03-10T11:07:25.0587952+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53542","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":620694700,"latency_human":"620.6947ms","bytes_in":91,"bytes_out":811}
+=== RUN   TestAuthFlow/Login_User_Success
+{"time":"2026-03-10T11:07:25.4783007+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53542","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":242362100,"latency_human":"242.3621ms","bytes_in":64,"bytes_out":811}
+=== RUN   TestAuthFlow/Login_User_Invalid_Password
+{"time":"2026-03-10T11:07:25.6533034+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53542","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":173039700,"latency_human":"173.0397ms","bytes_in":63,"bytes_out":41}
+--- PASS: TestAuthFlow (5.98s)
+    --- PASS: TestAuthFlow/Register_User (0.80s)
+    --- PASS: TestAuthFlow/Login_User_Success (0.24s)
+    --- PASS: TestAuthFlow/Login_User_Invalid_Password (0.17s)
+=== RUN   TestKeyRotation
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:07:28 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:07:28 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:07:28 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:07:28 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+=== RUN   TestKeyRotation/Happy_Path_-_Valid_Rotation
+{"time":"2026-03-10T11:07:28.7528105+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":486412100,"latency_human":"486.4121ms","bytes_in":196,"bytes_out":803}
+2026/03/10 11:07:29 Key rotated successfully for user 1d748c11-6149-4210-8c6b-e4bc9d416d7d (DID: did:splitter:keyrotation_happy)
+{"time":"2026-03-10T11:07:29.5179113+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":761257800,"latency_human":"761.2578ms","bytes_in":222,"bytes_out":147}
+2026/03/10 11:07:29 [Federation] DeliverToFollowers: authorDID=did:splitter:keyrotation_happy, domain=splitter-1
+2026/03/10 11:07:29 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 11:07:29 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T11:07:30.2763478+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"GET","uri":"/api/v1/auth/key-history","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":757264000,"latency_human":"757.264ms","bytes_in":0,"bytes_out":367}
+=== RUN   TestKeyRotation/Replay_Attack_-_Nonce_Reuse_Rejected
+2026/03/10 11:07:30 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: circuit breaker open for domain splitter-2
+{"time":"2026-03-10T11:07:30.8434437+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":560252400,"latency_human":"560.2524ms","bytes_in":199,"bytes_out":810}
+2026/03/10 11:07:31 Key rotated successfully for user 555659e8-7837-4cd1-9dff-bbc29f1e8f5e (DID: did:splitter:keyrotation_replay)
+2026/03/10 11:07:31 [Federation] DeliverToFollowers: authorDID=did:splitter:keyrotation_replay, domain=splitter-1
+{"time":"2026-03-10T11:07:31.4863725+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":639999400,"latency_human":"639.9994ms","bytes_in":223,"bytes_out":147}
+2026/03/10 11:07:31 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 11:07:31 [Federation] Delivering to 4 unique inboxes
+2026/03/10 11:07:31 RotateKey DB error for user 555659e8-7837-4cd1-9dff-bbc29f1e8f5e: failed to record key rotation: ERROR: duplicate key value violates unique constraint "key_rotations_nonce_key" (SQLSTATE 23505)
+{"time":"2026-03-10T11:07:31.8224732+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":500,"error":"","latency":335596500,"latency_human":"335.5965ms","bytes_in":223,"bytes_out":33}
+    key_rotation_test.go:175: Replay attack: expected 409, got 500
+=== RUN   TestKeyRotation/Expired_Timestamp_-_Rejected
+{"time":"2026-03-10T11:07:32.0905078+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":267288200,"latency_human":"267.2882ms","bytes_in":202,"bytes_out":816}
+{"time":"2026-03-10T11:07:32.2355444+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":404,"error":"","latency":144472900,"latency_human":"144.4729ms","bytes_in":224,"bytes_out":27}
+    key_rotation_test.go:194: Stale timestamp: expected 401, got 404
+=== RUN   TestKeyRotation/Invalid_Signature_-_Rejected
+{"time":"2026-03-10T11:07:32.3963073+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":409,"error":"","latency":156888600,"latency_human":"156.8886ms","bytes_in":199,"bytes_out":37}
+    key_rotation_test.go:202: registerWithKey: expected 201, got 409
+=== RUN   TestKeyRotation/Password-Only_User_-_No_Public_Key
+{"time":"2026-03-10T11:07:32.4626063+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":409,"error":"","latency":63587700,"latency_human":"63.5877ms","bytes_in":99,"bytes_out":35}
+{"time":"2026-03-10T11:07:32.4626063+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53547","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":0,"latency_human":"0s","bytes_in":223,"bytes_out":48}
+    key_rotation_test.go:244: Password-only user: expected 400, got 401
+2026/03/10 11:07:32 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery failed: Post "http://localhost:8001/ap/shared-inbox": dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it.
+2026/03/10 11:07:32 [Federation] Failed to deliver to http://localhost:8001/ap/users/admin/inbox: circuit breaker open for domain splitter-2
+2026/03/10 11:07:32 [Federation] Failed to deliver to http://localhost:8001/ap/users/subsan1729/inbox: delivery failed: Post "http://localhost:8001/ap/users/subsan1729/inbox": dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it.
+2026/03/10 11:07:32 [Federation] Failed to deliver to http://localhost:8001/ap/users/dm02/inbox: circuit breaker open for domain splitter-2
+--- FAIL: TestKeyRotation (6.89s)
+    --- PASS: TestKeyRotation/Happy_Path_-_Valid_Rotation (2.02s)
+    --- FAIL: TestKeyRotation/Replay_Attack_-_Nonce_Reuse_Rejected (1.54s)
+    --- FAIL: TestKeyRotation/Expired_Timestamp_-_Rejected (0.41s)
+    --- FAIL: TestKeyRotation/Invalid_Signature_-_Rejected (0.16s)
+    --- FAIL: TestKeyRotation/Password-Only_User_-_No_Public_Key (0.07s)
+=== RUN   TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:07:38 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:07:39 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:07:39 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:07:39 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T11:07:39.6203094+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":590133600,"latency_human":"590.1336ms","bytes_in":90,"bytes_out":775}
+{"time":"2026-03-10T11:07:39.9183215+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":296905800,"latency_human":"296.9058ms","bytes_in":86,"bytes_out":762}
+{"time":"2026-03-10T11:07:40.3781999+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/auth/devices/request","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":459878400,"latency_human":"459.8784ms","bytes_in":96,"bytes_out":449}
+{"time":"2026-03-10T11:07:40.6352871+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/auth/devices/request","user_agent":"Go-http-client/1.1","status":202,"error":"","latency":256578700,"latency_human":"256.5787ms","bytes_in":93,"bytes_out":353}
+{"time":"2026-03-10T11:07:41.0165261+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/auth/devices/alice-phone/approve","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":379987200,"latency_human":"379.9872ms","bytes_in":38,"bytes_out":442}
+{"time":"2026-03-10T11:07:41.2416899+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"GET","uri":"/api/v1/auth/devices","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":223589400,"latency_human":"223.5894ms","bytes_in":0,"bytes_out":823}
+{"time":"2026-03-10T11:07:44.1144721+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"GET","uri":"/api/v1/dids/did:splitter:alice_devices-d5e4ebdb6fab20bd/device-keys","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":2871272400,"latency_human":"2.8712724s","bytes_in":0,"bytes_out":271}
+{"time":"2026-03-10T11:07:50.6816088+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/messages/send","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":6567136700,"latency_human":"6.5671367s","bytes_in":195,"bytes_out":1193}
+--- PASS: TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage (18.38s)
+=== RUN   TestOfflineMessageSync_IdempotentByClientMessageID
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:07:53 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:07:53 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:07:53 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:07:53 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T11:07:54.0505863+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":556958800,"latency_human":"556.9588ms","bytes_in":84,"bytes_out":755}
+{"time":"2026-03-10T11:07:54.2604526+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":208400800,"latency_human":"208.4008ms","bytes_in":51,"bytes_out":755}
+{"time":"2026-03-10T11:07:54.5547848+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":293603600,"latency_human":"293.6036ms","bytes_in":80,"bytes_out":742}
+{"time":"2026-03-10T11:07:54.6778614+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/auth/login","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":123076600,"latency_human":"123.0766ms","bytes_in":49,"bytes_out":742}
+{"time":"2026-03-10T11:07:56.2193636+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/messages/sync","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":1541502200,"latency_human":"1.5415022s","bytes_in":206,"bytes_out":632}
+{"time":"2026-03-10T11:07:56.9139708+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/messages/sync","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":693820500,"latency_human":"693.8205ms","bytes_in":206,"bytes_out":633}
+--- PASS: TestOfflineMessageSync_IdempotentByClientMessageID (6.07s)
+=== RUN   TestPostFlow
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:07:59 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:07:59 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:07:59 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:07:59 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T11:08:00.1399079+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53587","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":604732300,"latency_human":"604.7323ms","bytes_in":80,"bytes_out":757}
+=== RUN   TestPostFlow/Create_Post
+2026/03/10 11:08:00 [Federation] Post created by did:splitter:post_author-df16ac039dd0cc01, triggering delivery...
+{"time":"2026-03-10T11:08:00.658784+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53587","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":515745000,"latency_human":"515.745ms","bytes_in":332,"bytes_out":337}
+2026/03/10 11:08:00 [Federation] Building Create activity for http://localhost:8000/ap/users/post_author (post 12d8a41a-713b-47fc-83a0-8d145f3811cb)
+2026/03/10 11:08:00 [Federation] DeliverToFollowers: authorDID=did:splitter:post_author-df16ac039dd0cc01, domain=splitter-1
+2026/03/10 11:08:00 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 11:08:01 [Federation] Delivering to 1 unique inboxes
+=== RUN   TestPostFlow/Get_Post
+{"time":"2026-03-10T11:08:01.4118641+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53587","method":"GET","uri":"/api/v1/posts/12d8a41a-713b-47fc-83a0-8d145f3811cb","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":162003200,"latency_human":"162.0032ms","bytes_in":0,"bytes_out":362}
+=== RUN   TestPostFlow/Public_Feed
+{"time":"2026-03-10T11:08:01.621146+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53587","method":"GET","uri":"/api/v1/posts/public","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":208157700,"latency_human":"208.1577ms","bytes_in":0,"bytes_out":364}
+2026/03/10 11:08:01 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery failed: Post "http://localhost:8001/ap/shared-inbox": dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it.
+--- PASS: TestPostFlow (4.77s)
+    --- PASS: TestPostFlow/Create_Post (1.11s)
+    --- PASS: TestPostFlow/Get_Post (0.16s)
+    --- PASS: TestPostFlow/Public_Feed (0.21s)
+=== RUN   TestEphemeralPostExpiryEnforcement
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:08:04 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:08:04 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:08:04 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:08:04 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T11:08:04.8765617+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53595","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":523211000,"latency_human":"523.211ms","bytes_in":88,"bytes_out":788}
+2026/03/10 11:08:05 [Federation] Post created by did:splitter:ephemeral_author-24a2cd2ff63e4049, triggering delivery...
+{"time":"2026-03-10T11:08:05.3254261+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53595","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":448255400,"latency_human":"448.2554ms","bytes_in":459,"bytes_out":388}
+2026/03/10 11:08:05 [Federation] Building Create activity for http://localhost:8000/ap/users/ephemeral_author (post 2ac18fe8-f4da-4916-9216-b4ed1746fca8)
+2026/03/10 11:08:05 [Federation] DeliverToFollowers: authorDID=did:splitter:ephemeral_author-24a2cd2ff63e4049, domain=splitter-1
+2026/03/10 11:08:05 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 11:08:05 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T11:08:06.0668099+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53595","method":"GET","uri":"/api/v1/posts/2ac18fe8-f4da-4916-9216-b4ed1746fca8","user_agent":"Go-http-client/1.1","status":404,"error":"","latency":161612900,"latency_human":"161.6129ms","bytes_in":0,"bytes_out":27}
+{"time":"2026-03-10T11:08:06.2959221+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53595","method":"GET","uri":"/api/v1/posts/public","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":227955700,"latency_human":"227.9557ms","bytes_in":0,"bytes_out":8164}
+2026/03/10 11:08:06 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery failed: Post "http://localhost:8001/ap/shared-inbox": dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it.
+--- PASS: TestEphemeralPostExpiryEnforcement (4.72s)
+=== RUN   TestReplyFlow
+    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 11:08:08 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 11:08:08 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 11:08:08 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 11:08:08 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T11:08:09.3608877+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53605","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":469379200,"latency_human":"469.3792ms","bytes_in":73,"bytes_out":723}
+{"time":"2026-03-10T11:08:09.643289+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53605","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":282401300,"latency_human":"282.4013ms","bytes_in":73,"bytes_out":723}
+=== RUN   TestReplyFlow/Create_Root_Post
+2026/03/10 11:08:10 [Federation] Post created by did:splitter:user_a-bb09db84be6c710f, triggering delivery...
+{"time":"2026-03-10T11:08:10.1261522+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53605","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":482226300,"latency_human":"482.2263ms","bytes_in":316,"bytes_out":316}
+=== RUN   TestReplyFlow/Create_First_Reply
+2026/03/10 11:08:10 [Federation] Building Create activity for http://localhost:8000/ap/users/user_a (post 1e0b2ead-ba44-4681-899e-880145d31c76)
+2026/03/10 11:08:10 [Federation] DeliverToFollowers: authorDID=did:splitter:user_a-bb09db84be6c710f, domain=splitter-1
+2026/03/10 11:08:10 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 11:08:10 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T11:08:11.4253237+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53605","method":"POST","uri":"/api/v1/posts/1e0b2ead-ba44-4681-899e-880145d31c76/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1297219300,"latency_human":"1.2972193s","bytes_in":318,"bytes_out":304}
+2026/03/10 11:08:11 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: circuit breaker open for domain splitter-2
+=== RUN   TestReplyFlow/Create_Nested_Reply
+{"time":"2026-03-10T11:08:12.5678786+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53605","method":"POST","uri":"/api/v1/posts/1e0b2ead-ba44-4681-899e-880145d31c76/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":956770500,"latency_human":"956.7705ms","bytes_in":348,"bytes_out":356}
+--- PASS: TestReplyFlow (6.22s)
+    --- PASS: TestReplyFlow/Create_Root_Post (0.48s)
+    --- PASS: TestReplyFlow/Create_First_Reply (1.48s)
+    --- PASS: TestReplyFlow/Create_Nested_Reply (1.06s)
+FAIL
+FAIL	splitter/tests/integration	53.590s
+FAIL

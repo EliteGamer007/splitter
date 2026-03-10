@@ -246,3 +246,48 @@ Status: PASS
 Execution Time: 869.9795ms
 Timestamp: 2026-03-10 06:20:15
 
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.2047246s
+Timestamp: 2026-03-10 16:35:30
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 927.1495ms
+Timestamp: 2026-03-10 16:35:31
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 564.9937ms
+Timestamp: 2026-03-10 16:35:31
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 2.8219719s
+Timestamp: 2026-03-10 16:43:11
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.4329328s
+Timestamp: 2026-03-10 16:43:12
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 867.21ms
+Timestamp: 2026-03-10 16:43:13
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.6423383s
+Timestamp: 2026-03-10 17:09:25
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.041387s
+Timestamp: 2026-03-10 17:09:26
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 986.5967ms
+Timestamp: 2026-03-10 17:09:27
+

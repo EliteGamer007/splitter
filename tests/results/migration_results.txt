@@ -163,3 +163,48 @@ Status: PASS
 Execution Time: 751.684ms
 Timestamp: 2026-03-10 06:20:14
 
+TestName: TestMigrationColumnAddition
+Status: PASS
+Execution Time: 1.6473219s
+Timestamp: 2026-03-10 16:35:41
+
+TestName: TestMigrationStoriesTable
+Status: PASS
+Execution Time: 1.267365s
+Timestamp: 2026-03-10 16:35:43
+
+TestName: TestMigrationIdempotent
+Status: PASS
+Execution Time: 867.7391ms
+Timestamp: 2026-03-10 16:35:43
+
+TestName: TestMigrationColumnAddition
+Status: PASS
+Execution Time: 3.2112265s
+Timestamp: 2026-03-10 16:43:27
+
+TestName: TestMigrationStoriesTable
+Status: PASS
+Execution Time: 1.9735044s
+Timestamp: 2026-03-10 16:43:29
+
+TestName: TestMigrationIdempotent
+Status: PASS
+Execution Time: 1.0150054s
+Timestamp: 2026-03-10 16:43:30
+
+TestName: TestMigrationColumnAddition
+Status: PASS
+Execution Time: 1.0410524s
+Timestamp: 2026-03-10 17:09:43
+
+TestName: TestMigrationStoriesTable
+Status: PASS
+Execution Time: 904.4666ms
+Timestamp: 2026-03-10 17:09:44
+
+TestName: TestMigrationIdempotent
+Status: PASS
+Execution Time: 616.3001ms
+Timestamp: 2026-03-10 17:09:45
+

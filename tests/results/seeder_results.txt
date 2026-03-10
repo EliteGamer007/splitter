@@ -218,3 +218,63 @@ Status: PASS
 Execution Time: 5.8403ms
 Timestamp: 2026-03-10 06:20:12
 
+TestName: TestSeederKeyGeneration
+Status: PASS
+Execution Time: 596.8µs
+Timestamp: 2026-03-10 16:35:46
+
+TestName: TestSeederPublicKeyRoundTrip
+Status: PASS
+Execution Time: 1.2106ms
+Timestamp: 2026-03-10 16:35:46
+
+TestName: TestSeederSharedSecretDerivation
+Status: PASS
+Execution Time: 549.7µs
+Timestamp: 2026-03-10 16:35:46
+
+TestName: TestSeederUniqueUsernames
+Status: PASS
+Execution Time: 8.7562ms
+Timestamp: 2026-03-10 16:35:46
+
+TestName: TestSeederKeyGeneration
+Status: PASS
+Execution Time: 603µs
+Timestamp: 2026-03-10 16:43:32
+
+TestName: TestSeederPublicKeyRoundTrip
+Status: PASS
+Execution Time: 776.1µs
+Timestamp: 2026-03-10 16:43:32
+
+TestName: TestSeederSharedSecretDerivation
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 16:43:32
+
+TestName: TestSeederUniqueUsernames
+Status: PASS
+Execution Time: 7.5917ms
+Timestamp: 2026-03-10 16:43:32
+
+TestName: TestSeederKeyGeneration
+Status: PASS
+Execution Time: 1.389ms
+Timestamp: 2026-03-10 17:09:49
+
+TestName: TestSeederPublicKeyRoundTrip
+Status: PASS
+Execution Time: 590.4µs
+Timestamp: 2026-03-10 17:09:49
+
+TestName: TestSeederSharedSecretDerivation
+Status: PASS
+Execution Time: 551.6µs
+Timestamp: 2026-03-10 17:09:49
+
+TestName: TestSeederUniqueUsernames
+Status: PASS
+Execution Time: 8.2958ms
+Timestamp: 2026-03-10 17:09:49
+

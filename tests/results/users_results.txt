@@ -247,3 +247,63 @@ Status: PASS
 Execution Time: 1.1495183s
 Timestamp: 2026-03-10 06:20:15
 
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.6932282s
+Timestamp: 2026-03-10 16:35:34
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.7661842s
+Timestamp: 2026-03-10 16:35:36
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.0325609s
+Timestamp: 2026-03-10 16:35:37
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.9446178s
+Timestamp: 2026-03-10 16:43:17
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.2549467s
+Timestamp: 2026-03-10 16:43:18
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.1562819s
+Timestamp: 2026-03-10 16:43:19
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.3474144s
+Timestamp: 2026-03-10 16:58:57
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.0043889s
+Timestamp: 2026-03-10 16:58:58
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 867.301ms
+Timestamp: 2026-03-10 16:58:59
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.5553001s
+Timestamp: 2026-03-10 17:09:34
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 897.7692ms
+Timestamp: 2026-03-10 17:09:35
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.5104858s
+Timestamp: 2026-03-10 17:09:36
+

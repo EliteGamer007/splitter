@@ -298,3 +298,153 @@ Status: PASS
 Execution Time: 518.8µs
 Timestamp: 2026-03-10 06:20:12
 
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 13.4631ms
+Timestamp: 2026-03-10 16:29:40
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 1.163281s
+Timestamp: 2026-03-10 16:29:41
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 1.6987ms
+Timestamp: 2026-03-10 16:29:41
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 699.1913ms
+Timestamp: 2026-03-10 16:29:42
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 150.1987ms
+Timestamp: 2026-03-10 16:29:42
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 273.4343ms
+Timestamp: 2026-03-10 16:29:42
+
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 23.7012ms
+Timestamp: 2026-03-10 16:37:10
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 761.173ms
+Timestamp: 2026-03-10 16:37:11
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 3.8768ms
+Timestamp: 2026-03-10 16:37:11
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 782.5135ms
+Timestamp: 2026-03-10 16:37:11
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 170.3823ms
+Timestamp: 2026-03-10 16:37:12
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 194.6744ms
+Timestamp: 2026-03-10 16:37:12
+
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 22.6711ms
+Timestamp: 2026-03-10 16:43:51
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 1.7136196s
+Timestamp: 2026-03-10 16:43:53
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 9.2798ms
+Timestamp: 2026-03-10 16:43:53
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 685.1828ms
+Timestamp: 2026-03-10 16:43:53
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 207.8357ms
+Timestamp: 2026-03-10 16:43:54
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 256.4985ms
+Timestamp: 2026-03-10 16:43:54
+
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 26.8432ms
+Timestamp: 2026-03-10 16:58:45
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 667.9458ms
+Timestamp: 2026-03-10 16:58:46
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 1.7656ms
+Timestamp: 2026-03-10 16:58:46
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 588.3033ms
+Timestamp: 2026-03-10 16:58:47
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 76.3333ms
+Timestamp: 2026-03-10 16:58:47
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 193.4898ms
+Timestamp: 2026-03-10 16:58:47
+
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 17.8678ms
+Timestamp: 2026-03-10 17:10:46
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 672.6353ms
+Timestamp: 2026-03-10 17:10:46
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 3.4628ms
+Timestamp: 2026-03-10 17:10:46
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 541.4399ms
+Timestamp: 2026-03-10 17:10:47
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 91.4355ms
+Timestamp: 2026-03-10 17:10:47
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 149.8345ms
+Timestamp: 2026-03-10 17:10:47
+

@@ -281,3 +281,63 @@ Status: PASS
 Execution Time: 750.8262ms
 Timestamp: 2026-03-10 06:20:15
 
+TestName: TestNoOrphanedPosts
+Status: PASS
+Execution Time: 1.1366158s
+Timestamp: 2026-03-10 16:35:50
+
+TestName: TestNoOrphanedReplies
+Status: PASS
+Execution Time: 1.0222244s
+Timestamp: 2026-03-10 16:35:51
+
+TestName: TestNoExpiredStoriesVisible
+Status: PASS
+Execution Time: 3.5945783s
+Timestamp: 2026-03-10 16:35:55
+
+TestName: TestNoOrphanedStoryViews
+Status: PASS
+Execution Time: 1.1406459s
+Timestamp: 2026-03-10 16:35:56
+
+TestName: TestNoOrphanedPosts
+Status: PASS
+Execution Time: 1.4060725s
+Timestamp: 2026-03-10 16:43:36
+
+TestName: TestNoOrphanedReplies
+Status: PASS
+Execution Time: 983.0438ms
+Timestamp: 2026-03-10 16:43:37
+
+TestName: TestNoExpiredStoriesVisible
+Status: PASS
+Execution Time: 1.9528561s
+Timestamp: 2026-03-10 16:43:39
+
+TestName: TestNoOrphanedStoryViews
+Status: PASS
+Execution Time: 1.9974589s
+Timestamp: 2026-03-10 16:43:41
+
+TestName: TestNoOrphanedPosts
+Status: PASS
+Execution Time: 833.6184ms
+Timestamp: 2026-03-10 17:09:51
+
+TestName: TestNoOrphanedReplies
+Status: PASS
+Execution Time: 902.4011ms
+Timestamp: 2026-03-10 17:09:52
+
+TestName: TestNoExpiredStoriesVisible
+Status: PASS
+Execution Time: 722.0898ms
+Timestamp: 2026-03-10 17:09:53
+
+TestName: TestNoOrphanedStoryViews
+Status: PASS
+Execution Time: 622.0306ms
+Timestamp: 2026-03-10 17:09:54
+

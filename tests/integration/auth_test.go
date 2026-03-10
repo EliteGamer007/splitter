@@ -147,4 +147,36 @@ func TestAuthFlow(t *testing.T) {
 			t.Errorf("Expected status 401, got %d", resp.StatusCode)
 		}
 	})
+
+	t.Run("Register User Missing Username", func(t *testing.T) {
+		reqBody, _ := json.Marshal(map[string]string{
+			"email":    uniqueEmail("missinguser"),
+			"password": "securePass123!",
+		})
+
+		req, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/auth/register", bytes.NewBuffer(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := (&http.Client{}).Do(req)
+		if err != nil {
+			t.Fatalf("Failed to execute request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("Access Protected Endpoint Without Token", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/auth/key-history", nil)
+		resp, err := (&http.Client{}).Do(req)
+		if err != nil {
+			t.Fatalf("Failed to execute request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Expected status 401, got %d", resp.StatusCode)
+		}
+	})
 }

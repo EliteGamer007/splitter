@@ -183,3 +183,48 @@ Status: PASS
 Execution Time: 2.0933ms
 Timestamp: 2026-03-10 06:20:12
 
+TestName: TestLoadPublicFeedConcurrent
+Status: PASS
+Execution Time: 1.226768s
+Timestamp: 2026-03-10 16:37:14
+
+TestName: TestLoadHealthEndpointLatency
+Status: PASS
+Execution Time: 1.7046426s
+Timestamp: 2026-03-10 16:37:16
+
+TestName: TestLoadStoryFeedConcurrent
+Status: PASS
+Execution Time: 2.8244432s
+Timestamp: 2026-03-10 16:37:19
+
+TestName: TestLoadPublicFeedConcurrent
+Status: PASS
+Execution Time: 429.4271ms
+Timestamp: 2026-03-10 16:43:56
+
+TestName: TestLoadHealthEndpointLatency
+Status: PASS
+Execution Time: 57.1762ms
+Timestamp: 2026-03-10 16:43:56
+
+TestName: TestLoadStoryFeedConcurrent
+Status: PASS
+Execution Time: 294.4507ms
+Timestamp: 2026-03-10 16:43:56
+
+TestName: TestLoadPublicFeedConcurrent
+Status: PASS
+Execution Time: 3.9225914s
+Timestamp: 2026-03-10 17:10:53
+
+TestName: TestLoadHealthEndpointLatency
+Status: PASS
+Execution Time: 585.1246ms
+Timestamp: 2026-03-10 17:10:53
+
+TestName: TestLoadStoryFeedConcurrent
+Status: PASS
+Execution Time: 420.7048ms
+Timestamp: 2026-03-10 17:10:54
+

@@ -1,0 +1,13 @@
+﻿2026/03/10 22:28:56 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+=== RUN   TestUsersTableColumns
+--- PASS: TestUsersTableColumns (1.35s)
+=== RUN   TestUsersUniqueConstraints
+    check_users_test.go:111: NOTE: No UNIQUE constraint on users.username (uniqueness may be enforced at app level)
+--- PASS: TestUsersUniqueConstraints (1.00s)
+=== RUN   TestUsersRequiredFieldsNotNull
+    check_users_test.go:143: WARNING: Column users.email allows NULL ΓÇö expected NOT NULL (may differ in shared DB)
+    check_users_test.go:143: WARNING: Column users.password_hash allows NULL ΓÇö expected NOT NULL (may differ in shared DB)
+    check_users_test.go:143: WARNING: Column users.role allows NULL ΓÇö expected NOT NULL (may differ in shared DB)
+--- PASS: TestUsersRequiredFieldsNotNull (0.87s)
+PASS
+ok  	splitter/tests/check_users	3.636s

@@ -1,0 +1,14 @@
+﻿=== RUN   TestE2EHealthCheck
+--- PASS: TestE2EHealthCheck (0.03s)
+=== RUN   TestE2ERegisterAndLogin
+--- PASS: TestE2ERegisterAndLogin (0.67s)
+=== RUN   TestE2EUnauthenticatedAccessRejected
+--- PASS: TestE2EUnauthenticatedAccessRejected (0.00s)
+=== RUN   TestE2EDuplicateRegistrationRejected
+--- PASS: TestE2EDuplicateRegistrationRejected (0.59s)
+=== RUN   TestE2EStoryFeedEndpoint
+--- PASS: TestE2EStoryFeedEndpoint (0.08s)
+=== RUN   TestE2EPublicFeed
+--- PASS: TestE2EPublicFeed (0.19s)
+PASS
+ok  	splitter/tests/e2e_test	2.229s

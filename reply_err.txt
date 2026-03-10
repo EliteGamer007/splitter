@@ -1,0 +1,28 @@
+2026/03/10 13:17:58 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+.env loaded successfully
+=== RUN   TestReplyFlow
+    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 13:18:00 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 13:18:00 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 13:18:00 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 13:18:00 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+{"time":"2026-03-10T13:18:01.0657787+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52041","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":495805300,"latency_human":"495.8053ms","bytes_in":105,"bytes_out":821}
+{"time":"2026-03-10T13:18:01.3849219+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52041","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":318549800,"latency_human":"318.5498ms","bytes_in":103,"bytes_out":814}
+=== RUN   TestReplyFlow/Create_Root_Post
+2026/03/10 13:18:01 [Federation] Post created by did:splitter:replyA_5689341000615-cf519fa7fd525161, triggering delivery...
+{"time":"2026-03-10T13:18:01.9616933+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52041","method":"POST","uri":"/api/v1/posts","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":576112600,"latency_human":"576.1126ms","bytes_in":316,"bytes_out":330}
+=== RUN   TestReplyFlow/Create_First_Reply
+2026/03/10 13:18:02 [Federation] Building Create activity for http://localhost:8000/ap/users/replyA_5689341000615 (post db339f53-aeaa-42ff-8972-e8fd19152ede)
+2026/03/10 13:18:02 [Federation] DeliverToFollowers: authorDID=did:splitter:replyA_5689341000615-cf519fa7fd525161, domain=splitter-1
+2026/03/10 13:18:02 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 13:18:02 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T13:18:03.4684761+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52041","method":"POST","uri":"/api/v1/posts/db339f53-aeaa-42ff-8972-e8fd19152ede/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1305589200,"latency_human":"1.3055892s","bytes_in":318,"bytes_out":317}
+=== RUN   TestReplyFlow/Create_Nested_Reply
+2026/03/10 13:18:03 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+{"time":"2026-03-10T13:18:04.8872539+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52041","method":"POST","uri":"/api/v1/posts/db339f53-aeaa-42ff-8972-e8fd19152ede/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1025265600,"latency_human":"1.0252656s","bytes_in":348,"bytes_out":370}
+--- PASS: TestReplyFlow (8.76s)
+    --- PASS: TestReplyFlow/Create_Root_Post (0.58s)
+    --- PASS: TestReplyFlow/Create_First_Reply (1.70s)
+    --- PASS: TestReplyFlow/Create_Nested_Reply (1.39s)
+PASS
+ok  	splitter/tests/integration	9.391s

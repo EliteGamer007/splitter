@@ -218,3 +218,63 @@ Status: PASS
 Execution Time: 862.2273ms
 Timestamp: 2026-03-10 06:20:15
 
+TestName: TestDeletedAtColumnExists
+Status: PASS
+Execution Time: 929.087ms
+Timestamp: 2026-03-10 16:35:59
+
+TestName: TestEditedAtColumnExists
+Status: PASS
+Execution Time: 937.3437ms
+Timestamp: 2026-03-10 16:36:00
+
+TestName: TestRepairIndexExists
+Status: PASS
+Execution Time: 1.1460887s
+Timestamp: 2026-03-10 16:36:01
+
+TestName: TestEncryptionPublicKeyColumnExists
+Status: PASS
+Execution Time: 1.1695313s
+Timestamp: 2026-03-10 16:36:02
+
+TestName: TestDeletedAtColumnExists
+Status: PASS
+Execution Time: 1.0556412s
+Timestamp: 2026-03-10 16:43:44
+
+TestName: TestEditedAtColumnExists
+Status: PASS
+Execution Time: 884.2077ms
+Timestamp: 2026-03-10 16:43:45
+
+TestName: TestRepairIndexExists
+Status: PASS
+Execution Time: 904.4494ms
+Timestamp: 2026-03-10 16:43:46
+
+TestName: TestEncryptionPublicKeyColumnExists
+Status: PASS
+Execution Time: 906.6783ms
+Timestamp: 2026-03-10 16:43:47
+
+TestName: TestDeletedAtColumnExists
+Status: PASS
+Execution Time: 603.054ms
+Timestamp: 2026-03-10 17:09:58
+
+TestName: TestEditedAtColumnExists
+Status: PASS
+Execution Time: 626.831ms
+Timestamp: 2026-03-10 17:09:59
+
+TestName: TestRepairIndexExists
+Status: PASS
+Execution Time: 626.0103ms
+Timestamp: 2026-03-10 17:09:59
+
+TestName: TestEncryptionPublicKeyColumnExists
+Status: PASS
+Execution Time: 664.9164ms
+Timestamp: 2026-03-10 17:10:00
+
