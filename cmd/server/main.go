@@ -66,6 +66,30 @@ func main() {
 	// Ensure admin user exists
 	ensureAdminUser(cfg) // Silent check, no logging needed
 
+	// One-time: deduplicate remote posts and add unique index to prevent future duplicates
+	dedupTag := "dedup_remote_posts_v1"
+	var dedupExists bool
+	db.GetDB().QueryRow(context.Background(),
+		"SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)", dedupTag).Scan(&dedupExists)
+	if !dedupExists {
+		log.Println("[Migration] Deduplicating remote posts and adding unique index on original_post_uri...")
+		// Delete duplicate remote posts keeping the earliest one per original_post_uri
+		db.GetDB().Exec(context.Background(), `
+			DELETE FROM posts WHERE id IN (
+				SELECT id FROM (
+					SELECT id, ROW_NUMBER() OVER (PARTITION BY original_post_uri ORDER BY created_at ASC) AS rn
+					FROM posts
+					WHERE is_remote = true AND original_post_uri IS NOT NULL AND original_post_uri != ''
+				) dupes WHERE dupes.rn > 1
+			)`)
+		// Create unique partial index for non-null, non-empty original_post_uri
+		db.GetDB().Exec(context.Background(),
+			"CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_original_post_uri ON posts (original_post_uri) WHERE original_post_uri IS NOT NULL AND original_post_uri != ''")
+		db.GetDB().Exec(context.Background(),
+			"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING", dedupTag)
+		log.Println("[Migration] Remote post dedup complete.")
+	}
+
 	// Ensure Split bot user exists
 	ensureSplitBotUser(cfg)
 

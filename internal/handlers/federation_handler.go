@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+	"time"
 
 	"splitter/internal/config"
 	"splitter/internal/db"
@@ -268,6 +270,7 @@ func (h *FederationHandler) FollowRemoteUser(c echo.Context) error {
 func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 	ctx := c.Request().Context()
 
+	// Phase 1: Get LOCAL posts from DB only (remote posts come from live fetch in Phase 2)
 	rows, err := db.GetDB().Query(ctx,
 		`SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
 		        COALESCE(p.original_post_uri, ''),
@@ -279,7 +282,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		        COALESCE(u.avatar_url, '')
 		 FROM posts p
 		 LEFT JOIN users u ON u.did = p.author_did
-		 WHERE p.deleted_at IS NULL AND p.visibility = 'public'
+		 WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND p.is_remote = false
 		 ORDER BY p.created_at DESC
 		 LIMIT 50`)
 	if err != nil {
@@ -289,25 +292,29 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 	}
 	defer rows.Close()
 
-	var posts []map[string]interface{}
-	seen := make(map[string]bool)
+	// Dedup map: key = author_did|content, value = post (prefer version with username)
+	seen := make(map[string]map[string]interface{})
 	addPost := func(post map[string]interface{}) {
-		id, _ := post["id"].(string)
 		author, _ := post["author_did"].(string)
 		content, _ := post["content"].(string)
-		key := fmt.Sprintf("%s|%s|%s", id, author, content)
-		if seen[key] {
+		key := author + "|" + content
+		if existing, ok := seen[key]; ok {
+			// Prefer the version that has a username
+			existingUser, _ := existing["username"].(string)
+			newUser, _ := post["username"].(string)
+			if existingUser == "" && newUser != "" {
+				seen[key] = post
+			}
 			return
 		}
-		seen[key] = true
-		posts = append(posts, post)
+		seen[key] = post
 	}
 
 	for rows.Next() {
 		var id, authorDID, content, visibility, originalURI, username, displayName, avatarURL string
 		var isRemote bool
 		var likeCount, repostCount int
-		var createdAt interface{}
+		var createdAt time.Time
 
 		if err := rows.Scan(&id, &authorDID, &content, &visibility, &isRemote,
 			&originalURI, &likeCount, &repostCount, &createdAt,
@@ -324,7 +331,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			"original_post_uri": originalURI,
 			"like_count":        likeCount,
 			"repost_count":      repostCount,
-			"created_at":        createdAt,
+			"created_at":        createdAt.Format(time.RFC3339Nano),
 			"username":          username,
 			"display_name":      displayName,
 			"avatar_url":        avatarURL,
@@ -339,7 +346,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		addPost(post)
 	}
 
-	// Fetch live remote public posts from known instances (with failover).
+	// Phase 2: Live fetch from healthy peers (with cache fallback)
 	for domain, baseURL := range federation.InstanceURLMap {
 		if domain == h.cfg.Federation.Domain {
 			continue
@@ -350,7 +357,6 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		if federation.IsPeerHealthy(domain) {
 			remotePosts = federation.FetchAndCachePeerPosts(domain, baseURL)
 		} else {
-			// Peer is down — serve from cache
 			remotePosts = federation.GetCachedPeerPosts(domain)
 			if remotePosts != nil {
 				log.Printf("[Federation] Serving %d cached posts for down peer %s", len(remotePosts), domain)
@@ -371,7 +377,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			username, _ := remotePost["username"].(string)
 			displayName, _ := remotePost["display_name"].(string)
 			avatarURL, _ := remotePost["avatar_url"].(string)
-			createdAt := remotePost["created_at"]
+			createdAt, _ := remotePost["created_at"].(string)
 			id, _ := remotePost["id"].(string)
 			likeCount, _ := remotePost["like_count"].(float64)
 			repostCount, _ := remotePost["repost_count"].(float64)
@@ -402,10 +408,46 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		}
 	}
 
+	// Collect deduped posts, sort by created_at DESC, limit to 50
+	posts := make([]map[string]interface{}, 0, len(seen))
+	for _, post := range seen {
+		posts = append(posts, post)
+	}
+
+	sort.Slice(posts, func(i, j int) bool {
+		ti := parseCreatedAt(posts[i]["created_at"])
+		tj := parseCreatedAt(posts[j]["created_at"])
+		return ti.After(tj)
+	})
+
+	if len(posts) > 50 {
+		posts = posts[:50]
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"posts": posts,
 		"total": len(posts),
 	})
+}
+
+// parseCreatedAt parses a created_at value (string or time.Time) into time.Time for sorting.
+func parseCreatedAt(v interface{}) time.Time {
+	switch val := v.(type) {
+	case time.Time:
+		return val
+	case string:
+		for _, layout := range []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02T15:04:05Z",
+			"2006-01-02T15:04:05.999999Z",
+		} {
+			if t, err := time.Parse(layout, val); err == nil {
+				return t
+			}
+		}
+	}
+	return time.Time{}
 }
 
 // GetAllFederatedUsers returns users from all instances
