@@ -39,6 +39,9 @@ func main() {
 	// Ensure migration 015 is applied (manual fix for Revoke Key)
 	db.GetDB().Exec(context.Background(), "ALTER TABLE key_rotations ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT 'rotated';")
 
+	// Ensure migration 023 is applied (remote actor encryption key for E2E DMs)
+	db.GetDB().Exec(context.Background(), "ALTER TABLE remote_actors ADD COLUMN IF NOT EXISTS encryption_public_key TEXT;")
+
 	// Ensure admin user exists
 	ensureAdminUser(cfg) // Silent check, no logging needed
 

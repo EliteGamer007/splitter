@@ -85,8 +85,8 @@ func ResolveRemoteUser(handle string) (*RemoteActor, error) {
 	// 1. Check cache
 	actor, err := getRemoteActorFromCache(ctx, username, domain)
 	if err == nil && actor != nil {
-		// Refresh if stale (older than 1 hour)
-		if time.Since(actor.LastFetchedAt) < time.Hour {
+		// Refresh if stale (older than 1 hour) OR encryption key is missing.
+		if time.Since(actor.LastFetchedAt) < time.Hour && strings.TrimSpace(actor.EncryptionPublicKey) != "" {
 			return actor, nil
 		}
 	}
@@ -221,12 +221,12 @@ func getRemoteActorFromCache(ctx context.Context, username, domain string) (*Rem
 	var actor RemoteActor
 	err := db.GetDB().QueryRow(ctx,
 		`SELECT id, actor_uri, username, domain, inbox_url, COALESCE(outbox_url,''),
-		        COALESCE(public_key_pem,''), COALESCE(display_name,''), COALESCE(avatar_url,''),
+		        COALESCE(public_key_pem,''), COALESCE(encryption_public_key, ''), COALESCE(display_name,''), COALESCE(avatar_url,''),
 		        last_fetched_at, created_at
 		 FROM remote_actors WHERE username = $1 AND domain = $2`,
 		username, domain,
 	).Scan(&actor.ID, &actor.ActorURI, &actor.Username, &actor.Domain,
-		&actor.InboxURL, &actor.OutboxURL, &actor.PublicKeyPEM,
+		&actor.InboxURL, &actor.OutboxURL, &actor.PublicKeyPEM, &actor.EncryptionPublicKey,
 		&actor.DisplayName, &actor.AvatarURL, &actor.LastFetchedAt, &actor.CreatedAt)
 
 	if err != nil {
@@ -254,13 +254,13 @@ func upsertRemoteActor(ctx context.Context, actor *RemoteActor) error {
 	}
 
 	_, err := db.GetDB().Exec(ctx,
-		`INSERT INTO remote_actors (actor_uri, username, domain, instance_domain, inbox_url, outbox_url, public_key, public_key_pem, display_name, avatar_url, last_fetched_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+		`INSERT INTO remote_actors (actor_uri, username, domain, instance_domain, inbox_url, outbox_url, public_key, public_key_pem, encryption_public_key, display_name, avatar_url, last_fetched_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
 		 ON CONFLICT (actor_uri) DO UPDATE SET
 		   inbox_url = $5, outbox_url = $6, public_key = $7, public_key_pem = $8,
-		   display_name = $9, avatar_url = $10, instance_domain = $4, last_fetched_at = now()`,
+		   encryption_public_key = $9, display_name = $10, avatar_url = $11, instance_domain = $4, last_fetched_at = now()`,
 		actor.ActorURI, actor.Username, actor.Domain, instanceDomain, actor.InboxURL,
-		outboxURL, publicKey, actor.PublicKeyPEM, actor.DisplayName, actor.AvatarURL,
+		outboxURL, publicKey, actor.PublicKeyPEM, actor.EncryptionPublicKey, actor.DisplayName, actor.AvatarURL,
 	)
 	return err
 }
@@ -269,7 +269,7 @@ func upsertRemoteActor(ctx context.Context, actor *RemoteActor) error {
 func GetAllRemoteActors(ctx context.Context) ([]*RemoteActor, error) {
 	rows, err := db.GetDB().Query(ctx,
 		`SELECT id, actor_uri, username, domain, inbox_url, COALESCE(outbox_url,''),
-		        COALESCE(public_key_pem,''), COALESCE(display_name,''), COALESCE(avatar_url,''),
+		        COALESCE(public_key_pem,''), COALESCE(encryption_public_key, ''), COALESCE(display_name,''), COALESCE(avatar_url,''),
 		        last_fetched_at, created_at
 		 FROM remote_actors ORDER BY username`)
 	if err != nil {
@@ -281,7 +281,7 @@ func GetAllRemoteActors(ctx context.Context) ([]*RemoteActor, error) {
 	for rows.Next() {
 		var a RemoteActor
 		if err := rows.Scan(&a.ID, &a.ActorURI, &a.Username, &a.Domain,
-			&a.InboxURL, &a.OutboxURL, &a.PublicKeyPEM,
+			&a.InboxURL, &a.OutboxURL, &a.PublicKeyPEM, &a.EncryptionPublicKey,
 			&a.DisplayName, &a.AvatarURL, &a.LastFetchedAt, &a.CreatedAt); err != nil {
 			return nil, err
 		}

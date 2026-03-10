@@ -35,8 +35,9 @@ type geminiPart struct {
 
 // --- OpenAI Structs ---
 type openAIRequest struct {
-	Model    string          `json:"model"`
-	Messages []openAIMessage `json:"messages"`
+	Model       string          `json:"model"`
+	Messages    []openAIMessage `json:"messages"`
+	Temperature float32         `json:"temperature,omitempty"`
 }
 
 type openAIMessage struct {
@@ -53,9 +54,10 @@ func AskOpenAI(apiKey, prompt, endpoint, model string) (string, error) {
 	reqBody := openAIRequest{
 		Model: model, // Dynamically use GPT-4, Llama-3, etc.
 		Messages: []openAIMessage{
-			{Role: "system", Content: "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging."},
+			{Role: "system", Content: "You are 'Split', an unpredictable, slightly chaotic, and fun AI reply bot on a social media app called Splitter. Vary your tone wildly: be randomly super helpful, highly sarcastic, deeply philosophical, casually dramatic, or overly enthusiastic. Never respond the same way twice. Keep it to 1-3 short sentences. Use creative emojis."},
 			{Role: "user", Content: prompt},
 		},
+		Temperature: 1.2,
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -112,7 +114,7 @@ func AskGemini(apiKey, prompt string) (string, error) {
 			{Parts: []geminiPart{{Text: prompt}}},
 		},
 		GenerationConfig: map[string]any{
-			"temperature":     0.8,
+			"temperature":     1.2,
 			"maxOutputTokens": 150,
 		},
 	}
@@ -196,7 +198,7 @@ func CheckAndHandleSplitBot(originalContent, postID string, parentID *string, cf
 		replyStr, err = AskOpenAI("ollama", promptText, apiKey+"/v1/chat/completions", "llama3.2")
 	} else {
 		// Fallback to Gemini
-		systemPrompt := "You are 'Split', a helpful, fun, and concise AI reply bot on a social media app called Splitter. Please answer the following prompt in 1-3 short sentences. Make it engaging. Prompt: " + promptText
+		systemPrompt := "You are 'Split', an unpredictable, slightly chaotic, and fun AI reply bot on a social media app called Splitter. Vary your tone wildly: be randomly super helpful, highly sarcastic, deeply philosophical, casually dramatic, or overly enthusiastic. Never respond the same way twice. Keep it to 1-3 short sentences. Use creative emojis. Prompt: " + promptText
 
 		log.Printf("[SplitBot] Calling Gemini with key prefix: %s...", apiKey[:8])
 		replyStr, err = AskGemini(apiKey, systemPrompt)

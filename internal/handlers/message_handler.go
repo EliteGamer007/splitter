@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"splitter/internal/config"
@@ -185,53 +187,18 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		})
 	}
 
-	// FEDERATION: If recipient is remote, deliver activity
-	if h.cfg.Federation.Enabled && recipient.InstanceDomain != h.cfg.Federation.Domain && recipient.InstanceDomain != "localhost" {
-		go func() {
-			// Resolve remote actor to get inbox
-			// Recipient DID should be the actor URI for remote users
-			remoteActor, err := federation.ResolveRemoteUser(recipient.Username + "@" + recipient.InstanceDomain)
-			if err != nil {
-				// Try using DID if it looks like an actor URI
-				remoteActor, err = federation.ResolveRemoteUser(recipient.DID)
-				if err != nil {
-					// Last resort
-					return
-				}
-			}
-
-			// Build activity
-			// Note: For DMs, we send a Create(Note) addressed ONLY to the recipient
-			// We use the ciphertext if available? ActivityPub standard is usually plaintext (or encoded).
-			// Splitter uses E2EE, but ActivityPub doesn't natively support it easily without extensions.
-			// For now, we send the Ciphertext as content or a specific field if we want to support E2EE federation.
-			// However, since we are sending to a standard AP server (which might not be Splitter),
-			// we should probably send the plaintext Content as fallback + Ciphertext if possible.
-			// But wait, if the recipient IS another Splitter instance, they expect E2EE.
-			// Currently `Create` activity uses `Content`.
-			// Let's send `Ciphertext` in the content field if it exists, labelled as such?
-			// Or just send Content for now to keep it simple and standard compliant.
-			// If we send plaintext Content, it won't be E2EE but it will work.
-			// Let's settle on sending `Content` (plaintext) for now to ensure interoperability.
-			// If we want E2EE, we'd need to negotiate keys which we did via the frontend.
-			// BUT: The frontend did E2EE. The `req.Content` might already be encrypted?
-			// No, `req.Content` is usually a fallback/notification text or empty if E2EE is strict.
-			// In `DMPage.jsx`, `sendMessage` sends `encMessage` as `ciphertext` and `message` as `content`.
-			// So `content` IS the plaintext message (if provided).
-
-			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, sender.Username)
-			activity := federation.BuildCreateDMActivity(actorURI, recipient.DID, req.Content, req.Ciphertext, req.EncryptedKeys)
-
-			// Deliver
-			federation.DeliverActivity(activity, remoteActor.InboxURL)
-		}()
-	}
-
-	return c.JSON(http.StatusCreated, map[string]interface{}{
+	response := map[string]interface{}{
 		"message":   msg,
 		"thread":    thread,
 		"recipient": recipient,
-	})
+	}
+
+	if err := h.deliverFederatedDM(sender, recipient, req.Content, req.Ciphertext, req.EncryptedKeys); err != nil {
+		log.Printf("[DM] Federation delivery failed (message saved locally): %v", err)
+		response["federation_error"] = err.Error()
+	}
+
+	return c.JSON(http.StatusCreated, response)
 }
 
 // StartConversation starts or gets a conversation with a user
@@ -397,6 +364,13 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 		Error           string          `json:"error,omitempty"`
 	}
 
+	sender, err := h.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to load sender profile",
+		})
+	}
+
 	results := make([]syncResult, 0, len(req.QueuedMessages))
 	createdCount := 0
 	deduplicatedCount := 0
@@ -423,7 +397,8 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			continue
 		}
 
-		if _, err := h.userRepo.GetByID(ctx, queued.RecipientID); err != nil {
+		recipient, err := h.userRepo.GetByID(ctx, queued.RecipientID)
+		if err != nil {
 			failureCount++
 			results = append(results, syncResult{
 				ClientMessageID: queued.ClientMessageID,
@@ -491,16 +466,26 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 
 		if created {
 			createdCount++
+			sr := syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Message:         msg,
+				ThreadID:        thread.ID,
+				Created:         true,
+			}
+			if fedErr := h.deliverFederatedDM(sender, recipient, queued.Content, queued.Ciphertext, queued.EncryptedKeys); fedErr != nil {
+				log.Printf("[DM] Sync federation delivery failed (message saved): %v", fedErr)
+				sr.Error = "federation delivery pending: " + fedErr.Error()
+			}
+			results = append(results, sr)
 		} else {
 			deduplicatedCount++
+			results = append(results, syncResult{
+				ClientMessageID: queued.ClientMessageID,
+				Message:         msg,
+				ThreadID:        thread.ID,
+				Created:         created,
+			})
 		}
-
-		results = append(results, syncResult{
-			ClientMessageID: queued.ClientMessageID,
-			Message:         msg,
-			ThreadID:        thread.ID,
-			Created:         created,
-		})
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -520,4 +505,47 @@ func mapToJSONString(value map[string]string) string {
 		return ""
 	}
 	return string(raw)
+}
+
+func (h *MessageHandler) deliverFederatedDM(sender, recipient *models.User, content, ciphertext string, encryptedKeys map[string]string) error {
+	if !h.cfg.Federation.Enabled || recipient == nil || sender == nil {
+		return nil
+	}
+
+	if recipient.InstanceDomain == h.cfg.Federation.Domain || recipient.InstanceDomain == "localhost" || recipient.InstanceDomain == "" {
+		return nil
+	}
+
+	resolveInputs := []string{}
+	if recipient.Username != "" && recipient.InstanceDomain != "" {
+		resolveInputs = append(resolveInputs, recipient.Username+"@"+recipient.InstanceDomain)
+	}
+	if recipient.DID != "" {
+		resolveInputs = append(resolveInputs, recipient.DID)
+	}
+
+	var remoteActor *federation.RemoteActor
+	var resolveErr error
+	for _, candidate := range resolveInputs {
+		remoteActor, resolveErr = federation.ResolveRemoteUser(candidate)
+		if resolveErr == nil && remoteActor != nil && strings.TrimSpace(remoteActor.InboxURL) != "" {
+			break
+		}
+	}
+
+	if remoteActor == nil || strings.TrimSpace(remoteActor.InboxURL) == "" {
+		if resolveErr == nil {
+			resolveErr = fmt.Errorf("missing remote inbox")
+		}
+		return fmt.Errorf("resolve recipient failed: %w", resolveErr)
+	}
+
+	actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, sender.Username)
+	recipientURI := recipient.DID
+	if strings.TrimSpace(recipientURI) == "" {
+		recipientURI = remoteActor.ActorURI
+	}
+
+	activity := federation.BuildCreateDMActivity(actorURI, recipientURI, content, ciphertext, encryptedKeys)
+	return federation.DeliverActivity(activity, remoteActor.InboxURL)
 }
