@@ -1,0 +1,249 @@
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 2.1837911s
+Timestamp: 2026-03-10 05:54:48
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 739.3136ms
+Timestamp: 2026-03-10 05:54:48
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 901.7056ms
+Timestamp: 2026-03-10 05:54:49
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 2.4437935s
+Timestamp: 2026-03-10 05:56:47
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 993.4927ms
+Timestamp: 2026-03-10 05:56:48
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.0382197s
+Timestamp: 2026-03-10 05:56:49
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 2.9823986s
+Timestamp: 2026-03-10 05:57:50
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 694.9802ms
+Timestamp: 2026-03-10 05:57:50
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.1297967s
+Timestamp: 2026-03-10 05:57:51
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 2.5215177s
+Timestamp: 2026-03-10 05:58:25
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 735.0994ms
+Timestamp: 2026-03-10 05:58:25
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.2850036s
+Timestamp: 2026-03-10 05:58:27
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.4585838s
+Timestamp: 2026-03-10 05:58:51
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 781.6338ms
+Timestamp: 2026-03-10 05:58:52
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.0021557s
+Timestamp: 2026-03-10 05:58:53
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.003998s
+Timestamp: 2026-03-10 06:00:21
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 3.4321321s
+Timestamp: 2026-03-10 06:01:06
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 834.8737ms
+Timestamp: 2026-03-10 06:01:07
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 993.7796ms
+Timestamp: 2026-03-10 06:01:08
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.3438031s
+Timestamp: 2026-03-10 06:02:51
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 918.4312ms
+Timestamp: 2026-03-10 06:02:52
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 948.4401ms
+Timestamp: 2026-03-10 06:02:53
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.2011467s
+Timestamp: 2026-03-10 06:08:29
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 755.527ms
+Timestamp: 2026-03-10 06:08:30
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 840.6524ms
+Timestamp: 2026-03-10 06:08:31
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.4666421s
+Timestamp: 2026-03-10 06:10:46
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 776.3078ms
+Timestamp: 2026-03-10 06:10:46
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 873.461ms
+Timestamp: 2026-03-10 06:10:47
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.3818316s
+Timestamp: 2026-03-10 06:11:03
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 671.3594ms
+Timestamp: 2026-03-10 06:11:04
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 860.7222ms
+Timestamp: 2026-03-10 06:11:05
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.0026564s
+Timestamp: 2026-03-10 06:11:22
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: FAIL
+Execution Time: 1.3056641s
+Timestamp: 2026-03-10 06:11:37
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.3757877s
+Timestamp: 2026-03-10 06:12:55
+
+TestName: TestUsersUniqueConstraints
+Status: FAIL
+Execution Time: 1.1193425s
+Timestamp: 2026-03-10 06:12:56
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 871.2596ms
+Timestamp: 2026-03-10 06:12:57
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.218508s
+Timestamp: 2026-03-10 06:14:40
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 941.5258ms
+Timestamp: 2026-03-10 06:14:41
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 808.6817ms
+Timestamp: 2026-03-10 06:14:42
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.3936117s
+Timestamp: 2026-03-10 06:18:19
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.0358352s
+Timestamp: 2026-03-10 06:18:20
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.1208837s
+Timestamp: 2026-03-10 06:18:21
+
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 1.4210698s
+Timestamp: 2026-03-10 06:20:13
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.1357059s
+Timestamp: 2026-03-10 06:20:14
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.1495183s
+Timestamp: 2026-03-10 06:20:15
+

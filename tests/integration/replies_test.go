@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"splitter/internal/db"
 	"testing"
+	"time"
 )
 
 /*
@@ -29,8 +30,8 @@ func TestReplyFlow(t *testing.T) {
 	defer cleanup()
 
 	// 2. Create Users
-	tokenA := registerUser(t, "user_a", "a@example.com", "SecurePass123!")
-	tokenB := registerUser(t, "user_b", "b@example.com", "SecurePass123!")
+	tokenA := registerUser(t, uniqueUsername("replyA"), uniqueEmail("replyA"), "SecurePass123!")
+	tokenB := registerUser(t, uniqueUsername("replyB"), uniqueEmail("replyB"), "SecurePass123!")
 
 	var postID string
 	var replyID1 string
@@ -70,6 +71,7 @@ func TestReplyFlow(t *testing.T) {
 
 	// Step 2: User B replies to Root Post
 	t.Run("Create First Reply", func(t *testing.T) {
+		time.Sleep(200 * time.Millisecond)
 		endpoint := "/api/v1/posts/" + postID + "/replies"
 		replyID1 = createContent(t, tokenB, endpoint, "First Reply")
 
@@ -86,6 +88,7 @@ func TestReplyFlow(t *testing.T) {
 
 	// Step 3: User A replies to User B's reply (Nested)
 	t.Run("Create Nested Reply", func(t *testing.T) {
+		time.Sleep(200 * time.Millisecond) // Wait for first reply to be visible
 		// Endpoint for replying to a reply?
 		// According to router.go:
 		// postsAuth.POST("/:id/replies", replyHandler.CreateReply)

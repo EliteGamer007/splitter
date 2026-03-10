@@ -1,0 +1,41 @@
+﻿2026/03/10 12:37:25 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+.env loaded successfully
+=== RUN   TestKeyRotation
+    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 12:37:27 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:37:27 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:37:27 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:37:27 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+=== RUN   TestKeyRotation/Happy_Path_-_Valid_Rotation
+{"time":"2026-03-10T12:37:28.173684+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":653795600,"latency_human":"653.7956ms","bytes_in":224,"bytes_out":864}
+2026/03/10 12:37:29 Key rotated successfully for user 28e125f5-8bc1-480f-a4e4-f9671b9ef2a6 (DID: did:splitter:krhappy_5179416001637_5179416001322)
+2026/03/10 12:37:29 [Federation] DeliverToFollowers: authorDID=did:splitter:krhappy_5179416001637_5179416001322, domain=splitter-1
+{"time":"2026-03-10T12:37:29.0596212+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":884835000,"latency_human":"884.835ms","bytes_in":221,"bytes_out":147}
+2026/03/10 12:37:29 [Federation] Adding shared inbox for splitter-2: http://localhost:8001/ap/shared-inbox
+2026/03/10 12:37:29 [Federation] Delivering to 1 unique inboxes
+{"time":"2026-03-10T12:37:29.9882682+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"GET","uri":"/api/v1/auth/key-history","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":928647000,"latency_human":"928.647ms","bytes_in":0,"bytes_out":366}
+=== RUN   TestKeyRotation/Replay_Attack_-_Nonce_Reuse_Rejected
+{"time":"2026-03-10T12:37:30.5943873+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":606119100,"latency_human":"606.1191ms","bytes_in":227,"bytes_out":871}
+2026/03/10 12:37:31 RotateKey DB error for user 14524dcc-326c-47e7-b8ad-31f7fcada7db: failed to record key rotation: ERROR: insert or update on table "key_rotations" violates foreign key constraint "key_rotations_user_id_fkey" (SQLSTATE 23503)
+{"time":"2026-03-10T12:37:31.5954698+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":500,"error":"","latency":999916600,"latency_human":"999.9166ms","bytes_in":222,"bytes_out":33}
+    key_rotation_test.go:170: First rotation should succeed, got 500
+=== RUN   TestKeyRotation/Expired_Timestamp_-_Rejected
+2026/03/10 12:37:31 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
+{"time":"2026-03-10T12:37:31.8850096+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":287465000,"latency_human":"287.465ms","bytes_in":230,"bytes_out":878}
+{"time":"2026-03-10T12:37:32.4808271+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":595207900,"latency_human":"595.2079ms","bytes_in":223,"bytes_out":64}
+=== RUN   TestKeyRotation/Invalid_Signature_-_Rejected
+{"time":"2026-03-10T12:37:34.140174+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":1656440000,"latency_human":"1.65644s","bytes_in":227,"bytes_out":871}
+{"time":"2026-03-10T12:37:34.3867684+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":404,"error":"","latency":245353400,"latency_human":"245.3534ms","bytes_in":222,"bytes_out":27}
+    key_rotation_test.go:223: Bad signature: expected 401, got 404. Body: {"error":"User not found"}
+=== RUN   TestKeyRotation/Password-Only_User_-_No_Public_Key
+{"time":"2026-03-10T12:37:34.6695017+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":281787300,"latency_human":"281.7873ms","bytes_in":109,"bytes_out":834}
+{"time":"2026-03-10T12:37:34.8073292+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63917","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":400,"error":"","latency":136373800,"latency_human":"136.3738ms","bytes_in":222,"bytes_out":94}
+--- FAIL: TestKeyRotation (9.98s)
+    --- PASS: TestKeyRotation/Happy_Path_-_Valid_Rotation (2.48s)
+    --- FAIL: TestKeyRotation/Replay_Attack_-_Nonce_Reuse_Rejected (1.60s)
+    --- PASS: TestKeyRotation/Expired_Timestamp_-_Rejected (0.89s)
+    --- FAIL: TestKeyRotation/Invalid_Signature_-_Rejected (1.91s)
+    --- PASS: TestKeyRotation/Password-Only_User_-_No_Public_Key (0.42s)
+FAIL
+FAIL	splitter/tests/integration	10.634s
+FAIL

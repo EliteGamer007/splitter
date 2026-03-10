@@ -1,0 +1,15 @@
+﻿2026/03/10 12:26:11 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+.env loaded successfully
+=== RUN   TestKeyRotation
+    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+2026/03/10 12:26:13 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
+2026/03/10 12:26:14 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
+2026/03/10 12:26:14 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
+2026/03/10 12:26:14 CORS allowed origins: [http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:8000 http://localhost:8001]
+=== RUN   TestKeyRotation/Invalid_Signature_-_Rejected
+{"time":"2026-03-10T12:26:14.7723486+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52477","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":552951200,"latency_human":"552.9512ms","bytes_in":227,"bytes_out":871}
+{"time":"2026-03-10T12:26:15.112058+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:52477","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":401,"error":"","latency":339709400,"latency_human":"339.7094ms","bytes_in":222,"bytes_out":90}
+--- PASS: TestKeyRotation (4.77s)
+    --- PASS: TestKeyRotation/Invalid_Signature_-_Rejected (0.90s)
+PASS
+ok  	splitter/tests/integration	8.711s

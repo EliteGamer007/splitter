@@ -1,0 +1,9 @@
+2026/03/10 11:41:36 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
+=== RUN   TestUsersRequiredFieldsNotNull
+    check_users_test.go:126: Column users.email allows NULL, expected NOT NULL
+    check_users_test.go:126: Column users.password_hash allows NULL, expected NOT NULL
+    check_users_test.go:126: Column users.role allows NULL, expected NOT NULL
+--- FAIL: TestUsersRequiredFieldsNotNull (1.31s)
+FAIL
+FAIL	splitter/tests/check_users	1.807s
+FAIL

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func registerWithKey(t *testing.T, username, email, password string, pubKey ed25
 		"email":      email,
 		"password":   password,
 		"public_key": pubKeyB64,
-		"did":        fmt.Sprintf("did:splitter:%s", username),
+		"did":        uniqueDID(username),
 	})
 	req, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/auth/register", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -46,7 +47,9 @@ func registerWithKey(t *testing.T, username, email, password string, pubKey ed25
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("registerWithKey: expected 201, got %d", resp.StatusCode)
+		var errBody map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		t.Fatalf("registerWithKey: expected 201, got %d. Body: %v, Request Username: %s", resp.StatusCode, errBody, username)
 	}
 
 	var result map[string]interface{}
@@ -100,15 +103,16 @@ func TestKeyRotation(t *testing.T) {
 		newPub, _, _ := ed25519.GenerateKey(nil)
 
 		// Register user with initial key
+		uname := uniqueUsername("krhappy")
 		token, _ := registerWithKey(t,
-			"keyrotation_happy",
-			"keyrotation_happy@test.com",
+			uname,
+			uniqueEmail("krhappy"),
 			"securePass123!",
 			oldPub,
 		)
 
 		// Build valid rotation request
-		nonce := "test-nonce-happy-001"
+		nonce := uniqueNonce("happy")
 		ts := time.Now().Unix()
 		reqBody := buildRotationRequest(t, oldPriv, newPub, nonce, ts)
 
@@ -132,6 +136,9 @@ func TestKeyRotation(t *testing.T) {
 			t.Errorf("new_public_key mismatch in response")
 		}
 
+		// Small delay to ensure database insert is visible across pooled connections (Neon pgBouncer)
+		time.Sleep(400 * time.Millisecond)
+
 		// Verify key history shows 1 entry
 		histReq, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/auth/key-history", nil)
 		histReq.Header.Set("Authorization", "Bearer "+token)
@@ -150,12 +157,12 @@ func TestKeyRotation(t *testing.T) {
 
 	t.Run("Replay Attack - Nonce Reuse Rejected", func(t *testing.T) {
 		oldPub, oldPriv, _ := ed25519.GenerateKey(nil)
-		newPub, _, _ := ed25519.GenerateKey(nil)
+		newPub, newPriv, _ := ed25519.GenerateKey(nil)
 		newPub2, _, _ := ed25519.GenerateKey(nil)
 
-		token, _ := registerWithKey(t, "keyrotation_replay", "keyrotation_replay@test.com", "securePass123!", oldPub)
+		token, _ := registerWithKey(t, uniqueUsername("krreplay"), uniqueEmail("krreplay"), "securePass123!", oldPub)
 
-		nonce := "test-nonce-replay-001"
+		nonce := uniqueNonce("replay")
 		ts := time.Now().Unix()
 
 		// First rotation — should succeed
@@ -167,12 +174,15 @@ func TestKeyRotation(t *testing.T) {
 		}
 
 		// Second rotation with the SAME nonce — must be rejected
-		reqBody2 := buildRotationRequest(t, oldPriv, newPub2, nonce, ts)
+		// Note: since the key was successfully rotated to newPub, we MUST sign with newPriv
+		// otherwise the signature check will reject it before it even checks the nonce replay constraint.
+		reqBody2 := buildRotationRequest(t, newPriv, newPub2, nonce, ts)
 		resp2 := doRotateKey(t, token, reqBody2)
 		defer resp2.Body.Close()
 
 		if resp2.StatusCode != http.StatusConflict {
-			t.Errorf("Replay attack: expected 409, got %d", resp2.StatusCode)
+			bodyBytes, _ := io.ReadAll(resp2.Body)
+			t.Errorf("Replay attack: expected 409, got %d. Body: %s", resp2.StatusCode, string(bodyBytes))
 		}
 	})
 
@@ -180,18 +190,19 @@ func TestKeyRotation(t *testing.T) {
 		oldPub, oldPriv, _ := ed25519.GenerateKey(nil)
 		newPub, _, _ := ed25519.GenerateKey(nil)
 
-		token, _ := registerWithKey(t, "keyrotation_expired", "keyrotation_expired@test.com", "securePass123!", oldPub)
+		token, _ := registerWithKey(t, uniqueUsername("krexpired"), uniqueEmail("krexpired"), "securePass123!", oldPub)
 
 		// Use a timestamp 10 minutes in the past
 		staleTS := time.Now().Add(-10 * time.Minute).Unix()
-		nonce := "test-nonce-expired-001"
+		nonce := uniqueNonce("expired")
 		reqBody := buildRotationRequest(t, oldPriv, newPub, nonce, staleTS)
 
 		resp := doRotateKey(t, token, reqBody)
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Stale timestamp: expected 401, got %d", resp.StatusCode)
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			t.Errorf("Stale timestamp: expected 401, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 		}
 	})
 
@@ -199,11 +210,11 @@ func TestKeyRotation(t *testing.T) {
 		oldPub, _, _ := ed25519.GenerateKey(nil)
 		newPub, _, _ := ed25519.GenerateKey(nil)
 
-		token, _ := registerWithKey(t, "keyrotation_badsig", "keyrotation_badsig@test.com", "securePass123!", oldPub)
+		token, _ := registerWithKey(t, uniqueUsername("krbadsig"), uniqueEmail("krbadsig"), "securePass123!", oldPub)
 
 		// Sign with a DIFFERENT (wrong) private key
 		_, wrongPriv, _ := ed25519.GenerateKey(nil)
-		nonce := "test-nonce-badsig-001"
+		nonce := uniqueNonce("badsig")
 		ts := time.Now().Unix()
 		reqBody := buildRotationRequest(t, wrongPriv, newPub, nonce, ts)
 
@@ -211,15 +222,16 @@ func TestKeyRotation(t *testing.T) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Bad signature: expected 401, got %d", resp.StatusCode)
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			t.Errorf("Bad signature: expected 401, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 		}
 	})
 
 	t.Run("Password-Only User - No Public Key", func(t *testing.T) {
 		// Register WITHOUT a public_key (password-only user)
 		body, _ := json.Marshal(map[string]string{
-			"username": "keyrotation_pwonly",
-			"email":    "keyrotation_pwonly@test.com",
+			"username": uniqueUsername("krpwonly"),
+			"email":    uniqueEmail("krpwonly"),
 			"password": "securePass123!",
 		})
 		req, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/auth/register", bytes.NewBuffer(body))
@@ -231,9 +243,11 @@ func TestKeyRotation(t *testing.T) {
 		resp.Body.Close()
 		token, _ := regResult["token"].(string)
 
+		time.Sleep(200 * time.Millisecond)
+
 		// Try to rotate — should get 400 (no public key)
 		somePub, somePriv, _ := ed25519.GenerateKey(nil)
-		nonce := "test-nonce-pwonly-001"
+		nonce := uniqueNonce("pwonly")
 		ts := time.Now().Unix()
 		reqBody := buildRotationRequest(t, somePriv, somePub, nonce, ts)
 

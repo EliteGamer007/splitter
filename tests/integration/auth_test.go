@@ -26,9 +26,9 @@ func TestAuthFlow(t *testing.T) {
 	cleanup := SetupTestEnv(t)
 	defer cleanup()
 
-	// Shared test data
-	username := "integration_test_user"
-	email := "test@example.com"
+	// Shared test data — unique per run to avoid collisions
+	username := uniqueUsername("auth")
+	email := uniqueEmail("auth")
 	password := "securePass123!"
 
 	t.Run("Register User", func(t *testing.T) {

@@ -9,7 +9,9 @@ import (
 	"splitter/internal/db"
 	"splitter/internal/server"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -44,7 +46,7 @@ func SetupTestEnv(t *testing.T) func() {
 	cfg := config.Load()
 
 	// Generate unique schema name
-	SchemaName = fmt.Sprintf("test_schema_%d", os.Getpid())
+	SchemaName = fmt.Sprintf("test_schema_%d_%d", os.Getpid(), time.Now().UnixNano())
 
 	// 1. Connect to DB to create Schema (using default public schema initially)
 	// We need to parse the config to get connection string
@@ -85,6 +87,9 @@ func SetupTestEnv(t *testing.T) func() {
 		"../../migrations/015_revocation_reason.sql",
 		"../../migrations/016_add_offline_message_sync.sql",
 		"../../migrations/017_add_multi_device_and_federated_dm_encryption.sql",
+		"../../migrations/018_fix_messages_schema.sql",
+		"../../migrations/019_add_stories.sql",
+		"../../migrations/020_add_story_views.sql",
 	}
 
 	for _, f := range files {
@@ -114,6 +119,12 @@ func SetupTestEnv(t *testing.T) func() {
 	// Let's manually set it to ensure isolation
 
 	testPoolConfig, _ := pgxpool.ParseConfig(testConnString)
+	// Add AfterConnect hook to guarantee the search_path is set correctly
+	// even when Neon's pgBouncer pooler reuses connections and ignores URL params.
+	testPoolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, fmt.Sprintf("SET search_path = %s, public", SchemaName))
+		return err
+	}
 	testPool, err := pgxpool.NewWithConfig(context.Background(), testPoolConfig)
 	if err != nil {
 		t.Fatalf("Failed to connect to test schema: %v", err)

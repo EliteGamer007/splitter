@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"splitter/internal/db"
 	"testing"
+	"time"
 )
 
 /*
@@ -29,8 +30,8 @@ func TestPostFlow(t *testing.T) {
 	defer cleanup()
 
 	// 2. Create User & Get Token
-	username := "post_author"
-	token := registerUser(t, username, "author@example.com", "password123")
+	username := uniqueUsername("post")
+	token := registerUser(t, username, uniqueEmail("post"), "password123")
 
 	var postID string
 
@@ -91,6 +92,7 @@ func TestPostFlow(t *testing.T) {
 
 	// Test 2: Get Post by ID
 	t.Run("Get Post", func(t *testing.T) {
+		time.Sleep(400 * time.Millisecond)
 		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/posts/%s", TestServer.URL, postID), nil)
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -122,6 +124,7 @@ func TestPostFlow(t *testing.T) {
 
 	// Test 3: Public Feed
 	t.Run("Public Feed", func(t *testing.T) {
+		time.Sleep(400 * time.Millisecond)
 		req, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/posts/public", nil)
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -182,7 +185,7 @@ func TestEphemeralPostExpiryEnforcement(t *testing.T) {
 	cleanup := SetupTestEnv(t)
 	defer cleanup()
 
-	token := registerUser(t, "ephemeral_author", "ephemeral@example.com", "password123")
+	token := registerUser(t, uniqueUsername("ephemeral"), uniqueEmail("ephemeral"), "password123")
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -226,6 +229,8 @@ func TestEphemeralPostExpiryEnforcement(t *testing.T) {
 		t.Fatalf("Failed to force post expiration: %v", err)
 	}
 
+	time.Sleep(1000 * time.Millisecond)
+
 	getReq, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/posts/%s", TestServer.URL, postID), nil)
 	getResp, err := (&http.Client{}).Do(getReq)
 	if err != nil {
@@ -236,6 +241,8 @@ func TestEphemeralPostExpiryEnforcement(t *testing.T) {
 	if getResp.StatusCode != http.StatusNotFound {
 		t.Fatalf("Expected status 404 for expired post, got %d", getResp.StatusCode)
 	}
+
+	time.Sleep(500 * time.Millisecond)
 
 	feedReq, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/posts/public", nil)
 	feedResp, err := (&http.Client{}).Do(feedReq)

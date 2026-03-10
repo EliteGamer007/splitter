@@ -1,0 +1,16 @@
+ok  	splitter/tests/unit/auth	0.906s
+ok  	splitter/tests/unit/helpers	0.512s
+ok  	splitter/tests/unit/posts	0.498s
+ok  	splitter/tests/unit/replies	1.675s
+ok  	splitter/tests/unit/security	0.540s
+ok  	splitter/tests/unit/users	0.542s
+ok  	splitter/tests/db	4.994s
+ok  	splitter/tests/apply_migration	5.535s
+ok  	splitter/tests/check_schema	3.036s
+ok  	splitter/tests/check_users	5.422s
+ok  	splitter/tests/check_encryption_keys	0.594s
+ok  	splitter/tests/fix_db	3.115s
+ok  	splitter/tests/seeder	0.595s
+ok  	splitter/tests/verify_db	2.914s
+ok  	splitter/tests/e2e_test	0.620s
+ok  	splitter/tests/load	0.723s

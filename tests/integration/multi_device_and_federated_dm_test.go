@@ -55,8 +55,8 @@ func TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage(t *testing.T) {
 	cleanup := SetupTestEnv(t)
 	defer cleanup()
 
-	aliceID, aliceDID, aliceToken := registerUserForDeviceTest(t, "alice_devices", "alice_devices@example.com")
-	bobID, _, _ := registerUserForDeviceTest(t, "bob_devices", "bob_devices@example.com")
+	aliceID, aliceDID, aliceToken := registerUserForDeviceTest(t, uniqueUsername("alice_dev"), uniqueEmail("alice_dev"))
+	bobID, _, _ := registerUserForDeviceTest(t, uniqueUsername("bob_dev"), uniqueEmail("bob_dev"))
 
 	if aliceID == bobID {
 		t.Fatalf("alice and bob should be different users")
@@ -82,11 +82,13 @@ func TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage(t *testing.T) {
 		}
 	}
 
-	requestDevice("alice-primary", "Alice Laptop", "alice-pk-1", http.StatusCreated)
-	requestDevice("alice-phone", "Alice Phone", "alice-pk-2", http.StatusAccepted)
+	primaryDevID := uniqueDeviceID("primary")
+	phoneDevID := uniqueDeviceID("phone")
+	requestDevice(primaryDevID, "Alice Laptop", "alice-pk-1", http.StatusCreated)
+	requestDevice(phoneDevID, "Alice Phone", "alice-pk-2", http.StatusAccepted)
 
-	approveBody, _ := json.Marshal(map[string]string{"approver_device_id": "alice-primary"})
-	approveReq, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/auth/devices/alice-phone/approve", bytes.NewBuffer(approveBody))
+	approveBody, _ := json.Marshal(map[string]string{"approver_device_id": primaryDevID})
+	approveReq, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/auth/devices/"+phoneDevID+"/approve", bytes.NewBuffer(approveBody))
 	approveReq.Header.Set("Content-Type", "application/json")
 	approveReq.Header.Set("Authorization", "Bearer "+aliceToken)
 	approveResp, err := (&http.Client{}).Do(approveReq)
@@ -140,8 +142,8 @@ func TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage(t *testing.T) {
 		"content":      "",
 		"ciphertext":   "federated-ciphertext-payload",
 		"encrypted_keys": map[string]string{
-			"alice-primary": "enc-for-primary",
-			"alice-phone":   "enc-for-phone",
+			primaryDevID: "enc-for-primary",
+			phoneDevID:   "enc-for-phone",
 		},
 	})
 	sendReq, _ := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/messages/send", bytes.NewBuffer(sendBody))

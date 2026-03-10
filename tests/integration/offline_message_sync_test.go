@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func registerAndLogin(t *testing.T, username, email, password string) (string, string) {
@@ -85,8 +86,8 @@ func TestOfflineMessageSync_IdempotentByClientMessageID(t *testing.T) {
 	cleanup := SetupTestEnv(t)
 	defer cleanup()
 
-	aliceID, aliceToken := registerAndLogin(t, "alice_sync", "alice_sync@example.com", "password123!")
-	bobID, _ := registerAndLogin(t, "bob_sync", "bob_sync@example.com", "password123!")
+	aliceID, aliceToken := registerAndLogin(t, uniqueUsername("alice_sync"), uniqueEmail("alice_sync"), "password123!")
+	bobID, _ := registerAndLogin(t, uniqueUsername("bob_sync"), uniqueEmail("bob_sync"), "password123!")
 
 	if aliceID == bobID {
 		t.Fatalf("alice and bob must be different users")
@@ -95,7 +96,7 @@ func TestOfflineMessageSync_IdempotentByClientMessageID(t *testing.T) {
 	syncPayload := map[string]interface{}{
 		"queued_messages": []map[string]interface{}{
 			{
-				"client_message_id": "offline-msg-001",
+				"client_message_id": uniqueClientMsgID("offline"),
 				"recipient_id":      bobID,
 				"content":           "",
 				"ciphertext":        "encrypted-payload-1",
@@ -135,6 +136,8 @@ func TestOfflineMessageSync_IdempotentByClientMessageID(t *testing.T) {
 	if int(firstResult["failed_count"].(float64)) != 0 {
 		t.Fatalf("expected failed_count=0 on first sync, got %v", firstResult["failed_count"])
 	}
+
+	time.Sleep(200 * time.Millisecond)
 
 	secondReq, err := http.NewRequest(http.MethodPost, TestServer.URL+"/api/v1/messages/sync", bytes.NewBuffer(payloadBytes))
 	if err != nil {

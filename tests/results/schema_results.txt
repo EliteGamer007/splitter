@@ -1,0 +1,248 @@
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 2.3485991s
+Timestamp: 2026-03-10 05:54:48
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 954.1396ms
+Timestamp: 2026-03-10 05:54:49
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 596.1189ms
+Timestamp: 2026-03-10 05:54:49
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 2.6505474s
+Timestamp: 2026-03-10 05:56:47
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.2602716s
+Timestamp: 2026-03-10 05:56:48
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 618.578ms
+Timestamp: 2026-03-10 05:56:49
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 3.1932895s
+Timestamp: 2026-03-10 05:57:50
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0342964s
+Timestamp: 2026-03-10 05:57:51
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 730.3007ms
+Timestamp: 2026-03-10 05:57:51
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 2.9192815s
+Timestamp: 2026-03-10 05:58:25
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0909838s
+Timestamp: 2026-03-10 05:58:26
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 780.0265ms
+Timestamp: 2026-03-10 05:58:27
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 1.5695525s
+Timestamp: 2026-03-10 05:58:51
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0673402s
+Timestamp: 2026-03-10 05:58:52
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 913.8077ms
+Timestamp: 2026-03-10 05:58:53
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 1.7292792s
+Timestamp: 2026-03-10 05:59:17
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 1.9024331s
+Timestamp: 2026-03-10 05:59:33
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 1.7100689s
+Timestamp: 2026-03-10 05:59:49
+Error: test failed (via t.Fail/t.Error)
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 3.1519545s
+Timestamp: 2026-03-10 06:01:06
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.161034s
+Timestamp: 2026-03-10 06:01:07
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 771.5268ms
+Timestamp: 2026-03-10 06:01:08
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.1445815s
+Timestamp: 2026-03-10 06:01:40
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0325379s
+Timestamp: 2026-03-10 06:01:41
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 769.1397ms
+Timestamp: 2026-03-10 06:01:42
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.4163746s
+Timestamp: 2026-03-10 06:02:07
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.205713s
+Timestamp: 2026-03-10 06:02:08
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 741.5494ms
+Timestamp: 2026-03-10 06:02:09
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.2498507s
+Timestamp: 2026-03-10 06:02:47
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0497535s
+Timestamp: 2026-03-10 06:02:48
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 648.0492ms
+Timestamp: 2026-03-10 06:02:49
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.1347837s
+Timestamp: 2026-03-10 06:08:26
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.0188239s
+Timestamp: 2026-03-10 06:08:27
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 670.0092ms
+Timestamp: 2026-03-10 06:08:27
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.3727664s
+Timestamp: 2026-03-10 06:10:36
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.1118012s
+Timestamp: 2026-03-10 06:10:37
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 698.7641ms
+Timestamp: 2026-03-10 06:10:38
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.3319817s
+Timestamp: 2026-03-10 06:12:51
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 881.8845ms
+Timestamp: 2026-03-10 06:12:52
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 657.7451ms
+Timestamp: 2026-03-10 06:12:52
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.1902514s
+Timestamp: 2026-03-10 06:14:34
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 834.6375ms
+Timestamp: 2026-03-10 06:14:35
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 631.077ms
+Timestamp: 2026-03-10 06:14:36
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.2121575s
+Timestamp: 2026-03-10 06:18:19
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.1313073s
+Timestamp: 2026-03-10 06:18:20
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 604.4153ms
+Timestamp: 2026-03-10 06:18:20
+
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 1.3003957s
+Timestamp: 2026-03-10 06:20:13
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.2337711s
+Timestamp: 2026-03-10 06:20:14
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 869.9795ms
+Timestamp: 2026-03-10 06:20:15
+

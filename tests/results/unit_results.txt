@@ -1,0 +1,605 @@
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 786.7µs
+Timestamp: 2026-03-10 05:54:12
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 657.9µs
+Timestamp: 2026-03-10 05:54:12
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 545.4µs
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 535µs
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 193.061ms
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 534.2µs
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 708.2µs
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 543.3µs
+Timestamp: 2026-03-10 05:54:13
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 531.1µs
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 549.7µs
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 585µs
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 594.5µs
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 209.4841ms
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 907.5µs
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:56:44
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 533.5µs
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 538.3µs
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 522.9µs
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 1.1672ms
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 377.1µs
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 532.3µs
+Timestamp: 2026-03-10 05:57:46
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 234.4877ms
+Timestamp: 2026-03-10 05:57:47
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 538.7µs
+Timestamp: 2026-03-10 05:57:47
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 521.6µs
+Timestamp: 2026-03-10 05:57:47
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 539.2µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 1.101ms
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 531.9µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 587.5µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 535.3µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 532.4µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 217.7438ms
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 1.4687ms
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 506.1µs
+Timestamp: 2026-03-10 05:58:22
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 512.3µs
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 1.0751ms
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 525.7µs
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 512.7µs
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 530.2µs
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 528.5µs
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 203.8538ms
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:01:02
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 200.3367ms
+Timestamp: 2026-03-10 06:02:29
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 458.6µs
+Timestamp: 2026-03-10 06:02:29
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:29
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:30
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:31
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 568.9µs
+Timestamp: 2026-03-10 06:02:32
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:32
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:32
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 543.4µs
+Timestamp: 2026-03-10 06:02:32
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:02:32
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 532.9µs
+Timestamp: 2026-03-10 06:02:33
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 192.8639ms
+Timestamp: 2026-03-10 06:08:03
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:08:03
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:08:03
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 525.7µs
+Timestamp: 2026-03-10 06:08:04
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:08:05
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 513.9µs
+Timestamp: 2026-03-10 06:08:08
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 531.2µs
+Timestamp: 2026-03-10 06:08:08
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:08:10
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:08:10
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 614.5µs
+Timestamp: 2026-03-10 06:08:10
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 600.3µs
+Timestamp: 2026-03-10 06:08:11
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 199.3883ms
+Timestamp: 2026-03-10 06:12:35
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:35
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:35
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 522.9µs
+Timestamp: 2026-03-10 06:12:36
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 523.6µs
+Timestamp: 2026-03-10 06:12:37
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 536.3µs
+Timestamp: 2026-03-10 06:12:38
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:38
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:38
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:38
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:38
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:12:39
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 217.1702ms
+Timestamp: 2026-03-10 06:14:16
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 725.2µs
+Timestamp: 2026-03-10 06:14:16
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:16
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:17
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 883µs
+Timestamp: 2026-03-10 06:14:18
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:20
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:20
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:21
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:21
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:14:21
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 538.5µs
+Timestamp: 2026-03-10 06:14:21
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 1.1042ms
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 563.2µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 545.4µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 215.0209ms
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 1.123ms
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 547.9µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 540.9µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 543.6µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 555.6µs
+Timestamp: 2026-03-10 06:18:18
+
+TestName: TestParsePaginationLogged
+Status: PASS
+Execution Time: 528.9µs
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestReplyCreateValidationLogged
+Status: PASS
+Execution Time: 530.7µs
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestReplyDepthLogicLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestPostCreateValidationLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestMessagingGuardLocalRateLimitLogged
+Status: PASS
+Execution Time: 531.7µs
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestMessagingGuardRemoteInboundLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestMessagingGuardSuspiciousLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestUserCreateValidationLogged
+Status: PASS
+Execution Time: 540.5µs
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestHashPasswordLogged
+Status: PASS
+Execution Time: 202.7284ms
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestGenerateTokenLogged
+Status: PASS
+Execution Time: 936.9µs
+Timestamp: 2026-03-10 06:20:12
+
+TestName: TestGenerateSimpleDIDLogged
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-10 06:20:12
+
