@@ -300,6 +300,8 @@ func setupRoutes(
 	fed.GET("/timeline", federationHandler.GetFederatedTimeline)  // Federated timeline
 	fed.GET("/all-users", federationHandler.GetAllFederatedUsers) // All users across instances
 	fed.GET("/public-users", federationHandler.GetPublicUserList) // Public user list for federation
+	fed.GET("/health", federationHandler.GetFederationHealth)     // Peer health status
+	fed.GET("/migrations", federationHandler.GetMigrationStatus)  // User migration status
 
 	// Federation API (authenticated)
 	fedAuth := api.Group("/federation")

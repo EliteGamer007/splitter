@@ -57,6 +57,7 @@ func main() {
 	// --- Start background worker loops in-process (goroutine) ---
 	if cfg.Federation.Enabled {
 		go runWorkerLoops(cfg)
+		go federation.RunHealthCheckLoop(context.Background(), cfg.Federation.Domain)
 	}
 
 	port := os.Getenv("PORT")
@@ -159,7 +160,7 @@ func ensureSplitBotUser(cfg *config.Config) error {
 	return err
 }
 
-// runWorkerLoops runs the federation background worker loops (retry + reputation)
+// runWorkerLoops runs the federation background worker loops (retry + reputation + migration)
 // inside the same process as the web server, using goroutines.
 func runWorkerLoops(cfg *config.Config) {
 	ctx := context.Background()
@@ -177,10 +178,17 @@ func runWorkerLoops(cfg *config.Config) {
 
 	retryTicker := time.NewTicker(retryInterval)
 	reputationTicker := time.NewTicker(reputationInterval)
+	migrationTicker := time.NewTicker(6 * time.Hour) // Check migration every 6 hours
 	defer retryTicker.Stop()
 	defer reputationTicker.Stop()
+	defer migrationTicker.Stop()
 
-	log.Printf("[InProcessWorker] Started: retry every %s, reputation every %s", retryInterval, reputationInterval)
+	log.Printf("[InProcessWorker] Started: retry every %s, reputation every %s, migration check every 6h", retryInterval, reputationInterval)
+
+	// Ensure migration table exists
+	if err := federation.EnsureMigrationTable(ctx); err != nil {
+		log.Printf("[InProcessWorker] Failed to ensure migration table: %v", err)
+	}
 
 	// Initial reputation calculation
 	if err := federation.RecalculateInstanceReputation(ctx); err != nil {
@@ -202,6 +210,8 @@ func runWorkerLoops(cfg *config.Config) {
 			if err := federation.RecalculateInstanceReputation(ctx); err != nil {
 				log.Printf("[InProcessWorker] Reputation recalculation failed: %v", err)
 			}
+		case <-migrationTicker.C:
+			federation.CheckAndMigrateUsers(ctx, cfg.Federation.Domain)
 		}
 	}
 }

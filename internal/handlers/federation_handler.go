@@ -127,13 +127,18 @@ func (h *FederationHandler) SearchRemoteUsers(c echo.Context) error {
 			}
 		}
 
-		// Also search known remote instances directly (not just cache)
+		// Also search known remote instances directly (with failover)
 		for remoteDomain, baseURL := range federation.InstanceURLMap {
 			if remoteDomain == h.cfg.Federation.Domain {
 				continue
 			}
 
-			remoteUsers := fetchRemoteUserList(baseURL)
+			var remoteUsers []map[string]interface{}
+			if federation.IsPeerHealthy(remoteDomain) {
+				remoteUsers = federation.FetchAndCachePeerUsers(remoteDomain, baseURL)
+			} else {
+				remoteUsers = federation.GetCachedPeerUsers(remoteDomain)
+			}
 			for _, u := range remoteUsers {
 				username, _ := u["username"].(string)
 				displayName, _ := u["display_name"].(string)
@@ -330,30 +335,23 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		addPost(post)
 	}
 
-	// Fetch live remote public posts from known instances.
+	// Fetch live remote public posts from known instances (with failover).
 	for domain, baseURL := range federation.InstanceURLMap {
 		if domain == h.cfg.Federation.Domain {
 			continue
 		}
 
-		client := &http.Client{}
-		resp, reqErr := client.Get(baseURL + "/api/v1/posts/public?limit=50&offset=0")
-		if reqErr != nil {
-			log.Printf("[Federation] Failed to fetch remote timeline from %s: %v", baseURL, reqErr)
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			_ = resp.Body.Close()
-			continue
-		}
-
 		var remotePosts []map[string]interface{}
-		if decodeErr := json.NewDecoder(resp.Body).Decode(&remotePosts); decodeErr != nil {
-			_ = resp.Body.Close()
-			continue
+
+		if federation.IsPeerHealthy(domain) {
+			remotePosts = federation.FetchAndCachePeerPosts(domain, baseURL)
+		} else {
+			// Peer is down — serve from cache
+			remotePosts = federation.GetCachedPeerPosts(domain)
+			if remotePosts != nil {
+				log.Printf("[Federation] Serving %d cached posts for down peer %s", len(remotePosts), domain)
+			}
 		}
-		_ = resp.Body.Close()
 
 		for _, remotePost := range remotePosts {
 			authorDID, _ := remotePost["author_did"].(string)
@@ -438,12 +436,20 @@ func (h *FederationHandler) GetAllFederatedUsers(c echo.Context) error {
 		}
 	}
 
-	// Remote users from other known instances
+	// Remote users from other known instances (with failover)
 	for domain, baseURL := range federation.InstanceURLMap {
 		if domain == h.cfg.Federation.Domain {
 			continue
 		}
-		remoteUsers := fetchRemoteUserList(baseURL)
+
+		var remoteUsers []map[string]interface{}
+		if federation.IsPeerHealthy(domain) {
+			remoteUsers = federation.FetchAndCachePeerUsers(domain, baseURL)
+		} else {
+			// Peer is down — serve from cache
+			remoteUsers = federation.GetCachedPeerUsers(domain)
+		}
+
 		for _, u := range remoteUsers {
 			allUsers = append(allUsers, map[string]interface{}{
 				"id":                    u["id"],
@@ -517,10 +523,10 @@ func extractDomainFromDID(did string) string {
 		parsed, err := url.Parse(did)
 		if err == nil {
 			host := parsed.Host
-			if strings.Contains(host, "localhost:8001") {
+			if strings.Contains(host, "localhost:8001") || strings.Contains(host, "splitter-2.onrender.com") {
 				return "splitter-2"
 			}
-			if strings.Contains(host, "localhost:8000") {
+			if strings.Contains(host, "localhost:8000") || strings.Contains(host, "splitter-m0kv.onrender.com") {
 				return "splitter-1"
 			}
 			if host != "" {
@@ -583,5 +589,30 @@ func (h *FederationHandler) GetPublicUserList(c echo.Context) error {
 		"users":  publicUsers,
 		"total":  total,
 		"domain": h.cfg.Federation.Domain,
+	})
+}
+
+// GetFederationHealth returns health status of all peer instances
+// GET /api/v1/federation/health
+func (h *FederationHandler) GetFederationHealth(c echo.Context) error {
+	peers := federation.HealthStatusJSON()
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"self_domain": h.cfg.Federation.Domain,
+		"peers":       peers,
+	})
+}
+
+// GetMigrationStatus returns user migration status
+// GET /api/v1/federation/migrations
+func (h *FederationHandler) GetMigrationStatus(c echo.Context) error {
+	migrations, err := federation.GetMigrationStatus(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "failed to get migration status",
+		})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"migrations": migrations,
+		"total":      len(migrations),
 	})
 }

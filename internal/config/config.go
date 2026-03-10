@@ -97,7 +97,7 @@ func Load() *Config {
 		Federation: FederationConfig{
 			Domain:  getEnv("FEDERATION_DOMAIN", "localhost"),
 			URL:     getEnv("FEDERATION_URL", "http://localhost:8000"),
-			Enabled: getEnv("FEDERATION_ENABLED", "false") == "true",
+			Enabled: getEnv("FEDERATION_ENABLED", "true") == "true",
 		},
 		Worker: WorkerConfig{
 			RetryIntervalSeconds:      getEnvAsInt("WORKER_RETRY_INTERVAL_SECONDS", 15),

@@ -40,13 +40,13 @@ type RemoteNote struct {
 	Deleted      bool
 }
 
-// InstanceURLMap maps domain names to actual URLs (for local testing)
+// InstanceURLMap maps domain names to actual URLs for cross-instance communication.
 // Populated from FEDERATION_INSTANCE_MAP env var if set, e.g.:
 //
-//	"splitter-1=http://host.docker.internal:8000,splitter-2=http://host.docker.internal:8001"
+//	"splitter-1=https://splitter-m0kv.onrender.com,splitter-2=https://splitter-2.onrender.com"
 var InstanceURLMap = map[string]string{
-	"splitter-1": "http://localhost:8000",
-	"splitter-2": "http://localhost:8001",
+	"splitter-1": "https://splitter-m0kv.onrender.com",
+	"splitter-2": "https://splitter-2.onrender.com",
 }
 
 func init() {
