@@ -609,7 +609,7 @@ type TrendingHashtag struct {
 	Count int    `json:"count"`
 }
 
-// GetTrendingHashtags returns the most used hashtags, counting all-time posts
+// GetTrendingHashtags returns the most used hashtags from the last 24 hours
 func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]TrendingHashtag, error) {
 	query := `
 		SELECT tag, COUNT(*) as cnt
@@ -620,6 +620,7 @@ func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]
 			WHERE deleted_at IS NULL
 			  AND visibility = 'public'
 			  AND (expires_at IS NULL OR expires_at > NOW())
+			  AND created_at > NOW() - INTERVAL '24 hours'
 		) hashtags
 		GROUP BY tag
 		ORDER BY cnt DESC, tag ASC
