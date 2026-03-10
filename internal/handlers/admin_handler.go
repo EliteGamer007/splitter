@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -1068,4 +1072,478 @@ func (h *AdminHandler) GetMessagingSecurity(c echo.Context) error {
 		"metrics":       snapshot.Metrics,
 		"recent_events": snapshot.RecentEvents,
 	})
+}
+
+// ─── AI Moderation ──────────────────────────────────────────────────────────
+
+// aiScreenPost calls Gemini to classify post content as "remove" or "allow".
+// Returns verdict and a brief reason. Falls back to "allow" on any error.
+func aiScreenPost(content string) (verdict string, reason string) {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return "allow", "AI screening unavailable (no API key configured)"
+	}
+
+	prompt := `You are a strict content moderation AI for a social network.
+Review the following post and respond ONLY with a JSON object in this exact format (no markdown, no code fences):
+{"verdict":"remove","reason":"one sentence explanation","category":"category"}
+OR
+{"verdict":"allow","reason":"No violations","category":"none"}
+
+Use verdict "remove" ONLY for: hate speech, explicit threats, graphic violence, severe harassment, or blatant spam.
+For borderline or ambiguous content, use "allow".
+
+Post content:
+` + content
+
+	type geminiPart struct {
+		Text string `json:"text"`
+	}
+	type geminiContent struct {
+		Parts []geminiPart `json:"parts"`
+	}
+	type geminiRequest struct {
+		Contents         []geminiContent `json:"contents"`
+		GenerationConfig map[string]any  `json:"generationConfig,omitempty"`
+	}
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{Parts: []geminiPart{{Text: prompt}}},
+		},
+		GenerationConfig: map[string]any{
+			"temperature":     0.1,
+			"maxOutputTokens": 120,
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "allow", "AI screening error: marshal failed"
+	}
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=%s", apiKey)
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return "allow", "AI screening error: request creation failed"
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "allow", "AI screening error: API call failed"
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "allow", fmt.Sprintf("AI screening error: API returned %d", resp.StatusCode)
+	}
+
+	var gemResp struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(body, &gemResp); err != nil {
+		return "allow", "AI screening error: parse failed"
+	}
+
+	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
+		return "allow", "AI screening: no response from model"
+	}
+
+	text := strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text)
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+
+	var result struct {
+		Verdict string `json:"verdict"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return "allow", "AI screening error: could not parse verdict JSON"
+	}
+
+	if result.Verdict == "remove" {
+		return "remove", result.Reason
+	}
+	return "allow", result.Reason
+}
+
+// ReportPost creates a moderation report for a post and triggers async AI screening.
+// Route: POST /api/v1/posts/:id/report
+func (h *AdminHandler) ReportPost(c echo.Context) error {
+	postID := c.Param("id")
+	if postID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Post ID required"})
+	}
+
+	reporterDID, _ := c.Get("did").(string)
+	if reporterDID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.Bind(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Report reason required"})
+	}
+
+	validReasons := map[string]bool{
+		"spam": true, "harassment": true, "inappropriate": true,
+		"hate_speech": true, "misinformation": true,
+	}
+	if !validReasons[req.Reason] {
+		req.Reason = "inappropriate"
+	}
+
+	var postContent string
+	err := db.GetDB().QueryRow(c.Request().Context(),
+		`SELECT COALESCE(content, '') FROM posts WHERE id = $1::uuid AND deleted_at IS NULL`, postID).Scan(&postContent)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
+
+	var reportID string
+	err = db.GetDB().QueryRow(c.Request().Context(),
+		`INSERT INTO reports (reporter_did, post_id, reason, status)
+		 VALUES ($1, $2::uuid, $3, 'pending')
+		 RETURNING id::text`,
+		reporterDID, postID, req.Reason).Scan(&reportID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to submit report: " + err.Error()})
+	}
+
+	// Async AI screening
+	capturedPostID := postID
+	capturedReportID := reportID
+	capturedContent := postContent
+	go func() {
+		verdict, aiReason := aiScreenPost(capturedContent)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if verdict == "remove" {
+			_, _ = db.GetDB().Exec(ctx,
+				`UPDATE posts SET deleted_at = now(), hidden_by_ai = true, hidden_reason = $1 WHERE id = $2::uuid AND deleted_at IS NULL`,
+				aiReason, capturedPostID)
+			_, _ = db.GetDB().Exec(ctx,
+				`UPDATE reports SET status = 'ai_actioned', ai_verdict = 'remove', ai_reason = $1, ai_screened_at = now() WHERE id = $2::uuid`,
+				aiReason, capturedReportID)
+		} else {
+			_, _ = db.GetDB().Exec(ctx,
+				`UPDATE reports SET ai_verdict = 'allow', ai_reason = $1, ai_screened_at = now() WHERE id = $2::uuid`,
+				aiReason, capturedReportID)
+		}
+	}()
+
+	return c.JSON(http.StatusCreated, map[string]string{
+		"message":   "Report submitted. AI moderation in progress.",
+		"report_id": reportID,
+	})
+}
+
+// GetAIActionsQueue returns posts auto-removed by AI moderation.
+// Route: GET /admin/ai-actions
+func (h *AdminHandler) GetAIActionsQueue(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	rows, err := db.GetDB().Query(c.Request().Context(), `
+		SELECT
+			r.id::text,
+			COALESCE(r.post_id::text, ''),
+			COALESCE(p.content, ''),
+			COALESCE(u.id::text, ''),
+			COALESCE(u.username, ''),
+			COALESCE(u.instance_domain, ''),
+			COALESCE(r.reason, 'reported'),
+			COALESCE(r.ai_reason, ''),
+			r.created_at,
+			COALESCE(r.ai_screened_at, r.created_at),
+			EXISTS(SELECT 1 FROM appeals a WHERE a.report_id = r.id AND a.status = 'pending') AS has_appeal
+		FROM reports r
+		LEFT JOIN posts p ON p.id = r.post_id
+		LEFT JOIN users u ON u.did = p.author_did
+		WHERE r.status = 'ai_actioned'
+		ORDER BY r.created_at DESC
+		LIMIT 200
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch AI actions queue: " + err.Error()})
+	}
+	defer rows.Close()
+
+	items := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var (
+			id, postID, content, authorID, username, instanceDomain string
+			reason, aiReason                                         string
+			createdAt, aiScreenedAt                                  time.Time
+			hasAppeal                                                bool
+		)
+		if scanErr := rows.Scan(&id, &postID, &content, &authorID, &username, &instanceDomain, &reason, &aiReason, &createdAt, &aiScreenedAt, &hasAppeal); scanErr != nil {
+			continue
+		}
+		preview := strings.TrimSpace(content)
+		if len(preview) > 140 {
+			preview = preview[:140] + "..."
+		}
+		items = append(items, map[string]interface{}{
+			"id":             id,
+			"post_id":        postID,
+			"preview":        preview,
+			"content":        content,
+			"author_id":      authorID,
+			"author":         username,
+			"server":         instanceDomain,
+			"reason":         reason,
+			"ai_reason":      aiReason,
+			"created_at":     createdAt,
+			"ai_screened_at": aiScreenedAt,
+			"has_appeal":     hasAppeal,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"items": items,
+		"total": len(items),
+	})
+}
+
+// SubmitAppeal lets an authenticated user contest an AI-actioned content removal.
+// Route: POST /api/v1/posts/:id/appeal
+func (h *AdminHandler) SubmitAppeal(c echo.Context) error {
+	postID := c.Param("id")
+	if postID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Post ID required"})
+	}
+
+	userDID, _ := c.Get("did").(string)
+	userID, _ := c.Get("user_id").(string)
+	if userDID == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authentication required"})
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.Bind(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Appeal reason required"})
+	}
+
+	// Find the ai_actioned report for this post
+	var reportID string
+	_ = db.GetDB().QueryRow(c.Request().Context(),
+		`SELECT r.id::text FROM reports r
+		 WHERE r.post_id = $1::uuid AND r.status = 'ai_actioned'
+		 ORDER BY r.created_at DESC LIMIT 1`,
+		postID).Scan(&reportID)
+
+	if reportID == "" {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "No AI-actioned report found for this post"})
+	}
+
+	// Prevent duplicate pending appeals
+	var existingID string
+	_ = db.GetDB().QueryRow(c.Request().Context(),
+		`SELECT id::text FROM appeals WHERE report_id = $1::uuid AND status = 'pending'`, reportID).Scan(&existingID)
+	if existingID != "" {
+		return c.JSON(http.StatusConflict, map[string]string{"error": "An appeal is already pending for this content"})
+	}
+
+	var appealID string
+	err := db.GetDB().QueryRow(c.Request().Context(),
+		`INSERT INTO appeals (report_id, post_id, appellant_did, appellant_id, appeal_reason)
+		 VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $5)
+		 RETURNING id::text`,
+		reportID, postID, userDID, userID, strings.TrimSpace(req.Reason)).Scan(&appealID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to submit appeal: " + err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, map[string]string{
+		"message":   "Appeal submitted. A moderator will review it shortly.",
+		"appeal_id": appealID,
+	})
+}
+
+// GetAppeals returns all content appeals for admin review.
+// Route: GET /admin/appeals
+func (h *AdminHandler) GetAppeals(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	rows, err := db.GetDB().Query(c.Request().Context(), `
+		SELECT
+			a.id::text,
+			COALESCE(a.report_id::text, ''),
+			COALESCE(a.post_id::text, ''),
+			COALESCE(p.content, ''),
+			COALESCE(u.id::text, ''),
+			COALESCE(u.username, ''),
+			COALESCE(r.ai_reason, ''),
+			a.appeal_reason,
+			a.status,
+			a.created_at
+		FROM appeals a
+		LEFT JOIN reports r ON r.id = a.report_id
+		LEFT JOIN posts p ON p.id = a.post_id
+		LEFT JOIN users u ON u.did = a.appellant_did
+		ORDER BY a.created_at DESC
+		LIMIT 200
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch appeals: " + err.Error()})
+	}
+	defer rows.Close()
+
+	appeals := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var (
+			id, reportID, postID, content, authorID, username string
+			aiReason, appealReason, status                    string
+			createdAt                                         time.Time
+		)
+		if scanErr := rows.Scan(&id, &reportID, &postID, &content, &authorID, &username, &aiReason, &appealReason, &status, &createdAt); scanErr != nil {
+			continue
+		}
+		preview := strings.TrimSpace(content)
+		if len(preview) > 140 {
+			preview = preview[:140] + "..."
+		}
+		appeals = append(appeals, map[string]interface{}{
+			"id":            id,
+			"report_id":     reportID,
+			"post_id":       postID,
+			"preview":       preview,
+			"author_id":     authorID,
+			"author":        username,
+			"ai_reason":     aiReason,
+			"appeal_reason": appealReason,
+			"status":        status,
+			"created_at":    createdAt,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"appeals": appeals,
+		"total":   len(appeals),
+	})
+}
+
+// ResolveAppeal accepts or rejects a content appeal.
+// Accept → restores the post. Reject → keeps it removed.
+// Route: POST /admin/appeals/:id/resolve
+func (h *AdminHandler) ResolveAppeal(c echo.Context) error {
+	if err := h.requireModOrAdmin(c); err != nil {
+		return err
+	}
+
+	appealID := c.Param("id")
+	if appealID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Appeal ID required"})
+	}
+
+	var req struct {
+		Decision string `json:"decision"` // "accept" or "reject"
+		Note     string `json:"note"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+	if req.Decision != "accept" && req.Decision != "reject" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Decision must be 'accept' or 'reject'"})
+	}
+
+	adminID := c.Get("user_id").(string)
+
+	tx, err := db.GetDB().Begin(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Transaction failed"})
+	}
+	defer tx.Rollback(c.Request().Context())
+
+	var postID, reportID string
+	if err := tx.QueryRow(c.Request().Context(),
+		`SELECT COALESCE(post_id::text, ''), COALESCE(report_id::text, '')
+		 FROM appeals WHERE id = $1::uuid AND status = 'pending'`, appealID).Scan(&postID, &reportID); err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Appeal not found or already resolved"})
+	}
+
+	newStatus := map[string]string{"accept": "accepted", "reject": "rejected"}[req.Decision]
+	if _, err := tx.Exec(c.Request().Context(),
+		`UPDATE appeals SET status = $1, reviewer_id = $2, reviewer_note = $3, resolved_at = now() WHERE id = $4::uuid`,
+		newStatus, adminID, req.Note, appealID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update appeal"})
+	}
+
+	if req.Decision == "accept" && postID != "" {
+		if _, err := tx.Exec(c.Request().Context(),
+			`UPDATE posts SET deleted_at = NULL, hidden_by_ai = false, hidden_reason = NULL WHERE id = $1::uuid`, postID); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to restore post"})
+		}
+		if reportID != "" {
+			_, _ = tx.Exec(c.Request().Context(), `UPDATE reports SET status = 'resolved' WHERE id = $1::uuid`, reportID)
+		}
+		h.logAdminAction(adminID, "appeal_accepted_restore", postID, req.Note)
+	} else {
+		if reportID != "" {
+			_, _ = tx.Exec(c.Request().Context(), `UPDATE reports SET status = 'resolved' WHERE id = $1::uuid`, reportID)
+		}
+		h.logAdminAction(adminID, "appeal_rejected", postID, req.Note)
+	}
+
+	if err := tx.Commit(c.Request().Context()); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to commit"})
+	}
+
+	msg := map[string]string{
+		"accept": "Appeal accepted. Content has been restored.",
+		"reject": "Appeal rejected. Content remains removed.",
+	}[req.Decision]
+	return c.JSON(http.StatusOK, map[string]string{"message": msg})
+}
+
+// BanUser permanently bans a user (sets is_suspended = true).
+// Route: POST /admin/users/:id/ban
+func (h *AdminHandler) BanUser(c echo.Context) error {
+	if err := h.requireAdmin(c); err != nil {
+		return err
+	}
+
+	userID := c.Param("id")
+	if userID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "User ID required"})
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.Bind(&req)
+
+	result, err := db.GetDB().Exec(c.Request().Context(),
+		`UPDATE users SET is_suspended = true, updated_at = now() WHERE id = $1::uuid`, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to ban user: " + err.Error()})
+	}
+	if result.RowsAffected() == 0 {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	adminID := c.Get("user_id").(string)
+	h.logAdminAction(adminID, "ban_user", userID, req.Reason)
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "User banned"})
 }
