@@ -14,14 +14,14 @@ import (
 
 // InstanceHealth tracks the health status of a peer federation instance.
 type InstanceHealth struct {
-	Domain        string    `json:"domain"`
-	URL           string    `json:"url"`
-	IsHealthy     bool      `json:"is_healthy"`
-	LastCheckedAt time.Time `json:"last_checked_at"`
-	LastHealthyAt time.Time `json:"last_healthy_at"`
-	FailingSince  time.Time `json:"failing_since,omitempty"`
-	ConsecutiveFails int    `json:"consecutive_fails"`
-	Latency       time.Duration `json:"latency_ms"`
+	Domain           string        `json:"domain"`
+	URL              string        `json:"url"`
+	IsHealthy        bool          `json:"is_healthy"`
+	LastCheckedAt    time.Time     `json:"last_checked_at"`
+	LastHealthyAt    time.Time     `json:"last_healthy_at"`
+	FailingSince     time.Time     `json:"failing_since,omitempty"`
+	ConsecutiveFails int           `json:"consecutive_fails"`
+	Latency          time.Duration `json:"latency_ms"`
 }
 
 var (
@@ -161,9 +161,9 @@ func persistHealthState(domain string, h *InstanceHealth) {
 // CachedPeerData stores cached user lists and posts from peer instances
 // so we can serve them when the peer is down.
 type CachedPeerData struct {
-	Users     []map[string]interface{} `json:"users"`
-	Posts     []map[string]interface{} `json:"posts"`
-	CachedAt  time.Time                `json:"cached_at"`
+	Users    []map[string]interface{} `json:"users"`
+	Posts    []map[string]interface{} `json:"posts"`
+	CachedAt time.Time                `json:"cached_at"`
 }
 
 var (
@@ -299,13 +299,13 @@ func HealthStatusJSON() []map[string]interface{} {
 	var result []map[string]interface{}
 	for _, h := range healthStatus {
 		entry := map[string]interface{}{
-			"domain":           h.Domain,
-			"url":              h.URL,
-			"is_healthy":       h.IsHealthy,
-			"last_checked_at":  h.LastCheckedAt,
-			"last_healthy_at":  h.LastHealthyAt,
+			"domain":            h.Domain,
+			"url":               h.URL,
+			"is_healthy":        h.IsHealthy,
+			"last_checked_at":   h.LastCheckedAt,
+			"last_healthy_at":   h.LastHealthyAt,
 			"consecutive_fails": h.ConsecutiveFails,
-			"latency_ms":       h.Latency.Milliseconds(),
+			"latency_ms":        h.Latency.Milliseconds(),
 		}
 		if !h.FailingSince.IsZero() {
 			entry["failing_since"] = h.FailingSince

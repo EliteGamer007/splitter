@@ -230,32 +230,36 @@ func (h *FederationHandler) FollowRemoteUser(c echo.Context) error {
 		})
 	}
 
-	// Store follow locally (as pending until Accept received)
-	// Use actor URI so it matches remote post author_did values in inbox processing
+	// Ensure ghost user exists locally so GetFollowing JOIN works
+	_, err = federation.EnsureRemoteUser(c.Request().Context(), remoteActor.ActorURI)
+	if err != nil {
+		log.Printf("[Federation] Failed to ensure remote user: %v", err)
+	}
+
+	// Store follow locally as accepted (both instances auto-accept)
 	remoteDID := remoteActor.ActorURI
 	_, err = db.GetDB().Exec(c.Request().Context(),
 		`INSERT INTO follows (follower_did, following_did, status)
-		 VALUES ($1, $2, 'pending')
-		 ON CONFLICT DO NOTHING`,
+		 VALUES ($1, $2, 'accepted')
+		 ON CONFLICT (follower_did, following_did) DO UPDATE SET status = 'accepted'`,
 		localUser.DID, remoteDID,
 	)
 	if err != nil {
-		log.Printf("[Federation] Failed to store pending follow: %v", err)
+		log.Printf("[Federation] Failed to store follow: %v", err)
 	}
 
-	// Send Follow activity
+	// Send Follow activity to remote instance
 	localActorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, localUser.Username)
 	err = federation.SendFollow(localActorURI, remoteActor)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("failed to send follow: %v", err),
-		})
+		log.Printf("[Federation] Failed to send follow activity: %v", err)
+		// Don't fail — local follow is already stored
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"status":  "follow_sent",
+		"status":  "follow_accepted",
 		"target":  req.Handle,
-		"message": "Follow request sent. Waiting for acceptance.",
+		"message": "Follow successful.",
 	})
 }
 
@@ -391,6 +395,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				"display_name":      displayName,
 				"avatar_url":        avatarURL,
 				"domain":            domain,
+				"instance_url":      baseURL,
 			}
 
 			addPost(post)
