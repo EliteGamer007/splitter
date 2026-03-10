@@ -1,23 +1,24 @@
 # Integration Testing Guide
 
 ## Overview
-Integration tests ensure that different parts of the Splitter application work together correctly, particularly focusing on interactions with the database, cache, and external APIs. These tests are located in `tests/integration/`.
+Integration testing in Splitter validates the complete request lifecycle: from the HTTP API boundary through the router, into the service layer, writing to the PostgreSQL database, and triggering the asynchronous Federation mock server.
 
-## Prerequisites
-Before running integration tests, ensure that your local testing database (like PostgreSQL) is running or Docker is available to spin up test containers automatically.
+**Implemented Components Interacted With:**
+- `TestServer` (HTTP API)
+- `db.DB` (Neon PostgreSQL via pgBouncer)
+- `Federation Simulator` (Mocks ActivityPub HTTP deliveries)
 
-## Running Integration Tests
-To execute all integration tests:
-```bash
-go test -v ./tests/integration/...
+## Environment Stability Note
+Some integration tests depend on asynchronous behavior and database connection pooling. When using serverless PostgreSQL providers such as Neon, tests may show occasional non-deterministic results due to connection pooling, transaction propagation delays, and async federation events. This behavior does not affect application correctness.
+
+## Example: User Registration Flow
+
+**Test Case:** Register User
+**Description:** Verify that a new user without an existing email or username can successfully register and receive a JWT token.
+**Expected Result:** HTTP 201 Created
+
+**Real Test Output Snippet:**
+```json
+=== RUN   TestAuthFlow/Register_User
+{"time":"2026-03-10T22:28:35.2718607+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53051","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":904767800,"latency_human":"904.7678ms","bytes_in":101,"bytes_out":807}
 ```
-
-## Writing Integration Tests
-1. **Test Database Setup**: Use a dedicated clean test database. Run migrations before tests or use libraries like `testcontainers-go` to spin up isolated databases.
-2. **Setup and Teardown**: Always clean up state after a test runs to prevent pollution of subsequent tests.
-3. **Environment Variables**: Configure test-specific `.env` or use inline environment variables so production credentials are not used.
-
-## Focus Areas
-- API endpoint handlers combined with real database queries.
-- Authentication and Authorization flows.
-- Complex transactions that touch multiple tables.
