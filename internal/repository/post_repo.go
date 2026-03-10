@@ -609,7 +609,7 @@ type TrendingHashtag struct {
 	Count int    `json:"count"`
 }
 
-// GetTrendingHashtags returns the most used hashtags from the last 24 hours
+// GetTrendingHashtags returns the most used hashtags, counting all-time posts
 func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]TrendingHashtag, error) {
 	query := `
 		SELECT tag, COUNT(*) as cnt
@@ -618,7 +618,6 @@ func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]
 			FROM posts,
 			     LATERAL regexp_matches(content, '#([A-Za-z0-9_]+)', 'g') AS match
 			WHERE deleted_at IS NULL
-			  AND created_at > NOW() - INTERVAL '24 hours'
 			  AND visibility = 'public'
 			  AND (expires_at IS NULL OR expires_at > NOW())
 		) hashtags
@@ -797,4 +796,22 @@ func (r *PostRepository) SearchHashtags(ctx context.Context, query string, limit
 	}
 
 	return results, nil
+}
+
+// CountPostsByHashtag returns the total number of public posts containing a given hashtag
+func (r *PostRepository) CountPostsByHashtag(ctx context.Context, tag string) (int, error) {
+	pattern := `#` + tag + `\y`
+	var count int
+	err := db.GetDB().QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM posts
+		WHERE content ~* $1
+		  AND deleted_at IS NULL
+		  AND visibility = 'public'
+		  AND (expires_at IS NULL OR expires_at > NOW())
+	`, pattern).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count posts by hashtag: %w", err)
+	}
+	return count, nil
 }
