@@ -74,10 +74,12 @@ func (h *HashtagHandler) GetPostsByHashtag(c echo.Context) error {
 		})
 	}
 
+	totalCount, _ := h.postRepo.CountPostsByHashtag(c.Request().Context(), tag)
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"hashtag": tag,
 		"posts":   posts,
-		"count":   len(posts),
+		"count":   totalCount,
 	})
 }
 

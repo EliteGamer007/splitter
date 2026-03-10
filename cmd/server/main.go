@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"splitter/internal/config"
@@ -39,7 +40,7 @@ func main() {
 	db.GetDB().Exec(context.Background(), "ALTER TABLE key_rotations ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT 'rotated';")
 
 	// Ensure admin user exists
-	ensureAdminUser() // Silent check, no logging needed
+	ensureAdminUser(cfg) // Silent check, no logging needed
 
 	// Ensure Split bot user exists
 	ensureSplitBotUser(cfg)
@@ -56,6 +57,7 @@ func main() {
 	// --- Start background worker loops in-process (goroutine) ---
 	if cfg.Federation.Enabled {
 		go runWorkerLoops(cfg)
+		go federation.RunHealthCheckLoop(context.Background(), cfg.Federation.Domain)
 	}
 
 	port := os.Getenv("PORT")
@@ -69,48 +71,54 @@ func main() {
 	}
 }
 
-// ensureAdminUser creates the admin user if it doesn't exist
-func ensureAdminUser() error {
+// ensureAdminUser creates a domain-specific admin user (admin1 for splitter-1,
+// admin2 for splitter-2) and always keeps the password and role in sync.
+func ensureAdminUser(cfg *config.Config) error {
 	ctx := context.Background()
 	userRepo := repository.NewUserRepository()
 
-	// Check if admin already exists
-	existingAdmin, _, _ := userRepo.GetByUsername(ctx, "admin")
-	if existingAdmin != nil {
-		// Silently ensure admin role is set
-		updateQuery := `UPDATE users SET role = 'admin' WHERE username = 'admin'`
-		db.GetDB().Exec(ctx, updateQuery)
-		return nil
+	// Determine admin username from federation domain
+	adminUsername := "admin1" // default for primary instance
+	domain := cfg.Federation.Domain
+	if strings.Contains(domain, "-2") || strings.HasSuffix(domain, "2") || strings.Contains(domain, ":8001") {
+		adminUsername = "admin2"
 	}
+	adminEmail := adminUsername + "@" + cfg.Federation.Domain
+	adminDID := "did:key:" + adminUsername
 
-	// Create admin user with password "splitteradmin"
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte("splitteradmin"), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
+	// Check if this domain-specific admin already exists
+	existingAdmin, _, _ := userRepo.GetByUsername(ctx, adminUsername)
+	if existingAdmin != nil {
+		updateQuery := `UPDATE users SET role = 'admin', password_hash = $1, instance_domain = $2 WHERE username = $3`
+		db.GetDB().Exec(ctx, updateQuery, string(passwordHash), cfg.Federation.Domain, adminUsername)
+		return nil
+	}
+
 	query := `
 		INSERT INTO users (username, email, password_hash, instance_domain, display_name, role, did, public_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (email) DO UPDATE SET role = 'admin'
+		ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = EXCLUDED.password_hash
 	`
-
 	_, err = db.GetDB().Exec(ctx, query,
-		"admin",
-		"admin@localhost",
+		adminUsername,
+		adminEmail,
 		string(passwordHash),
-		"localhost",
+		cfg.Federation.Domain,
 		"System Admin",
 		"admin",
-		"did:key:admin",
+		adminDID,
 		"",
 	)
-
 	if err != nil {
 		return err
 	}
 
-	log.Println("Admin user created successfully (username: admin, password: splitteradmin)")
+	log.Printf("Admin user created (username: %s, password: splitteradmin, domain: %s)", adminUsername, cfg.Federation.Domain)
 	return nil
 }
 
@@ -152,7 +160,7 @@ func ensureSplitBotUser(cfg *config.Config) error {
 	return err
 }
 
-// runWorkerLoops runs the federation background worker loops (retry + reputation)
+// runWorkerLoops runs the federation background worker loops (retry + reputation + migration)
 // inside the same process as the web server, using goroutines.
 func runWorkerLoops(cfg *config.Config) {
 	ctx := context.Background()
@@ -170,10 +178,17 @@ func runWorkerLoops(cfg *config.Config) {
 
 	retryTicker := time.NewTicker(retryInterval)
 	reputationTicker := time.NewTicker(reputationInterval)
+	migrationTicker := time.NewTicker(6 * time.Hour) // Check migration every 6 hours
 	defer retryTicker.Stop()
 	defer reputationTicker.Stop()
+	defer migrationTicker.Stop()
 
-	log.Printf("[InProcessWorker] Started: retry every %s, reputation every %s", retryInterval, reputationInterval)
+	log.Printf("[InProcessWorker] Started: retry every %s, reputation every %s, migration check every 6h", retryInterval, reputationInterval)
+
+	// Ensure migration table exists
+	if err := federation.EnsureMigrationTable(ctx); err != nil {
+		log.Printf("[InProcessWorker] Failed to ensure migration table: %v", err)
+	}
 
 	// Initial reputation calculation
 	if err := federation.RecalculateInstanceReputation(ctx); err != nil {
@@ -195,6 +210,8 @@ func runWorkerLoops(cfg *config.Config) {
 			if err := federation.RecalculateInstanceReputation(ctx); err != nil {
 				log.Printf("[InProcessWorker] Reputation recalculation failed: %v", err)
 			}
+		case <-migrationTicker.C:
+			federation.CheckAndMigrateUsers(ctx, cfg.Federation.Domain)
 		}
 	}
 }

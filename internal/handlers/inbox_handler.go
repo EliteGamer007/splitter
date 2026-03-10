@@ -366,14 +366,26 @@ func (h *InboxHandler) handleAccept(c echo.Context, activity map[string]interfac
 	if object, ok := activity["object"].(map[string]interface{}); ok {
 		if followActor, ok := object["actor"].(string); ok {
 			if followTarget, ok := object["object"].(string); ok {
-				_, err := db.GetDB().Exec(ctx,
+				// Try exact match first (actor URI in follower_did), then fallback to DID match
+				result, err := db.GetDB().Exec(ctx,
 					`UPDATE follows SET status = 'accepted'
-					 WHERE follower_did LIKE '%' || $1 || '%' AND following_did LIKE '%' || $2 || '%'`,
-					extractUsernameFromURI(followActor),
-					extractUsernameFromURI(followTarget),
+					 WHERE following_did = $1 AND follower_did = $2 AND status = 'pending'`,
+					followTarget, followActor,
 				)
 				if err != nil {
-					log.Printf("[Inbox] Failed to update follow status: %v", err)
+					log.Printf("[Inbox] Failed to update follow status (exact): %v", err)
+				}
+				// If exact match didn't find rows, try matching by username extraction
+				if err == nil && result.RowsAffected() == 0 {
+					_, err = db.GetDB().Exec(ctx,
+						`UPDATE follows SET status = 'accepted'
+						 WHERE follower_did LIKE '%' || $1 || '%' AND following_did LIKE '%' || $2 || '%' AND status = 'pending'`,
+						extractUsernameFromURI(followActor),
+						extractUsernameFromURI(followTarget),
+					)
+					if err != nil {
+						log.Printf("[Inbox] Failed to update follow status (fuzzy): %v", err)
+					}
 				}
 			}
 		}

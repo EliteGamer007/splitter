@@ -5,7 +5,9 @@ info:
   version: 1.0.0
 servers:
   - url: http://localhost:8000/api/v1
-    description: Local Development Server
+    description: API v1 (Standard Endpoints)
+  - url: http://localhost:8000
+    description: Root Server (Federation & Well-Known)
 
 components:
   securitySchemes:
@@ -109,6 +111,55 @@ components:
           type: string
         is_read:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Hashtag:
+      type: object
+      properties:
+        tag:
+          type: string
+        count:
+          type: integer
+        last_used:
+          type: string
+          format: date-time
+
+    Story:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author_did:
+          type: string
+        media_url:
+          type: string
+        media_type:
+          type: string
+        view_count:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    DeviceKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+        encryption_public_key:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
         created_at:
           type: string
           format: date-time
@@ -243,6 +294,150 @@ paths:
                   user:
                     $ref: '#/components/schemas/User'
 
+  /auth/register-key:
+    post:
+      summary: Register initial public key (password users)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [public_key]
+              properties:
+                public_key:
+                  type: string
+      responses:
+        '200':
+          description: Key registered
+
+  /auth/rotate-key:
+    post:
+      summary: Rotate signing key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_public_key, signature]
+              properties:
+                new_public_key:
+                  type: string
+                signature:
+                  type: string
+      responses:
+        '200':
+          description: Key rotated
+
+  /auth/revoke-key:
+    post:
+      summary: Revoke current signing key
+      responses:
+        '200':
+          description: Key revoked
+
+  /auth/key-history:
+    get:
+      summary: View key rotation history
+      responses:
+        '200':
+          description: List of historical keys
+
+  /auth/revoked-keys:
+    get:
+      summary: View own revoked keys
+      responses:
+        '200':
+          description: List of revoked keys
+
+  /auth/devices/request:
+    post:
+      summary: Request new device authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, encryption_public_key]
+              properties:
+                device_id:
+                  type: string
+                encryption_public_key:
+                  type: string
+      responses:
+        '202':
+          description: Request submitted
+
+  /auth/devices/{deviceId}/approve:
+    post:
+      summary: Approve device key
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device approved
+
+  /auth/devices:
+    get:
+      summary: List registered devices
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceKey'
+
+  /auth/check-key:
+    get:
+      summary: Check if a key is revoked
+      security: []
+      parameters:
+        - in: query
+          name: key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revocation status
+
+  /dids/{did}/revoked-keys:
+    get:
+      summary: Get public revocation list for a DID
+      security: []
+      parameters:
+        - in: path
+          name: did
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of revoked keys
+
+  /dids/{did}/device-keys:
+    get:
+      summary: Get public device keys for a DID
+      security: []
+      parameters:
+        - in: path
+          name: did
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of device keys
+
   # Users
   /users/me:
     get:
@@ -281,6 +476,38 @@ paths:
         '200':
           description: Account deleted
 
+  /users/me/avatar:
+    post:
+      summary: Upload avatar
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Avatar uploaded
+
+  /users/me/encryption-key:
+    put:
+      summary: Update encryption key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [encryption_public_key]
+              properties:
+                encryption_public_key:
+                  type: string
+      responses:
+        '200':
+          description: Encryption key updated
+
   /users/{id}:
     get:
       summary: Get user by ID
@@ -301,6 +528,25 @@ paths:
                 $ref: '#/components/schemas/User'
         '404':
           description: User not found
+
+  /users/{id}/avatar:
+    get:
+      summary: Get user avatar
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Avatar image
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
 
   /users/did:
     get:
@@ -436,6 +682,48 @@ paths:
       responses:
         '200':
           description: Post deleted
+
+  /posts/{id}/report:
+    post:
+      summary: Report a post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Post reported
+
+  /posts/{id}/appeal:
+    post:
+      summary: Appeal an AI-actioned removal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Appeal submitted
 
   /posts/user/{did}:
     get:
@@ -749,6 +1037,60 @@ paths:
                 items:
                   $ref: '#/components/schemas/Post'
 
+  /hashtags/trending:
+    get:
+      summary: Get trending hashtags
+      security: []
+      responses:
+        '200':
+          description: List of trending hashtags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hashtag'
+
+  /hashtags/search:
+    get:
+      summary: Search hashtags
+      security: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hashtag'
+
+  /hashtags/tag/{tag}:
+    get:
+      summary: Get posts by hashtag
+      security: []
+      parameters:
+        - in: path
+          name: tag
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
   # Messages
   /messages/threads:
     get:
@@ -846,6 +1188,56 @@ paths:
       responses:
         '200':
           description: Marked as read
+
+  /messages/sync:
+    post:
+      summary: Sync offline message queue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Messages synced
+
+  /messages/{messageId}:
+    put:
+      summary: Edit a message (3-hour window)
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Message edited
+    delete:
+      summary: Delete a message (3-hour window)
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message deleted
 
   # Admin
   /admin/users:
@@ -986,10 +1378,374 @@ paths:
         '200':
           description: List of actions
 
+  /admin/moderation-queue:
+    get:
+      summary: Get content moderation queue
+      responses:
+        '200':
+          description: List of items
+
+  /admin/moderation-queue/{id}/approve:
+    post:
+      summary: Approve content item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Approved
+
+  /admin/moderation-queue/{id}/remove:
+    post:
+      summary: Remove content item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Removed
+
+  /admin/users/{id}/warn:
+    post:
+      summary: Warn a user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Warning issued
+
+  /admin/users/{id}/ban:
+    post:
+      summary: Permanently ban user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User banned
+
+  /admin/domains/block:
+    post:
+      summary: Block a remote domain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain, reason]
+              properties:
+                domain:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Domain blocked
+
+  /admin/domains/blocked:
+    get:
+      summary: Get list of blocked domains
+      responses:
+        '200':
+          description: List of domains
+
+  /admin/domains/{domain}/block:
+    delete:
+      summary: Unblock a domain
+      parameters:
+        - in: path
+          name: domain
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Domain unblocked
+
+  /admin/federation-inspector:
+    get:
+      summary: Get federation health and traffic metrics
+      responses:
+        '200':
+          description: Metrics returned
+
+  /admin/federation/reputation:
+    get:
+      summary: Get remote instance reputation scores
+      responses:
+        '200':
+          description: Scores returned
+
+  /admin/federation/network:
+    get:
+      summary: Get federation network map
+      responses:
+        '200':
+          description: Network map
+
+  /admin/messaging-security:
+    get:
+      summary: Get messaging rate limit and security metrics
+      responses:
+        '200':
+          description: Metrics returned
+
+  /admin/ai-actions:
+    get:
+      summary: Get AI-auto-removed content queue
+      responses:
+        '200':
+          description: List of items
+
+  /admin/appeals:
+    get:
+      summary: Get user appeals queue
+      responses:
+        '200':
+          description: List of appeals
+
+  /admin/appeals/{id}/resolve:
+    post:
+      summary: Resolve an appeal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution]
+              properties:
+                resolution:
+                  type: string
+      responses:
+        '200':
+          description: Resolved
+
+  # Federation (v1)
+  /federation/users:
+    get:
+      summary: Search remote users
+      responses:
+        '200':
+          description: List of users
+
+  /federation/timeline:
+    get:
+      summary: Get federated timeline
+      responses:
+        '200':
+          description: List of posts
+
+  /federation/all-users:
+    get:
+      summary: Get all users across instances
+      responses:
+        '200':
+          description: List of users
+
+  /federation/public-users:
+    get:
+      summary: Get public user list for federation
+      responses:
+        '200':
+          description: List of users
+
+  /federation/health:
+    get:
+      summary: Get federation health status
+      responses:
+        '200':
+          description: Health stats
+
+  /federation/migrations:
+    get:
+      summary: Get user migration status
+      responses:
+        '200':
+          description: Status
+
+  /federation/follow:
+    post:
+      summary: Follow a remote user
+      responses:
+        '200':
+          description: Followed
+
+  # Stories
+  /stories:
+    get:
+      summary: Get stories
+      responses:
+        '200':
+          description: List of stories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Story'
+    post:
+      summary: Create a story
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Story created
+
+  /stories/feed:
+    get:
+      summary: Get story feed
+      responses:
+        '200':
+          description: Feed items
+
+  /stories/{id}:
+    delete:
+      summary: Delete a story
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+
+  /stories/{id}/view:
+    post:
+      summary: Record story view
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: View recorded
+
+  /stories/{id}/media:
+    get:
+      summary: Get story media
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media file
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+
+  /ap/users/{username}:
+    get:
+      summary: Get ActivityPub Actor
+      security: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Actor object
+
+  /ap/users/{username}/inbox:
+    post:
+      summary: User Inbox (ActivityPub)
+      security: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Activity received
+
+  /ap/shared-inbox:
+    post:
+      summary: Shared Inbox (Federation)
+      security: []
+      responses:
+        '202':
+          description: Activity received
+
+  /ap/users/{username}/outbox:
+    get:
+      summary: User Outbox (ActivityPub)
+      security: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Activity collection
+
+  /.well-known/webfinger:
+    get:
+      summary: WebFinger Resource Discovery
+      security: []
+      parameters:
+        - in: query
+          name: resource
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JRD object
+
   # System
   /health:
     get:
-      summary: Health check
+      summary: Health check (v1 relative)
       security: []
       responses:
         '200':

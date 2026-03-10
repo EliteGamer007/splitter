@@ -197,6 +197,8 @@ func setupRoutes(
 	postsAuth.GET("/feed", postHandler.GetFeed)
 	postsAuth.PUT("/:id", postHandler.UpdatePost)
 	postsAuth.DELETE("/:id", postHandler.DeletePost)
+	postsAuth.POST("/:id/report", adminHandler.ReportPost)   // Report a post (triggers AI screen)
+	postsAuth.POST("/:id/appeal", adminHandler.SubmitAppeal) // Appeal an AI-actioned removal
 	// Replies (Authenticated)
 	postsAuth.POST("/:id/replies", replyHandler.CreateReply)
 
@@ -276,6 +278,10 @@ func setupRoutes(
 	admin.GET("/federation/reputation", adminHandler.GetInstanceReputation)
 	admin.GET("/federation/network", adminHandler.GetFederationNetwork)
 	admin.GET("/messaging-security", adminHandler.GetMessagingSecurity)
+	admin.GET("/ai-actions", adminHandler.GetAIActionsQueue)       // AI-auto-removed content
+	admin.GET("/appeals", adminHandler.GetAppeals)                 // User appeals queue
+	admin.POST("/appeals/:id/resolve", adminHandler.ResolveAppeal) // Resolve an appeal
+	admin.POST("/users/:id/ban", adminHandler.BanUser)             // Permanently ban user
 
 	// ============================================================
 	// FEDERATION ROUTES
@@ -294,6 +300,8 @@ func setupRoutes(
 	fed.GET("/timeline", federationHandler.GetFederatedTimeline)  // Federated timeline
 	fed.GET("/all-users", federationHandler.GetAllFederatedUsers) // All users across instances
 	fed.GET("/public-users", federationHandler.GetPublicUserList) // Public user list for federation
+	fed.GET("/health", federationHandler.GetFederationHealth)     // Peer health status
+	fed.GET("/migrations", federationHandler.GetMigrationStatus)  // User migration status
 
 	// Federation API (authenticated)
 	fedAuth := api.Group("/federation")

@@ -298,14 +298,23 @@ docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
 |----------|-------------|
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Complete database schema reference |
 | [API_ENDPOINTS.md](API_ENDPOINTS.md) | Full API reference with examples |
-| [CODING_STANDARDS.md](CODING_STANDARDS.md) | Code style and conventions guide |
+| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 specification for backend API |
+| [SECURITY.md](SECURITY.md) | Security disclosure policy and protocols |
+| [WELL_KNOWN.md](WELL_KNOWN.md) | Federation manifest and ActivityPub specs |
+| [OPS.md](OPS.md) | Operations, monitoring, and scaling guide |
+| [RECIPES.md](RECIPES.md) | Developer "how-to" guides and code examples |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
+| [ROADMAP.md](ROADMAP.md) | Future development milestones |
+| [GLOSSARY.md](GLOSSARY.md) | Key concepts and terminology |
+| [PRIVACY.md](PRIVACY.md) | Data ethics and security overview |
+| [DESIGN.md](DESIGN.md) | Theming and branding guide |
+| [BOTS.md](BOTS.md) | Bot development and AI bot guide |
+| [CODE_OF_CONDUCT.md](CODE_of_CONDUCT.md) | Community standards and expectations |
 | [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) | Complete cloud database setup |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Full stack deployment guide |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [diagrams/architecture-diagram.md](diagrams/architecture-diagram.md) | System architecture diagram |
-| [SPRINT_1_STATUS.md](SPRINT_1_STATUS.md) | Sprint 1 completion details |
-
-| [DEPLOY_BACKEND_RENDER.md](DEPLOY_BACKEND_RENDER.md) | Backend Render deployment feasibility + step-by-step setup |
+| [diagrams/](diagrams/) | System architecture and design diagrams |
+| [DEPLOY_BACKEND_RENDER.md](DEPLOY_BACKEND_RENDER.md) | Backend Render deployment feasibility guide |
 
 ## Contributing
 

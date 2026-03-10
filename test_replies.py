@@ -4,7 +4,7 @@ import json
 BASE = "https://splitter-m0kv.onrender.com/api/v1"
 
 # Login as admin
-r = requests.post(f"{BASE}/auth/login", json={"username":"admin","password":"splitteradmin"}, verify=False)
+r = requests.post(f"{BASE}/auth/login", json={"username":"admin1","password":"splitteradmin"}, verify=False)
 token = r.json()["token"]
 headers = {"Authorization": f"Bearer {token}"}
 
