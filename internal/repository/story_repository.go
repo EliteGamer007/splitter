@@ -21,10 +21,10 @@ func NewStoryRepository() *StoryRepository {
 
 func (r *StoryRepository) CreateStory(ctx context.Context, story *models.Story) error {
 	query := `
-		INSERT INTO stories (id, user_id, media_url, created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO stories (id, user_id, media_url, media_data, media_type, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := db.GetDB().Exec(ctx, query, story.ID, story.UserID, story.MediaURL, story.CreatedAt, story.ExpiresAt)
+	_, err := db.GetDB().Exec(ctx, query, story.ID, story.UserID, story.MediaURL, story.MediaData, story.MediaType, story.CreatedAt, story.ExpiresAt)
 	return err
 }
 
@@ -177,11 +177,20 @@ func (r *StoryRepository) GetStoryFeed(ctx context.Context) ([]models.StoryUser,
 }
 
 func (r *StoryRepository) GetStoryMedia(ctx context.Context, id string) ([]byte, string, error) {
-	query := "SELECT media_url FROM stories WHERE id = $1"
+	query := "SELECT media_url, COALESCE(media_data, '\\x'::bytea), COALESCE(media_type, '') FROM stories WHERE id = $1"
 	var mediaURL string
-	err := db.GetDB().QueryRow(ctx, query, id).Scan(&mediaURL)
+	var mediaData []byte
+	var mediaType string
+	err := db.GetDB().QueryRow(ctx, query, id).Scan(&mediaURL, &mediaData, &mediaType)
 	if err != nil {
 		return nil, "", err
+	}
+
+	if len(mediaData) > 0 {
+		if mediaType == "" {
+			mediaType = http.DetectContentType(mediaData)
+		}
+		return mediaData, mediaType, nil
 	}
 
 	fileName := strings.TrimPrefix(mediaURL, "/media/")

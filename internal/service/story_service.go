@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"splitter/internal/models"
@@ -18,15 +19,23 @@ func NewStoryService(repo *repository.StoryRepository) *StoryService {
 	return &StoryService{repo: repo}
 }
 
-func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaURL string) error {
+func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaURL string, mediaData []byte, mediaType string) error {
 	now := time.Now()
 	story := &models.Story{
 		ID:        uuid.New(),
 		UserID:    userID,
-		MediaURL:  mediaURL,
+		MediaData: mediaData,
+		MediaType: mediaType,
 		CreatedAt: now,
 		ExpiresAt: now.Add(24 * time.Hour),
 	}
+	
+	if mediaURL != "" && !strings.HasPrefix(mediaURL, "/media/") {
+		story.MediaURL = mediaURL
+	} else {
+		story.MediaURL = "/api/v1/stories/" + story.ID.String() + "/media"
+	}
+	
 	return s.repo.CreateStory(ctx, story)
 }
 
