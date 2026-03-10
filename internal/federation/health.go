@@ -243,7 +243,7 @@ func FetchAndCachePeerUsers(domain, baseURL string) []map[string]interface{} {
 // FetchAndCachePeerPosts fetches and caches posts from a healthy peer.
 func FetchAndCachePeerPosts(domain, baseURL string) []map[string]interface{} {
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(baseURL + "/api/v1/posts/public?limit=50&offset=0")
+	resp, err := client.Get(baseURL + "/api/v1/posts/public?limit=50&offset=0&local_only=true")
 	if err != nil {
 		log.Printf("[FederationCache] Failed to fetch posts from %s: %v", domain, err)
 		return GetCachedPeerPosts(domain)
