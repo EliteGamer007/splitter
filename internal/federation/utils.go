@@ -30,7 +30,14 @@ func EnsureRemoteUser(ctx context.Context, actorURI string) (*models.User, error
 
 	if err == nil {
 		if user.EncryptionPublicKey == "" {
-			if remoteKey := fetchRemoteEncryptionPublicKey(user.InstanceDomain, user.Username); remoteKey != "" {
+			remoteKey := ""
+			if actor, resolveErr := resolveActorFromURI(actorURI); resolveErr == nil && actor != nil {
+				remoteKey = strings.TrimSpace(actor.EncryptionPublicKey)
+			}
+			if remoteKey == "" {
+				remoteKey = fetchRemoteEncryptionPublicKey(user.InstanceDomain, user.Username)
+			}
+			if remoteKey != "" {
 				_, _ = db.GetDB().Exec(ctx,
 					`UPDATE users SET encryption_public_key = $1, updated_at = NOW() WHERE id = $2`,
 					remoteKey, user.ID,

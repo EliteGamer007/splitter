@@ -29,6 +29,17 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 		return nil, fmt.Errorf("message request blocked: %s", reason)
 	}
 
+	return r.getOrCreateThreadNoPolicy(ctx, userAID, userBID)
+}
+
+// GetOrCreateThreadForInbound creates/loads a DM thread without applying outbound privacy checks.
+// Use this only for trusted inbound federation inbox processing.
+func (r *MessageRepository) GetOrCreateThreadForInbound(ctx context.Context, userAID, userBID string) (*models.MessageThread, error) {
+	return r.getOrCreateThreadNoPolicy(ctx, userAID, userBID)
+}
+
+func (r *MessageRepository) getOrCreateThreadNoPolicy(ctx context.Context, userAID, userBID string) (*models.MessageThread, error) {
+
 	// Check if thread exists (either direction)
 	query := `
 		SELECT id, participant_a_id, participant_b_id, created_at, updated_at
@@ -38,7 +49,7 @@ func (r *MessageRepository) GetOrCreateThread(ctx context.Context, userAID, user
 	`
 
 	var thread models.MessageThread
-	err = db.GetDB().QueryRow(ctx, query, userAID, userBID).Scan(
+	err := db.GetDB().QueryRow(ctx, query, userAID, userBID).Scan(
 		&thread.ID,
 		&thread.ParticipantAID,
 		&thread.ParticipantBID,

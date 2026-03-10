@@ -29,13 +29,13 @@ func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaU
 		CreatedAt: now,
 		ExpiresAt: now.Add(24 * time.Hour),
 	}
-	
+
 	if mediaURL != "" && !strings.HasPrefix(mediaURL, "/media/") {
 		story.MediaURL = mediaURL
 	} else {
 		story.MediaURL = "/api/v1/stories/" + story.ID.String() + "/media"
 	}
-	
+
 	return s.repo.CreateStory(ctx, story)
 }
 

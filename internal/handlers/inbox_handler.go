@@ -457,12 +457,21 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 		if domain := extractDomainFromURI(recipient); domain == h.cfg.Federation.Domain || domain == "localhost" {
 			username := extractUsernameFromURI(recipient)
 			if username != "" {
-				// Verify local user exists (support localhost/legacy local domain values)
+				// Resolve local user by username first (more robust than instance_domain matching),
+				// while still preferring non-ghost local accounts when duplicates exist.
 				var u models.User
 				err := db.GetDB().QueryRow(ctx,
-					"SELECT id, username FROM users WHERE username = $1 AND (instance_domain = $2 OR instance_domain = 'localhost' OR COALESCE(instance_domain,'') = '') LIMIT 1",
+					`SELECT id, username, COALESCE(encryption_public_key, '')
+					 FROM users
+					 WHERE username = $1
+					 ORDER BY CASE
+					   WHEN instance_domain = $2 OR instance_domain = 'localhost' OR COALESCE(instance_domain, '') = '' THEN 0
+					   ELSE 1
+					 END,
+					 updated_at DESC
+					 LIMIT 1`,
 					username, h.cfg.Federation.Domain,
-				).Scan(&u.ID, &u.Username)
+				).Scan(&u.ID, &u.Username, &u.EncryptionPublicKey)
 				if err == nil {
 					targetLocalUser = &u
 				}
@@ -489,7 +498,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 		}
 
 		// 2. Get/Create Thread
-		thread, err := h.msgRepo.GetOrCreateThread(ctx, senderUser.ID, targetLocalUser.ID)
+		thread, err := h.msgRepo.GetOrCreateThreadForInbound(ctx, senderUser.ID, targetLocalUser.ID)
 		if err != nil {
 			log.Printf("[Inbox] Failed to get thread: %v", err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get thread"})
@@ -507,6 +516,10 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 		if err != nil {
 			log.Printf("[Inbox] Failed to save message: %v", err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save message"})
+		}
+
+		if id, _ := activity["id"].(string); id != "" {
+			federation.MarkActivityProcessed(ctx, id)
 		}
 
 		log.Printf("[Inbox] DM saved successfully")
