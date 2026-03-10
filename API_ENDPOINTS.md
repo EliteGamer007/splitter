@@ -4,7 +4,59 @@ Base URL: `http://localhost:8000/api/v1`
 
 This document lists all available API endpoints for testing with Postman or cURL.
 
-## 🔐 Authentication
+## 🔐 Authentication & Security
+
+### Sequence: DID Challenge-Response
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client
+    participant Server
+
+    User->>Client: Clicks "Login with DID"
+    Client->>Server: POST /auth/challenge {did}
+    Server-->>Client: 200 {challenge: "nonce_123"}
+    Client->>Client: Sign nonce with Private Key
+    Client->>Server: POST /auth/verify {did, challenge, signature}
+    Server->>Server: Verify Signature with Public Key
+    Server-->>Client: 200 {token: "JWT_TOKEN"}
+```
+
+### E2EE Key Exchange
+```mermaid
+sequenceDiagram
+    participant Device A
+    participant Server
+    participant Device B
+
+    Device A->>Server: GET /users/did/device-keys
+    Server-->>Device A: 200 {device_id: "B1", key: "PUB_KEY_B"}
+    Device A->>Device A: Encrypt message with PUB_KEY_B
+    Device A->>Server: POST /messages/send {content: "CIPHERTEXT"}
+    Device B->>Server: GET /messages/sync
+    Server-->>Device B: 200 {content: "CIPHERTEXT"}
+    Device B->>Device B: Decrypt with PRV_KEY_B
+```
+
+### Register Key
+Register a new device encryption key.
+```http
+POST /auth/register-key
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "device_id": "phone-1",
+  "public_key": "base64_encoded_key"
+}
+```
+
+### Rotate Key
+Update an existing device key.
+```http
+POST /auth/rotate-key
+Authorization: Bearer <jwt_token>
+```
 
 ### Register
 Create a new user account.
@@ -292,6 +344,73 @@ Authorization: Bearer <jwt_token>
 
 ---
 
+## 🏷️ Hashtags & Discovery
+
+### Get Trending
+Get top 10 trending hashtags.
+```http
+GET /hashtags/trending
+```
+
+### Search Hashtags
+Search for tags.
+```http
+GET /hashtags/search?q=crypto
+```
+
+### Get Posts by Tag
+Get all posts matching a specific hashtag.
+```http
+GET /hashtags/tag/splitter?limit=20
+```
+
+---
+
+## 📖 Stories
+
+### Create Story
+Upload a media story (24-hour expiry).
+```http
+POST /stories
+Authorization: Bearer <jwt_token>
+Content-Type: multipart/form-data
+
+file=@/path/to/story.mp4
+```
+
+### Get Story Feed
+Get stories from users you follow.
+```http
+GET /stories/feed
+Authorization: Bearer <jwt_token>
+```
+
+### Record View
+Notify the server that a story was viewed.
+```http
+POST /stories/:id/view
+Authorization: Bearer <jwt_token>
+```
+
+---
+
+## 🌐 Federation & Well-Known
+
+### WebFinger
+Discover actor details.
+```http
+GET /.well-known/webfinger?resource=acct:alice@splitter.social
+```
+
+### ActivityPub Actor
+Get ActivityPub JSON represention of a user.
+```http
+GET /ap/users/alice
+Accept: application/activity+json
+```
+
+---
+
 ## 📨 Messages (Direct Messages)
 
 ### Get Threads
@@ -337,7 +456,25 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## 🛡️ Admin & Moderation
+## 🛡️ Admin & Moderation (Advanced)
+
+### Federation Inspector
+View real-time federation metrics (Admin only).
+```http
+GET /admin/federation-inspector
+Authorization: Bearer <jwt_token>
+```
+
+### Domain Block
+Block a malicious instance.
+```http
+POST /admin/domains/block
+Authorization: Bearer <jwt_token>
+{
+  "domain": "spam-instance.com",
+  "reason": "Repeated spam traffic"
+}
+```
 
 ### Get All Users
 List all users (Admin only).
@@ -414,10 +551,20 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## 🏥 System
+## 🏥 System & Errors
 
 ### Health Check
 Check if the API is running.
 ```http
 GET /health
 ```
+
+### Common Error Codes
+
+| Status | Code | Description |
+| --- | --- | --- |
+| 400 | `INVALID_DID` | The provided DID format is incorrect. |
+| 401 | `CHALLENGE_EXPIRED` | Nonce expired; request a new challenge. |
+| 403 | `INSUFFICIENT_PERMISSIONS` | Role (User) cannot perform Admin action. |
+| 404 | `USER_NOT_FOUND` | No account matches the ID/DID. |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many requests; slow down. |
