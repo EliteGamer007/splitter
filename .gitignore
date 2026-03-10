@@ -76,3 +76,6 @@ uploads/
 # Test output / logs
 *_test_output*.txt
 *.log
+node_modules/
+package.json
+package-lock.json
