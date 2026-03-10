@@ -304,6 +304,12 @@ docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
 | [OPS.md](OPS.md) | Operations, monitoring, and scaling guide |
 | [RECIPES.md](RECIPES.md) | Developer "how-to" guides and code examples |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
+| [ROADMAP.md](ROADMAP.md) | Future development milestones |
+| [GLOSSARY.md](GLOSSARY.md) | Key concepts and terminology |
+| [PRIVACY.md](PRIVACY.md) | Data ethics and security overview |
+| [DESIGN.md](DESIGN.md) | Theming and branding guide |
+| [BOTS.md](BOTS.md) | Bot development and AI bot guide |
+| [CODE_OF_CONDUCT.md](CODE_of_CONDUCT.md) | Community standards and expectations |
 | [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) | Complete cloud database setup |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Full stack deployment guide |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
