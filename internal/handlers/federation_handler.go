@@ -371,11 +371,35 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		addPost(post)
 	}
 
-	// Phase 2: Live fetch from healthy peers (with cache fallback)
-	for domain, baseURL := range federation.InstanceURLMap {
-		if domain == h.cfg.Federation.Domain {
-			continue
+	// Phase 2: Live fetch from known peers (InstanceURLMap + domains discovered via remote_actors)
+	peerMap := make(map[string]string) // domain → baseURL
+	for d, u := range federation.InstanceURLMap {
+		if d != h.cfg.Federation.Domain {
+			peerMap[d] = u
 		}
+	}
+	// Also include any domains we've cached actors for but aren't in InstanceURLMap
+	actorDomainRows, adErr := db.GetDB().Query(ctx,
+		`SELECT DISTINCT domain, actor_uri FROM remote_actors
+		 WHERE domain != '' AND domain != $1 AND inbox_url != ''
+		 LIMIT 20`, h.cfg.Federation.Domain)
+	if adErr == nil {
+		defer actorDomainRows.Close()
+		for actorDomainRows.Next() {
+			var adDomain, actorURI string
+			if sErr := actorDomainRows.Scan(&adDomain, &actorURI); sErr != nil {
+				continue
+			}
+			if _, exists := peerMap[adDomain]; !exists {
+				// Build base URL from actor URI
+				if parsed, pErr := url.Parse(actorURI); pErr == nil {
+					peerMap[adDomain] = parsed.Scheme + "://" + parsed.Host
+				}
+			}
+		}
+	}
+
+	for domain, baseURL := range peerMap {
 
 		var remotePosts []map[string]interface{}
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"splitter/internal/config"
@@ -63,8 +64,14 @@ func (h *WebFingerHandler) Handle(c echo.Context) error {
 	username := parts[0]
 	domain := parts[1]
 
-	// Verify this is our domain
-	if domain != h.cfg.Federation.Domain {
+	// Verify this is our domain — accept both the short domain (e.g. "splitter-1")
+	// and the actual hostname (e.g. "splitter-m0kv.onrender.com") so external apps
+	// can discover users via @user@splitter-m0kv.onrender.com
+	var ownHostname string
+	if parsed, pErr := url.Parse(h.cfg.Federation.URL); pErr == nil {
+		ownHostname = parsed.Hostname()
+	}
+	if domain != h.cfg.Federation.Domain && domain != ownHostname {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": fmt.Sprintf("domain '%s' not served here (this is %s)", domain, h.cfg.Federation.Domain),
 		})
