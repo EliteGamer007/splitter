@@ -278,3 +278,23 @@ Status: PASS
 Execution Time: 664.9164ms
 Timestamp: 2026-03-10 17:10:00
 
+TestName: TestDeletedAtColumnExists
+Status: PASS
+Execution Time: 1.9555727s
+Timestamp: 2026-03-11 07:54:16
+
+TestName: TestEditedAtColumnExists
+Status: PASS
+Execution Time: 919.9923ms
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestRepairIndexExists
+Status: PASS
+Execution Time: 797.1461ms
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestEncryptionPublicKeyColumnExists
+Status: PASS
+Execution Time: 889.4472ms
+Timestamp: 2026-03-11 07:54:18
+

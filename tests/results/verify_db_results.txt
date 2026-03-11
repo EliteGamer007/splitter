@@ -341,3 +341,23 @@ Status: PASS
 Execution Time: 622.0306ms
 Timestamp: 2026-03-10 17:09:54
 
+TestName: TestNoOrphanedPosts
+Status: PASS
+Execution Time: 1.5053196s
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestNoOrphanedReplies
+Status: PASS
+Execution Time: 827.4119ms
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestNoExpiredStoriesVisible
+Status: PASS
+Execution Time: 1.0054478s
+Timestamp: 2026-03-11 07:54:18
+
+TestName: TestNoOrphanedStoryViews
+Status: PASS
+Execution Time: 895.1264ms
+Timestamp: 2026-03-11 07:54:19
+

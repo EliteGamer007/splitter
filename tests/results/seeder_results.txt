@@ -278,3 +278,23 @@ Status: PASS
 Execution Time: 8.2958ms
 Timestamp: 2026-03-10 17:09:49
 
+TestName: TestSeederKeyGeneration
+Status: PASS
+Execution Time: 540.3µs
+Timestamp: 2026-03-11 07:54:07
+
+TestName: TestSeederPublicKeyRoundTrip
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-11 07:54:07
+
+TestName: TestSeederSharedSecretDerivation
+Status: PASS
+Execution Time: 517µs
+Timestamp: 2026-03-11 07:54:07
+
+TestName: TestSeederUniqueUsernames
+Status: PASS
+Execution Time: 5.9244ms
+Timestamp: 2026-03-11 07:54:07
+

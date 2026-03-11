@@ -193,3 +193,18 @@ Status: PASS
 Execution Time: 891.8621ms
 Timestamp: 2026-03-10 17:09:20
 
+TestName: TestDatabaseConnectionLogged
+Status: PASS
+Execution Time: 1.0314479s
+Timestamp: 2026-03-11 07:54:16
+
+TestName: TestSchemaChecksLogged
+Status: PASS
+Execution Time: 2.2573532s
+Timestamp: 2026-03-11 07:54:19
+
+TestName: TestDatabaseTransactionRollback
+Status: PASS
+Execution Time: 1.2828336s
+Timestamp: 2026-03-11 07:54:20
+

@@ -402,11 +402,16 @@ func BuildUpdateActorActivity(actorURI, username, displayName, summary, avatarUR
 // storeOutboxActivity stores an activity in the outbox table
 func storeOutboxActivity(ctx context.Context, activityType string, payload []byte, targetInbox string) (string, error) {
 	var id string
+
+	// Convert JSON bytes to string so Postgres JSONB can parse it correctly
+	payloadStr := string(payload)
+
 	err := db.GetDB().QueryRow(ctx,
 		`INSERT INTO outbox_activities (activity_type, payload, target_inbox, status, next_retry_at)
-		 VALUES ($1, $2, $3, 'pending', now()) RETURNING id::text`,
-		activityType, payload, targetInbox,
+		 VALUES ($1, $2::jsonb, $3, 'pending', now()) RETURNING id::text`,
+		activityType, payloadStr, targetInbox,
 	).Scan(&id)
+
 	return id, err
 }
 

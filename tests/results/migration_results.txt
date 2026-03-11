@@ -208,3 +208,18 @@ Status: PASS
 Execution Time: 616.3001ms
 Timestamp: 2026-03-10 17:09:45
 
+TestName: TestMigrationColumnAddition
+Status: PASS
+Execution Time: 2.9215385s
+Timestamp: 2026-03-11 07:54:16
+
+TestName: TestMigrationStoriesTable
+Status: PASS
+Execution Time: 1.191664s
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestMigrationIdempotent
+Status: PASS
+Execution Time: 762.48ms
+Timestamp: 2026-03-11 07:54:18
+

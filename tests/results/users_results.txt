@@ -307,3 +307,18 @@ Status: PASS
 Execution Time: 1.5104858s
 Timestamp: 2026-03-10 17:09:36
 
+TestName: TestUsersTableColumns
+Status: PASS
+Execution Time: 3.6938356s
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestUsersUniqueConstraints
+Status: PASS
+Execution Time: 1.3259224s
+Timestamp: 2026-03-11 07:54:18
+
+TestName: TestUsersRequiredFieldsNotNull
+Status: PASS
+Execution Time: 1.2947875s
+Timestamp: 2026-03-11 07:54:20
+

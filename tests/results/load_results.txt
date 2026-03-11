@@ -228,3 +228,18 @@ Status: PASS
 Execution Time: 420.7048ms
 Timestamp: 2026-03-10 17:10:54
 
+TestName: TestLoadPublicFeedConcurrent
+Status: PASS
+Execution Time: 8.5790604s
+Timestamp: 2026-03-11 07:54:16
+
+TestName: TestLoadHealthEndpointLatency
+Status: PASS
+Execution Time: 14.3513ms
+Timestamp: 2026-03-11 07:54:16
+
+TestName: TestLoadStoryFeedConcurrent
+Status: PASS
+Execution Time: 208.0661ms
+Timestamp: 2026-03-11 07:54:16
+

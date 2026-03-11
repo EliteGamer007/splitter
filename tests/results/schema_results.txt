@@ -291,3 +291,18 @@ Status: PASS
 Execution Time: 986.5967ms
 Timestamp: 2026-03-10 17:09:27
 
+TestName: TestSchemaTablesExist
+Status: PASS
+Execution Time: 3.4511755s
+Timestamp: 2026-03-11 07:54:17
+
+TestName: TestSchemaColumnTypes
+Status: PASS
+Execution Time: 1.4571393s
+Timestamp: 2026-03-11 07:54:18
+
+TestName: TestSchemaIndexesExist
+Status: PASS
+Execution Time: 1.0166834s
+Timestamp: 2026-03-11 07:54:19
+
