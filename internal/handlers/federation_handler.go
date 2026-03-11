@@ -284,7 +284,7 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		 FROM posts p
 		 LEFT JOIN users u ON u.did = p.author_did
 		 LEFT JOIN media m ON p.id = m.post_id
-		 WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND p.is_remote = false
+		 WHERE p.deleted_at IS NULL AND p.visibility = 'public'
 		 ORDER BY p.created_at DESC
 		 LIMIT 50`)
 	if err != nil {
@@ -349,10 +349,23 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			}}
 		}
 
-		// For remote posts, try to get info from remote_actors
-		if isRemote && username == "" {
-			post["username"] = extractUsernameFromDID(authorDID)
-			post["domain"] = extractDomainFromDID(authorDID)
+		// For remote posts, populate domain and instance_url
+		if isRemote {
+			domain := extractDomainFromDID(authorDID)
+			post["domain"] = domain
+			if domain != "" {
+				if instanceURL, ok := federation.InstanceURLMap[domain]; ok {
+					post["instance_url"] = instanceURL
+				} else if strings.HasPrefix(authorDID, "http") {
+					parsed, pErr := url.Parse(authorDID)
+					if pErr == nil {
+						post["instance_url"] = parsed.Scheme + "://" + parsed.Host
+					}
+				}
+			}
+			if username == "" {
+				post["username"] = extractUsernameFromDID(authorDID)
+			}
 		}
 
 		addPost(post)
