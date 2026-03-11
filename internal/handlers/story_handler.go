@@ -58,7 +58,7 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 		}
 		defer src.Close()
 
-		mediaData, err = io.ReadAll(src)
+		mediaData, err = io.ReadAll(io.LimitReader(src, 10<<20))
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to read file contents"})
 		}
@@ -69,7 +69,11 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 			filename := uuid.New().String() + filepath.Ext(file.Filename)
 			path := "./uploads/" + filename
 			if dst, err := os.Create(path); err == nil {
-				dst.Write(mediaData)
+				if _, err := dst.Write(mediaData); err != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": "failed to save uploaded file",
+					})
+				}
 				dst.Close()
 			}
 			mediaURL = "/media/" + filename
@@ -78,8 +82,18 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 		}
 	}
 
+	c.Logger().Infof(
+		"Story upload request: user=%s mediaType=%s size=%d bytes",
+		userID.String(),
+		mediaType,
+		len(mediaData),
+	)
+
 	if err := h.service.CreateStory(c.Request().Context(), userID, mediaURL, mediaData, mediaType); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create story"})
+		c.Logger().Errorf("CreateStory failed: %v", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
 	}
 
 	return c.JSON(http.StatusCreated, map[string]string{"status": "story created"})
