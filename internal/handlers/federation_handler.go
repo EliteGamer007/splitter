@@ -399,6 +399,35 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				authorDID = fmt.Sprintf("%s/ap/users/%s", baseURL, username)
 			}
 
+			// Build original_post_uri if not provided (remote instance's canonical URI)
+			if originalURI == "" && id != "" {
+				originalURI = fmt.Sprintf("%s/posts/%s", strings.TrimRight(baseURL, "/"), id)
+			}
+
+			// Cache the remote post locally so it gets a local UUID for replies
+			parsedTime, _ := time.Parse(time.RFC3339Nano, createdAt)
+			if parsedTime.IsZero() {
+				parsedTime = time.Now()
+			}
+			if originalURI != "" {
+				var localID string
+				cacheErr := db.GetDB().QueryRow(ctx,
+					`WITH existing AS (
+						SELECT id::text FROM posts WHERE original_post_uri = $1 AND deleted_at IS NULL LIMIT 1
+					), inserted AS (
+						INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, created_at)
+						SELECT $2, $3, 'public', true, $1, $4
+						WHERE NOT EXISTS (SELECT 1 FROM existing)
+						RETURNING id::text
+					)
+					SELECT id FROM inserted UNION ALL SELECT id FROM existing LIMIT 1`,
+					originalURI, authorDID, content, parsedTime,
+				).Scan(&localID)
+				if cacheErr == nil && localID != "" {
+					id = localID
+				}
+			}
+
 			post := map[string]interface{}{
 				"id":                id,
 				"author_did":        authorDID,
