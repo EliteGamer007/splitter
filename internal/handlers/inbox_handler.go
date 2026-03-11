@@ -16,6 +16,7 @@ import (
 	"splitter/internal/repository"
 	"splitter/internal/security"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -532,19 +533,48 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	// Store as remote post
 	log.Printf("[Inbox] DEBUG: Inserting remote post values: author_did=%s, content=%s, original_post_uri=%s, published=%v", actorURI, content, noteID, publishedTime)
 
-	_, err := db.GetDB().Exec(ctx,
+	var postID string
+	err := db.GetDB().QueryRow(ctx,
 		`INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, in_reply_to_uri, created_at)
 		 VALUES ($1, $2, 'public', true, $3, NULLIF($4, ''), $5)
-		 ON CONFLICT DO NOTHING`,
+		 ON CONFLICT DO NOTHING
+		 RETURNING id`,
 		actorURI, content, noteID, inReplyTo, publishedTime,
-	)
-	if err != nil {
+	).Scan(&postID)
+	if err != nil && err != pgx.ErrNoRows {
 		log.Printf("[Inbox] Failed to store remote post: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "failed to store post",
 		})
 	}
-	log.Printf("[Inbox] DEBUG: Successfully inserted remote post")
+	log.Printf("[Inbox] DEBUG: Successfully inserted remote post, id=%s", postID)
+
+	// Store media attachments from the Note
+	if postID != "" {
+		if attachments, ok := object["attachment"].([]interface{}); ok {
+			for _, att := range attachments {
+				attMap, ok := att.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				mediaURL, _ := attMap["url"].(string)
+				mediaType, _ := attMap["mediaType"].(string)
+				if mediaURL == "" {
+					continue
+				}
+				if mediaType == "" {
+					mediaType = "image/jpeg"
+				}
+				_, mErr := db.GetDB().Exec(ctx,
+					`INSERT INTO media (post_id, media_url, media_type) VALUES ($1, $2, $3)`,
+					postID, mediaURL, mediaType,
+				)
+				if mErr != nil {
+					log.Printf("[Inbox] Failed to store media attachment: %v", mErr)
+				}
+			}
+		}
+	}
 
 	// Mark as processed
 	if id, _ := activity["id"].(string); id != "" {

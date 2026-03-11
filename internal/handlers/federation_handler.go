@@ -279,10 +279,12 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		        p.created_at,
 		        COALESCE(u.username, ''),
 		        COALESCE(u.display_name, ''),
-		        COALESCE(u.avatar_url, '')
+		        COALESCE(u.avatar_url, ''),
+		        m.id, m.media_url, m.media_type
 		 FROM posts p
 		 LEFT JOIN users u ON u.did = p.author_did
-		 WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND p.is_remote = false
+		 LEFT JOIN media m ON p.id = m.post_id
+		 WHERE p.deleted_at IS NULL AND p.visibility = 'public'
 		 ORDER BY p.created_at DESC
 		 LIMIT 50`)
 	if err != nil {
@@ -315,10 +317,12 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		var isRemote bool
 		var likeCount, repostCount int
 		var createdAt time.Time
+		var mediaID, mediaURL, mediaType *string
 
 		if err := rows.Scan(&id, &authorDID, &content, &visibility, &isRemote,
 			&originalURI, &likeCount, &repostCount, &createdAt,
-			&username, &displayName, &avatarURL); err != nil {
+			&username, &displayName, &avatarURL,
+			&mediaID, &mediaURL, &mediaType); err != nil {
 			continue
 		}
 
@@ -337,20 +341,65 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			"avatar_url":        avatarURL,
 		}
 
-		// For remote posts, try to get info from remote_actors
-		if isRemote && username == "" {
-			post["username"] = extractUsernameFromDID(authorDID)
-			post["domain"] = extractDomainFromDID(authorDID)
+		if mediaID != nil && mediaURL != nil {
+			post["media"] = []map[string]interface{}{{
+				"id":         *mediaID,
+				"media_url":  *mediaURL,
+				"media_type": *mediaType,
+			}}
+		}
+
+		// For remote posts, populate domain and instance_url
+		if isRemote {
+			domain := extractDomainFromDID(authorDID)
+			post["domain"] = domain
+			if domain != "" {
+				if instanceURL, ok := federation.InstanceURLMap[domain]; ok {
+					post["instance_url"] = instanceURL
+				} else if strings.HasPrefix(authorDID, "http") {
+					parsed, pErr := url.Parse(authorDID)
+					if pErr == nil {
+						post["instance_url"] = parsed.Scheme + "://" + parsed.Host
+					}
+				}
+			}
+			if username == "" {
+				post["username"] = extractUsernameFromDID(authorDID)
+			}
 		}
 
 		addPost(post)
 	}
 
-	// Phase 2: Live fetch from healthy peers (with cache fallback)
-	for domain, baseURL := range federation.InstanceURLMap {
-		if domain == h.cfg.Federation.Domain {
-			continue
+	// Phase 2: Live fetch from known peers (InstanceURLMap + domains discovered via remote_actors)
+	peerMap := make(map[string]string) // domain → baseURL
+	for d, u := range federation.InstanceURLMap {
+		if d != h.cfg.Federation.Domain {
+			peerMap[d] = u
 		}
+	}
+	// Also include any domains we've cached actors for but aren't in InstanceURLMap
+	actorDomainRows, adErr := db.GetDB().Query(ctx,
+		`SELECT DISTINCT domain, actor_uri FROM remote_actors
+		 WHERE domain != '' AND domain != $1 AND inbox_url != ''
+		 LIMIT 20`, h.cfg.Federation.Domain)
+	if adErr == nil {
+		defer actorDomainRows.Close()
+		for actorDomainRows.Next() {
+			var adDomain, actorURI string
+			if sErr := actorDomainRows.Scan(&adDomain, &actorURI); sErr != nil {
+				continue
+			}
+			if _, exists := peerMap[adDomain]; !exists {
+				// Build base URL from actor URI
+				if parsed, pErr := url.Parse(actorURI); pErr == nil {
+					peerMap[adDomain] = parsed.Scheme + "://" + parsed.Host
+				}
+			}
+		}
+	}
+
+	for domain, baseURL := range peerMap {
 
 		var remotePosts []map[string]interface{}
 
@@ -387,6 +436,52 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				authorDID = fmt.Sprintf("%s/ap/users/%s", baseURL, username)
 			}
 
+			// Build original_post_uri if not provided (remote instance's canonical URI)
+			if originalURI == "" && id != "" {
+				originalURI = fmt.Sprintf("%s/posts/%s", strings.TrimRight(baseURL, "/"), id)
+			}
+
+			// Cache the remote post locally so it gets a local UUID for replies
+			parsedTime, _ := time.Parse(time.RFC3339Nano, createdAt)
+			if parsedTime.IsZero() {
+				parsedTime = time.Now()
+			}
+			if originalURI != "" {
+				var localID string
+				cacheErr := db.GetDB().QueryRow(ctx,
+					`WITH existing AS (
+						SELECT id::text FROM posts WHERE original_post_uri = $1 AND deleted_at IS NULL LIMIT 1
+					), inserted AS (
+						INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, created_at)
+						SELECT $2, $3, 'public', true, $1, $4
+						WHERE NOT EXISTS (SELECT 1 FROM existing)
+						RETURNING id::text
+					)
+					SELECT id FROM inserted UNION ALL SELECT id FROM existing LIMIT 1`,
+					originalURI, authorDID, content, parsedTime,
+				).Scan(&localID)
+				if cacheErr == nil && localID != "" {
+					id = localID
+				}
+			}
+
+			// Derive a clean username if remote API didn't provide one
+			if username == "" {
+				if strings.HasPrefix(authorDID, "http://") || strings.HasPrefix(authorDID, "https://") {
+					// Extract last path segment from actor URI (e.g. /users/alice → alice)
+					if parsed, pErr := url.Parse(authorDID); pErr == nil {
+						parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+						if len(parts) > 0 && parts[len(parts)-1] != "" {
+							username = parts[len(parts)-1]
+						}
+					}
+				}
+				// Last resort: use display_name as slug
+				if username == "" && displayName != "" {
+					username = strings.ToLower(strings.ReplaceAll(displayName, " ", "_"))
+				}
+			}
+
 			post := map[string]interface{}{
 				"id":                id,
 				"author_did":        authorDID,
@@ -402,6 +497,11 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				"avatar_url":        avatarURL,
 				"domain":            domain,
 				"instance_url":      baseURL,
+			}
+
+			// Pass through media array from remote public feed
+			if media, ok := remotePost["media"]; ok {
+				post["media"] = media
 			}
 
 			addPost(post)

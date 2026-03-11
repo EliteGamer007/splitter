@@ -33,9 +33,18 @@ type Note struct {
 	Content       string            `json:"content"`
 	Ciphertext    string            `json:"ciphertext,omitempty"`
 	EncryptedKeys map[string]string `json:"encrypted_keys,omitempty"`
+	InReplyTo     string            `json:"inReplyTo,omitempty"`
+	Attachment    []Attachment      `json:"attachment,omitempty"`
 	Published     string            `json:"published"`
 	To            []string          `json:"to,omitempty"`
 	CC            []string          `json:"cc,omitempty"`
+}
+
+// Attachment represents an ActivityPub media attachment
+type Attachment struct {
+	Type      string `json:"type"`
+	MediaType string `json:"mediaType"`
+	URL       string `json:"url"`
 }
 
 // DeliverActivity sends an activity to a remote inbox with HTTP Signature
@@ -285,8 +294,10 @@ func SendFollow(localActorURI string, remoteActor *RemoteActor) error {
 	return DeliverActivity(activity, remoteActor.InboxURL)
 }
 
-// BuildCreateNoteActivity creates a Create activity wrapping a Note
-func BuildCreateNoteActivity(actorURI, postID, content string, createdAt time.Time) *Activity {
+// BuildCreateNoteActivity creates a Create activity wrapping a Note.
+// mediaURL is the absolute URL to attached media (empty if none).
+// inReplyTo is the URI of the parent post/note (empty if not a reply).
+func BuildCreateNoteActivity(actorURI, postID, content string, createdAt time.Time, mediaURL, inReplyTo string) *Activity {
 	domain := GetInstanceDomain()
 	baseURL := resolveInstanceURL(domain)
 
@@ -295,8 +306,17 @@ func BuildCreateNoteActivity(actorURI, postID, content string, createdAt time.Ti
 		Type:         "Note",
 		AttributedTo: actorURI,
 		Content:      content,
+		InReplyTo:    inReplyTo,
 		Published:    createdAt.UTC().Format(time.RFC3339),
 		To:           []string{"https://www.w3.org/ns/activitystreams#Public"},
+	}
+
+	if mediaURL != "" {
+		note.Attachment = []Attachment{{
+			Type:      "Document",
+			MediaType: "image/jpeg",
+			URL:       mediaURL,
+		}}
 	}
 
 	return &Activity{

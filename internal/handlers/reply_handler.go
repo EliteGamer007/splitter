@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 
 	"splitter/internal/config"
+	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/service"
@@ -14,13 +19,15 @@ import (
 type ReplyHandler struct {
 	Repo     *repository.ReplyRepository
 	PostRepo *repository.PostRepository
+	userRepo *repository.UserRepository
 	cfg      *config.Config
 }
 
-func NewReplyHandler(cfg *config.Config) *ReplyHandler {
+func NewReplyHandler(cfg *config.Config, userRepo *repository.UserRepository) *ReplyHandler {
 	return &ReplyHandler{
 		Repo:     repository.NewReplyRepository(),
 		PostRepo: repository.NewPostRepository(),
+		userRepo: userRepo,
 		cfg:      cfg,
 	}
 }
@@ -81,6 +88,42 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 	reply, err := h.Repo.Create(c.Request().Context(), authorDID, &req, depth)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create reply"})
+	}
+
+	// Federation Hook: Deliver reply to remote instances
+	if h.cfg.Federation.Enabled {
+		go func() {
+			user, err := h.userRepo.GetByDID(context.Background(), authorDID)
+			if err != nil {
+				log.Printf("[Federation] Failed to fetch user %s for reply delivery: %v", authorDID, err)
+				return
+			}
+			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
+
+			// Determine the correct inReplyTo URI
+			// For remote posts, use the original_post_uri; for local posts, build a local URL
+			parentPost, pErr := h.PostRepo.GetByID(context.Background(), req.PostID)
+			var inReplyTo string
+			if pErr == nil && parentPost.IsRemote && parentPost.OriginalPostURI != "" {
+				inReplyTo = parentPost.OriginalPostURI
+			} else {
+				inReplyTo = fmt.Sprintf("%s/posts/%s", strings.TrimRight(h.cfg.Federation.URL, "/"), req.PostID)
+			}
+
+			activity := federation.BuildCreateNoteActivity(actorURI, reply.ID, reply.Content, reply.CreatedAt, "", inReplyTo)
+			federation.DeliverToFollowers(activity, authorDID)
+
+			// If replying to a remote post, also deliver directly to the remote author
+			if pErr == nil && parentPost.IsRemote && parentPost.AuthorDID != "" {
+				if dErr := federation.DeliverToActor(activity, parentPost.AuthorDID); dErr != nil {
+					log.Printf("[Federation] Failed to deliver reply to remote author %s: %v", parentPost.AuthorDID, dErr)
+				} else {
+					log.Printf("[Federation] Reply %s delivered to remote author %s", reply.ID, parentPost.AuthorDID)
+				}
+			}
+
+			log.Printf("[Federation] Reply %s to post %s delivered", reply.ID, req.PostID)
+		}()
 	}
 
 	// Trigger AI bot if mentioned

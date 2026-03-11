@@ -46,7 +46,7 @@ func NewServer(cfg *config.Config) *Server {
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo, postRepo, cfg)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
-	replyHandler := handlers.NewReplyHandler(cfg)
+	replyHandler := handlers.NewReplyHandler(cfg, userRepo)
 	hashtagHandler := handlers.NewHashtagHandler(postRepo)
 
 	storyService := service.NewStoryService(storyRepo)
