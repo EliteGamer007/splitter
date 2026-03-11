@@ -279,9 +279,11 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		        p.created_at,
 		        COALESCE(u.username, ''),
 		        COALESCE(u.display_name, ''),
-		        COALESCE(u.avatar_url, '')
+		        COALESCE(u.avatar_url, ''),
+		        m.id, m.media_url, m.media_type
 		 FROM posts p
 		 LEFT JOIN users u ON u.did = p.author_did
+		 LEFT JOIN media m ON p.id = m.post_id
 		 WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND p.is_remote = false
 		 ORDER BY p.created_at DESC
 		 LIMIT 50`)
@@ -315,10 +317,12 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		var isRemote bool
 		var likeCount, repostCount int
 		var createdAt time.Time
+		var mediaID, mediaURL, mediaType *string
 
 		if err := rows.Scan(&id, &authorDID, &content, &visibility, &isRemote,
 			&originalURI, &likeCount, &repostCount, &createdAt,
-			&username, &displayName, &avatarURL); err != nil {
+			&username, &displayName, &avatarURL,
+			&mediaID, &mediaURL, &mediaType); err != nil {
 			continue
 		}
 
@@ -335,6 +339,14 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 			"username":          username,
 			"display_name":      displayName,
 			"avatar_url":        avatarURL,
+		}
+
+		if mediaID != nil && mediaURL != nil {
+			post["media"] = []map[string]interface{}{{
+				"id":         *mediaID,
+				"media_url":  *mediaURL,
+				"media_type": *mediaType,
+			}}
 		}
 
 		// For remote posts, try to get info from remote_actors
@@ -402,6 +414,11 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				"avatar_url":        avatarURL,
 				"domain":            domain,
 				"instance_url":      baseURL,
+			}
+
+			// Pass through media array from remote public feed
+			if media, ok := remotePost["media"]; ok {
+				post["media"] = media
 			}
 
 			addPost(post)

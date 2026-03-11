@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"splitter/internal/config"
 	"splitter/internal/federation"
@@ -129,8 +130,18 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 			actorURI := fmt.Sprintf("%s/ap/users/%s", h.cfg.Federation.URL, user.Username)
 			log.Printf("[Federation] Building Create activity for %s (post %s)", actorURI, post.ID)
 
+			// Resolve absolute media URL for federation
+			mediaURL := ""
+			if len(post.Media) > 0 && post.Media[0].MediaURL != "" {
+				mu := post.Media[0].MediaURL
+				if !strings.HasPrefix(mu, "http") {
+					mu = strings.TrimRight(h.cfg.Federation.URL, "/") + mu
+				}
+				mediaURL = mu
+			}
+
 			// Build Create activity
-			activity := federation.BuildCreateNoteActivity(actorURI, post.ID, post.Content, post.CreatedAt)
+			activity := federation.BuildCreateNoteActivity(actorURI, post.ID, post.Content, post.CreatedAt, mediaURL, "")
 
 			// Deliver to followers
 			federation.DeliverToFollowers(activity, did)
