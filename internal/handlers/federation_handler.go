@@ -465,6 +465,23 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 				}
 			}
 
+			// Derive a clean username if remote API didn't provide one
+			if username == "" {
+				if strings.HasPrefix(authorDID, "http://") || strings.HasPrefix(authorDID, "https://") {
+					// Extract last path segment from actor URI (e.g. /users/alice → alice)
+					if parsed, pErr := url.Parse(authorDID); pErr == nil {
+						parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+						if len(parts) > 0 && parts[len(parts)-1] != "" {
+							username = parts[len(parts)-1]
+						}
+					}
+				}
+				// Last resort: use display_name as slug
+				if username == "" && displayName != "" {
+					username = strings.ToLower(strings.ReplaceAll(displayName, " ", "_"))
+				}
+			}
+
 			post := map[string]interface{}{
 				"id":                id,
 				"author_did":        authorDID,
