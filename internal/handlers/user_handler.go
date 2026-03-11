@@ -19,15 +19,17 @@ import (
 
 // UserHandler handles user-related requests
 type UserHandler struct {
-	userRepo *repository.UserRepository
-	cfg      *config.Config
+	userRepo   *repository.UserRepository
+	circleRepo *repository.CircleRepository
+	cfg        *config.Config
 }
 
 // NewUserHandler creates a new UserHandler
 func NewUserHandler(userRepo *repository.UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{
-		userRepo: userRepo,
-		cfg:      cfg,
+		userRepo:   userRepo,
+		circleRepo: repository.NewCircleRepository(),
+		cfg:        cfg,
 	}
 }
 
@@ -356,4 +358,99 @@ func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": "Encryption key updated successfully",
 	})
+}
+
+// GetCircle returns the list of users in the authenticated user's circle.
+// GET /api/v1/users/me/circle
+func (h *UserHandler) GetCircle(c echo.Context) error {
+	did := c.Get("did").(string)
+
+	user, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	members, err := h.circleRepo.GetCircleMembers(c.Request().Context(), user.ID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get circle members"})
+	}
+
+	if members == nil {
+		members = []*models.User{}
+	}
+
+	return c.JSON(http.StatusOK, members)
+}
+
+// AddToCircle adds a user to the authenticated user's circle.
+// POST /api/v1/users/me/circle/:id   (id = UUID of the user to add)
+func (h *UserHandler) AddToCircle(c echo.Context) error {
+	did := c.Get("did").(string)
+	memberID := c.Param("id")
+	if memberID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "User ID is required"})
+	}
+
+	owner, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	if owner.ID == memberID {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Cannot add yourself to your own circle"})
+	}
+
+	// Verify the target user exists
+	if _, err := h.userRepo.GetByID(c.Request().Context(), memberID); err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Target user not found"})
+	}
+
+	if err := h.circleRepo.AddCircleMember(c.Request().Context(), owner.ID, memberID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to add to circle"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "User added to circle"})
+}
+
+// RemoveFromCircle removes a user from the authenticated user's circle.
+// DELETE /api/v1/users/me/circle/:id   (id = UUID of the user to remove)
+func (h *UserHandler) RemoveFromCircle(c echo.Context) error {
+	did := c.Get("did").(string)
+	memberID := c.Param("id")
+	if memberID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "User ID is required"})
+	}
+
+	owner, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	if err := h.circleRepo.RemoveCircleMember(c.Request().Context(), owner.ID, memberID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to remove from circle"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "User removed from circle"})
+}
+
+// IsInCircle checks whether a given user is in the authenticated user's circle.
+// GET /api/v1/users/me/circle/:id/check
+func (h *UserHandler) IsInCircle(c echo.Context) error {
+	did := c.Get("did").(string)
+	memberID := c.Param("id")
+	if memberID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "User ID is required"})
+	}
+
+	owner, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+	}
+
+	inCircle, err := h.circleRepo.IsInCircle(c.Request().Context(), owner.ID, memberID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check circle membership"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]bool{"in_circle": inCircle})
 }

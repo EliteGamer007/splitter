@@ -346,11 +346,20 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
-		LEFT JOIN follows f ON p.author_did = f.following_did
+		LEFT JOIN follows f ON p.author_did = f.following_did AND f.follower_did = $1
 		LEFT JOIN media m ON p.id = m.post_id
 		WHERE (f.follower_did = $1 OR p.author_did = $1) AND p.deleted_at IS NULL
 		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
-		  AND (p.visibility = 'public' OR (p.visibility = 'followers' AND f.follower_did = $1))
+		  AND (
+		    p.author_did = $1
+		    OR p.visibility = 'public'
+		    OR (p.visibility = 'followers' AND f.follower_did = $1)
+		    OR (p.visibility = 'circle' AND EXISTS (
+		        SELECT 1 FROM circle_members cm
+		        JOIN users u_owner  ON cm.owner_id  = u_owner.id  AND u_owner.did  = p.author_did
+		        JOIN users u_viewer ON cm.member_id = u_viewer.id AND u_viewer.did = $1
+		    ))
+		  )
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`

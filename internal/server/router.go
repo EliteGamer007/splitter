@@ -179,6 +179,11 @@ func setupRoutes(
 	usersAuth.POST("/me/avatar", userHandler.UploadAvatar)
 	usersAuth.PUT("/me/encryption-key", userHandler.UpdateEncryptionKey) // Add encryption key for existing users
 	usersAuth.DELETE("/me", userHandler.DeleteAccount)
+	// Circle (close friends) endpoints
+	usersAuth.GET("/me/circle", userHandler.GetCircle)
+	usersAuth.POST("/me/circle/:id", userHandler.AddToCircle)
+	usersAuth.DELETE("/me/circle/:id", userHandler.RemoveFromCircle)
+	usersAuth.GET("/me/circle/:id/check", userHandler.IsInCircle)
 
 	// Media routes
 	api.GET("/media/:id/content", mediaHandler.GetMediaContent)
