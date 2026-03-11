@@ -1,6 +1,6 @@
 # Contributing to Splitter
 
-Thank you for contributing to Splitter! This guide will help you get started.
+Thank you for contributing to Splitter! This guide covers developer workflow, code standards, recipes for extending the platform, and the PR process.
 
 ## Development Workflow
 
@@ -13,7 +13,7 @@ cd splitter
 
 # Copy environment file
 cp .env.example .env
-# Update .env with your Neon PostgreSQL credentials (see NEON_SETUP_GUIDE.md)
+# Update .env with your Neon PostgreSQL credentials (see DEPLOYMENT.md)
 
 # Run database migration (requires Docker for psql)
 docker run --rm postgres:15 psql \
@@ -212,5 +212,65 @@ Before submitting PR, ensure:
 - [ ] Documentation is updated
 - [ ] Commit messages are clear
 - [ ] Branch is up to date with main
+
+---
+
+## Developer Recipes
+
+Common patterns for extending Splitter.
+
+### 1. Adding a New ActivityPub Activity Type
+
+To support a new activity type (e.g., `Invite`, `Flag`):
+
+1. **Update federation processing**: Add recognition in `internal/federation/`.
+2. **Handle inbound**: Update `inbox_handler.go`:
+   ```go
+   case "Invite":
+       return h.handleInvite(ctx, activity)
+   ```
+3. **Update outbox**: Create a helper to build the outbound JSON payload.
+
+### 2. Customize the Frontend Theme
+
+Splitter uses CSS Variables for theming. To add a new "Midnight" theme:
+
+1. Open `Splitter-frontend/styles/globals.css`.
+2. Add a theme block:
+   ```css
+   .theme-midnight {
+     --background: 240 10% 3.9%;
+     --foreground: 0 0% 98%;
+     --primary: 263.4 70% 50.4%;
+   }
+   ```
+3. Add a toggle in the Settings component to apply the class to the root container.
+
+### 3. Creating a Bot or Automation Client
+
+Use the REST API with a bearer token:
+
+```javascript
+const response = await fetch('https://splitter-m0kv.onrender.com/api/v1/posts', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    content: "Automated post content #Splitter",
+    visibility: "public"
+  })
+});
+```
+
+See `scripts/bots/populate.py` for the production bot reference implementation.
+
+### 4. Hooking into the Message Pipeline
+
+To add auto-responses or filters to DMs:
+- Edit `internal/handlers/message_handler.go`
+- Insert your logic before `repo.CreateMessage(...)`
+- Useful for "Away Messages" or automated safety scans
 
 Thank you for contributing! 🚀

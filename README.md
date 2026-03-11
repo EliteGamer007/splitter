@@ -1,335 +1,437 @@
-# Splitter - Federated Social Media Platform
+# Splitter
 
-A federated social media application with **password-based** and **DID (Decentralized Identity)** authentication, built with Go, Echo framework, and PostgreSQL (Neon Cloud).
+> **Federated social media platform** built with Go, ActivityPub, and Next.js. Run your own instance and communicate across the network.
+
+[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)](https://postgresql.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+
+**Live Demo:** https://splitter-red-phi.vercel.app  
+**Backend API:** https://splitter-m0kv.onrender.com/api/v1/health
+
+---
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
-- [API Endpoints](#api-endpoints)
-- [API Examples](#api-examples)
-- [Database](#database)
-- [Migration Policy](#migration-policy)
-- [Security Features](#security-features)
-- [Development](#development)
-- [Documentation](#documentation)
+- [API Reference](#api-reference)
+- [Authentication](#authentication)
+- [Federation](#federation)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Documentation Index](#documentation-index)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
 ## Overview
 
-Splitter is a full-stack federated social media application. It includes:
-- **Authentication**: Password login & DID (Decentralized Identity) cryptographic keypairs.
-- **Social Features**: Posts, intricate threading/replies, dynamic hashtag extraction, and real-time trending tabs.
-- **AI Integration**: A built-in reply bot (`@split`) that intelligently answers mentions synchronously using either Gemini API or OpenAI API.
-- **Automation**: GitHub Actions chron jobs that run python scripts to seamlessly populate the network with simulated users and topical text.
+Splitter is a full-stack federated social network. Each instance is independent but communicates with others via the **ActivityPub** protocol — users on one instance can follow and exchange content with users on any other Splitter (or compatible) instance.
 
-## Tech Stack
+**Core Features:**
+- **Federated social graph** — follow, posts, boosts, replies across instances
+- **End-to-end encrypted DMs** — Ed25519 key-pairs per device; server never sees plaintext
+- **Dual authentication** — password/JWT and DID (Decentralized Identity) cryptographic login
+- **Hashtag trending** — regex extraction + real-time trending tab backed by PostgreSQL full-text search
+- **AI `@split` bot** — mention `@split` in any post to receive a synchronous AI reply (Gemini 1.5 Flash / GPT-4o-mini)
+- **Automated bot population** — GitHub Actions cron job seeds the network with realistic content every 30 minutes
+- **Circle visibility** — posts visible only to curated "circle" members
+- **Admin & moderation** — role management, content reports, AI-assisted screening
+
+---
+
+## Architecture
+
+```
+┌─────────────────────┐     HTTPS      ┌─────────────────────┐
+│  Next.js Frontend   │ ◄────────────► │  Go/Echo Backend    │
+│  (Vercel)           │                │  (Render)           │
+│  React + Tailwind   │                │  REST API + AP      │
+└─────────────────────┘                └──────────┬──────────┘
+                                                   │ pgx/v5
+                                       ┌───────────▼──────────┐
+                                       │  PostgreSQL 15        │
+                                       │  (Neon — serverless)  │
+                                       └───────────────────────┘
+
+Federation:
+  Instance 1  ◄──── ActivityPub (HTTP Signatures) ────►  Instance 2
+  splitter-m0kv.onrender.com                             splitter-2.onrender.com
+```
 
 | Component | Technology |
 |-----------|-----------|
-| Backend | Go 1.21+ / Echo v4 |
-| Database | PostgreSQL 15 (Neon Cloud) |
-| Frontend | Next.js / React (Vercel) |
-| Auth | bcrypt + JWT / Ed25519 DID |
-| AI / Bots | Gemini 1.5 Flash / GPT-4o-mini / Python Actions |
-| ORM | pgx/v5 |
+| Backend API | Go 1.24 / Echo v4 |
+| Database | PostgreSQL 15 (Neon serverless) |
+| ORM / Driver | jackc/pgx v5 |
+| Frontend | Next.js 16 / React 19 / Tailwind CSS |
+| Auth | bcrypt + JWT (RS256) / Ed25519 DID keypairs |
+| Federation | ActivityPub (W3C), HTTP Signatures, WebFinger |
+| AI | Google Gemini 1.5 Flash / OpenAI GPT-4o-mini |
+| Bots | Python 3 + GitHub Actions cron |
+| Hosting | Render (backend) + Vercel (frontend) + Neon (DB) |
+
+---
 
 ## Project Structure
 
 ```
 splitter/
-├── cmd/server/          # Application entrypoint
+├── cmd/
+│   ├── server/             # Main server entrypoint
+│   └── migrate/            # Standalone migration runner
 ├── internal/
-│   ├── config/         # Configuration management
-│   ├── db/             # Database connection (Neon + SSL)
-│   ├── handlers/       # HTTP request handlers
-│   ├── middleware/      # Authentication middleware
-│   ├── models/         # Data models
-│   ├── repository/     # Data access layer
-│   └── server/         # Router setup
-├── migrations/         # Database migration scripts
-├── .env.example        # Environment variables template
-└── NEON_SETUP_GUIDE.md # Cloud database setup guide
+│   ├── auth/               # DID keypair generation & verification
+│   ├── config/             # Environment-based configuration
+│   ├── db/                 # Database connection (Neon + SSL)
+│   ├── federation/         # ActivityPub delivery, signatures, peer health
+│   ├── handlers/           # HTTP request handlers (one file per domain)
+│   ├── helpers/            # Shared utility functions
+│   ├── middleware/         # JWT auth, optional auth, CORS
+│   ├── models/             # Domain model structs
+│   ├── repository/         # Data-access layer (pgx queries)
+│   └── server/             # Router setup & middleware wiring
+├── migrations/             # Ordered SQL migration files
+├── scripts/
+│   └── bots/               # Python bot population scripts
+├── tests/
+│   ├── docs/               # Testing documentation (01–08)
+│   ├── unit/               # Unit tests (auth, posts, replies, users, security)
+│   ├── integration/        # Integration test suite
+│   ├── e2e_test/           # End-to-end tests
+│   ├── load/               # Load tests (k6 / Go)
+│   ├── seeder/             # Test data seeder
+│   └── results/            # Captured test output
+├── diagrams/               # Architecture, ER, sequence, class diagrams (Mermaid)
+├── .env.example            # Environment variables template
+├── Dockerfile              # Multi-stage Docker build
+├── docker-compose.instances.yml  # Two-instance local federation setup
+├── Makefile                # Common dev commands
+└── go.mod
 ```
 
-Frontend lives in a separate directory: `Splitter-frontend/`
-
-## Prerequisites
-
-- **Go**: 1.21 or higher — [Download Go](https://go.dev/dl/)
-- **Node.js**: 18+ — [Download Node.js](https://nodejs.org/)
-- **Docker**: For running migrations via psql — [Download Docker](https://www.docker.com/)
-- **Neon Account**: Free cloud PostgreSQL — [Sign up](https://neon.tech)
+---
 
 ## Quick Start
 
-### 1. Set Up Neon Database
+### Prerequisites
 
-1. Create a project at [console.neon.tech](https://console.neon.tech)
-2. Copy your connection string
+| Tool | Version | Notes |
+|------|---------|-------|
+| Go | 1.21+ | [go.dev/dl](https://go.dev/dl/) |
+| Node.js | 18+ | [nodejs.org](https://nodejs.org) |
+| Docker | Any | For running `psql` migrations |
+| Neon account | — | Free tier at [neon.tech](https://neon.tech) |
 
-### 2. Run Database Migration
-
-```bash
-docker run --rm postgres:15 psql \
-  'postgresql://user:password@host.neon.tech/dbname?sslmode=require' \
-  -f migrations/000_master_schema.sql
-```
-
-### 3. Configure Environment
+### 1. Clone & Configure
 
 ```bash
+git clone <repository-url>
+cd splitter
 cp .env.example .env
 ```
 
 Edit `.env` with your Neon credentials:
+
 ```env
-# Database (Neon Cloud)
 DB_HOST=ep-your-endpoint.region.aws.neon.tech
 DB_PORT=5432
-DB_USER=your_neon_username
-DB_PASSWORD=your_neon_password
+DB_USER=neondb_owner
+DB_PASSWORD=your-password
 DB_NAME=neondb
-
-# Application
 PORT=8000
 ENV=development
 BASE_URL=http://localhost:8000
-JWT_SECRET=your-secret-key-change-this
+JWT_SECRET=change-this-to-a-secure-random-string
 ```
 
-### 4. Install Dependencies & Run
+### 2. Apply Database Migrations
 
-**Backend (Terminal 1):**
 ```bash
-cd splitter
+docker run --rm postgres:15 psql \
+  'postgres://USER:PASS@HOST/DBNAME?sslmode=require' \
+  -f migrations/000_master_schema.sql
+```
+
+### 3. Start the Backend
+
+```bash
 go mod download
 go run ./cmd/server
+# → Server listening on http://localhost:8000
 ```
-Server starts on `http://localhost:8000`
 
-**Frontend (Terminal 2):**
-```bash
-cd Splitter-frontend
-npm install
-npm run dev
-```
-Frontend starts on `http://localhost:3000`
+Default admin account created on first startup:
 
-### 5. Default Admin Account
-
-On first startup, an admin account is automatically created:
 ```
 Username: admin
-Password: splitteradmin
+Password: splitteradmin   ⚠️ Change immediately in production
 ```
 
-> **Change this password in production!**
+### 4. Start the Frontend
 
-## API Endpoints
+```bash
+cd ../Splitter-frontend
+npm install
+npm run dev
+# → Frontend at http://localhost:3000
+```
+
+### 5. Two-Instance Local Federation (Optional)
+
+```bash
+docker compose -f docker-compose.instances.yml up
+```
+
+This spins up two backend instances that federate with each other locally.
+
+---
+
+## API Reference
+
+Base URL: `http://localhost:8000/api/v1`  
+`🔒` = Requires `Authorization: Bearer <jwt_token>`
 
 ### Authentication
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register with username/email/password |
-| POST | `/api/v1/auth/login` | Login with username + password |
-| POST | `/api/v1/auth/challenge` | Get DID auth challenge |
-| POST | `/api/v1/auth/verify` | Verify DID signed challenge |
+| `POST` | `/auth/register` | Register with username/email/password |
+| `POST` | `/auth/login` | Login → returns JWT |
+| `POST` | `/auth/challenge` | Request a DID auth nonce |
+| `POST` | `/auth/verify` | Verify DID signature → returns JWT |
+| `POST` | `/auth/refresh` 🔒 | Rotate JWT |
+| `POST` | `/auth/logout` 🔒 | Invalidate token |
 
-### Users (🔒 = Requires JWT)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET 🔒 | `/api/v1/users/me` | Get current user profile |
-| PUT 🔒 | `/api/v1/users/me` | Update profile |
-| DELETE 🔒 | `/api/v1/users/me` | Delete account |
-| GET | `/api/v1/users/:id` | Get user by ID |
-| GET | `/api/v1/users/did` | Get user by DID |
-| GET 🔒 | `/api/v1/users/search` | Search users |
-
-### Posts (🔒 = Requires JWT)
+### Users
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST 🔒 | `/api/v1/posts` | Create post (multipart/form-data) |
-| GET | `/api/v1/posts/:id` | Get post |
-| PUT 🔒 | `/api/v1/posts/:id` | Update post |
-| DELETE 🔒 | `/api/v1/posts/:id` | Delete post |
-| GET 🔒 | `/api/v1/posts/feed` | Get personalized feed |
-| GET | `/api/v1/posts/public` | Get public feed |
+| `GET` | `/users/:id` | Get user by ID |
+| `GET` | `/users/did` | Get user by DID |
+| `GET` 🔒 | `/users/me` | Get own profile |
+| `PUT` 🔒 | `/users/me` | Update profile |
+| `DELETE` 🔒 | `/users/me` | Delete account |
+| `GET` 🔒 | `/users/search` | Search users |
+| `POST` 🔒 | `/users/me/circle/:id` | Add user to circle |
+| `DELETE` 🔒 | `/users/me/circle/:id` | Remove from circle |
+| `GET` 🔒 | `/users/me/circle/:id/check` | Check circle membership |
 
-### Social (🔒 = Requires JWT)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST 🔒 | `/api/v1/users/:id/follow` | Follow user |
-| DELETE 🔒 | `/api/v1/users/:id/follow` | Unfollow user |
-| GET | `/api/v1/users/:id/followers` | Get followers |
-| GET | `/api/v1/users/:id/following` | Get following |
-| POST 🔒 | `/api/v1/posts/:id/like` | Like post |
-| POST 🔒 | `/api/v1/posts/:id/repost` | Repost |
-| POST 🔒 | `/api/v1/posts/:id/bookmark` | Bookmark post |
-
-### Messaging (🔒 = Requires JWT)
+### Posts
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET 🔒 | `/api/v1/messages/threads` | Get message threads |
-| POST 🔒 | `/api/v1/messages/send` | Send message |
-| POST 🔒 | `/api/v1/messages/conversation/:userId` | Start conversation |
+| `GET` | `/posts/public` | Public feed |
+| `GET` | `/posts/:id` | Get post |
+| `GET` | `/posts/user/:did` | Posts by user DID |
+| `GET` 🔒 | `/posts/feed` | Personalized feed (follows + own) |
+| `POST` 🔒 | `/posts` | Create post (multipart/form-data) |
+| `PUT` 🔒 | `/posts/:id` | Update post |
+| `DELETE` 🔒 | `/posts/:id` | Delete post |
 
-### Admin (🔒 = Admin role required)
+### Replies
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET 🔒 | `/api/v1/admin/users` | List all users |
-| PUT 🔒 | `/api/v1/admin/users/:id/role` | Change user role |
-| POST 🔒 | `/api/v1/admin/users/:id/suspend` | Suspend user |
-| POST 🔒 | `/api/v1/admin/users/:id/unsuspend` | Unsuspend user |
-| GET 🔒 | `/api/v1/admin/moderation-requests` | List moderation requests |
-| POST 🔒 | `/api/v1/admin/moderation-requests/:id/approve` | Approve moderator request |
+| `GET` | `/posts/:id/replies` | Threaded replies for a post |
+| `POST` 🔒 | `/posts/:id/replies` | Reply to a post |
 
-## API Examples
+### Social
 
-### Register User
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "alice",
-    "email": "alice@example.com",
-    "password": "password123",
-    "display_name": "Alice"
-  }'
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` 🔒 | `/users/:id/follow` | Follow user |
+| `DELETE` 🔒 | `/users/:id/follow` | Unfollow |
+| `GET` | `/users/:id/followers` | Followers list |
+| `GET` | `/users/:id/following` | Following list |
+| `POST` 🔒 | `/posts/:id/like` | Like post |
+| `DELETE` 🔒 | `/posts/:id/like` | Unlike post |
+| `POST` 🔒 | `/posts/:id/repost` | Boost/repost |
+| `POST` 🔒 | `/posts/:id/bookmark` | Bookmark post |
 
-### Login
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "splitteradmin"}'
-```
+### Direct Messages
 
-### Get Current User (Protected)
-```bash
-curl http://localhost:8000/api/v1/users/me \
-  -H "Authorization: Bearer <your-jwt-token>"
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` 🔒 | `/messages/threads` | All message threads |
+| `GET` 🔒 | `/messages/conversation/:userId` | Messages with a user |
+| `POST` 🔒 | `/messages/send` | Send encrypted message |
 
-### Health Check
-```bash
-curl http://localhost:8000/api/v1/health
-# Returns: {"status":"ok"}
-```
+### Federation
 
-## Database
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/federation/timeline` | Cross-instance federated timeline |
+| `GET` | `/federation/users` | Search users across instances |
+| `POST` | `/ap/users/:username/inbox` | ActivityPub inbox |
+| `GET` | `/ap/users/:username` | ActivityPub Actor JSON-LD |
+| `GET` | `/.well-known/webfinger` | WebFinger discovery |
 
-### Cloud Database (Neon)
+### Admin `🔒 Admin role required`
 
-Splitter uses **Neon PostgreSQL** cloud database with SSL.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/admin/users` | List all users |
+| `PUT` | `/admin/users/:id/role` | Change role |
+| `POST` | `/admin/users/:id/suspend` | Suspend account |
+| `POST` | `/admin/users/:id/unsuspend` | Unsuspend account |
+| `GET` | `/admin/moderation-requests` | Content reports queue |
+| `POST` | `/admin/moderation-requests/:id/approve` | Approve moderator |
 
-- **Schema:** 21 tables (users, posts, follows, messages, moderation, federation)
-- **Migration:** `migrations/000_master_schema.sql` (complete schema)
-- **SSL:** Required (`sslmode=require`)
-- **Auto-migrations:** Disabled (manual only)
-
-## Migration Policy
-
-- **Fresh database setup:** run `migrations/000_master_schema.sql`
-- **Upgrade existing legacy database:** run `migrations/002_upgrade_to_current.sql`
-- **Baseline legacy file:** `migrations/001_initial_schema.sql` is kept for historical compatibility
-- **Verification after migration:** run `migrations/verify_migration.sql`
-
-Do not add many one-off migration files for small fixes. Prefer either:
-1. Updating `000_master_schema.sql` for current source of truth, and
-2. Extending `002_upgrade_to_current.sql` for backward-safe upgrades.
-
-See [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) for detailed setup.
-
-### Test Accounts
-
-| Username | Password | Role |
-|----------|----------|------|
-| admin | splitteradmin | Admin |
-| alice | password123 | User |
-| bob | password123 | User |
-| carol | password123 | User |
-| dave | password123 | User |
-| eve | password123 | User |
-
-## Security Features
-
-- ✅ **bcrypt password hashing** — Secure password storage
-- ✅ **JWT authentication** — Stateless token-based auth
-- ✅ **Role-based access control** — Admin, Moderator, User roles
-- ✅ **Ed25519 DID auth** — Optional cryptographic authentication
-- ✅ **SSL database connections** — Encrypted data in transit
-- ✅ **Challenge-response auth** — Prevents replay attacks (DID mode)
-
-## Development
-
-### Run Tests
-```bash
-go test ./...
-```
-
-### Build for Production
-```bash
-go build -o bin/server ./cmd/server
-./bin/server
-```
-
-### Verify Database
-```bash
-docker run --rm postgres:15 psql 'YOUR_CONNECTION_STRING' \
-  -f migrations/verify_migration.sql
-```
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Complete database schema reference |
-| [API_ENDPOINTS.md](API_ENDPOINTS.md) | Full API reference with examples |
-| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 specification for backend API |
-| [SECURITY.md](SECURITY.md) | Security disclosure policy and protocols |
-| [WELL_KNOWN.md](WELL_KNOWN.md) | Federation manifest and ActivityPub specs |
-| [OPS.md](OPS.md) | Operations, monitoring, and scaling guide |
-| [RECIPES.md](RECIPES.md) | Developer "how-to" guides and code examples |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
-| [ROADMAP.md](ROADMAP.md) | Future development milestones |
-| [GLOSSARY.md](GLOSSARY.md) | Key concepts and terminology |
-| [PRIVACY.md](PRIVACY.md) | Data ethics and security overview |
-| [DESIGN.md](DESIGN.md) | Theming and branding guide |
-| [BOTS.md](BOTS.md) | Bot development and AI bot guide |
-| [CODE_OF_CONDUCT.md](CODE_of_CONDUCT.md) | Community standards and expectations |
-| [NEON_SETUP_GUIDE.md](NEON_SETUP_GUIDE.md) | Complete cloud database setup |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Full stack deployment guide |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [diagrams/](diagrams/) | System architecture and design diagrams |
-| [DEPLOY_BACKEND_RENDER.md](DEPLOY_BACKEND_RENDER.md) | Backend Render deployment feasibility guide |
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
-
-## License
-
-MIT License — see [LICENSE](LICENSE) file for details.
+Full annotated reference with request/response examples: [`API_ENDPOINTS.md`](API_ENDPOINTS.md)
 
 ---
 
-**Project Status:** Active Development (Sprint 2)  
-**Backend:** http://localhost:8000  
-**Frontend:** http://localhost:3000  
-**Database:** Neon Cloud PostgreSQL (SSL)
+## Authentication
+
+### Password Login
+
+Standard username + password flow returning a JWT:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"secret"}'
+# → {"token":"eyJ..."}
+```
+
+Use the token as `Authorization: Bearer <token>` on subsequent requests.
+
+### DID (Decentralized Identity)
+
+Challenge-response using Ed25519 keypairs — the server never receives the private key:
+
+```
+1. POST /auth/challenge   { did: "did:web:..." }   → { challenge: "nonce" }
+2. Client signs nonce with private key
+3. POST /auth/verify      { did, challenge, signature } → { token: "JWT" }
+```
+
+Private keys are stored locally (encrypted) in the browser. Recovery requires the encrypted backup file downloaded at registration.
+
+---
+
+## Federation
+
+Splitter implements a subset of [ActivityPub](https://www.w3.org/TR/activitypub/):
+
+### Supported Activities
+`Create` · `Follow` · `Accept` · `Like` · `Announce` · `Undo` · `Delete`
+
+### Security
+All inbound federation POSTs require:
+- `Signature` header — HTTP Signatures (RSA-SHA256)
+- `Digest` header — SHA-256 body digest
+- `Date` header — within ±30 seconds (keep clocks synced via NTP)
+
+### Environmental Requirements
+```env
+FEDERATION_ENABLED=true
+FEDERATION_DOMAIN=your-instance-id
+FEDERATION_URL=https://your-public-url
+```
+
+For full well-known endpoints and ActivityPub routes, see [`API_ENDPOINTS.md`](API_ENDPOINTS.md#federation--well-known-endpoints).
+
+---
+
+## Configuration
+
+All configuration is via environment variables. See `.env.example` for the full list.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DB_HOST` | ✅ | PostgreSQL host (Neon endpoint) |
+| `DB_PORT` | ✅ | PostgreSQL port (default: 5432) |
+| `DB_USER` | ✅ | Database username |
+| `DB_PASSWORD` | ✅ | Database password |
+| `DB_NAME` | ✅ | Database name |
+| `PORT` | ✅ | HTTP server port |
+| `ENV` | ✅ | `development` or `production` |
+| `JWT_SECRET` | ✅ | Secret for JWT signing |
+| `BASE_URL` | ✅ | Public base URL of this instance |
+| `SPLIT_BOT_API_KEY` | Optional | OpenAI / Gemini key for `@split` bot |
+| `FEDERATION_ENABLED` | Optional | Enable ActivityPub federation |
+| `FEDERATION_DOMAIN` | Optional | Canonical domain/ID for this instance |
+| `FEDERATION_URL` | Optional | Public HTTPS URL for federation |
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage report
+make test-cover
+
+# Test a specific package
+go test ./tests/unit/auth -v
+
+# Integration tests (requires live DB in .env)
+go test ./tests/integration/... -v
+
+# Load tests
+go test ./tests/load -v
+```
+
+Test documentation is in [`tests/docs/`](tests/docs/):
+
+| Doc | Coverage |
+|-----|---------|
+| [`01_UNIT_TESTING.md`](tests/docs/01_UNIT_TESTING.md) | Unit test strategy & examples |
+| [`02_INTEGRATION_TESTING.md`](tests/docs/02_INTEGRATION_TESTING.md) | Integration flows |
+| [`03_E2E_TESTING.md`](tests/docs/03_E2E_TESTING.md) | End-to-end scenarios |
+| [`04_DATABASE_TESTING.md`](tests/docs/04_DATABASE_TESTING.md) | Schema & migration tests |
+| [`05_LOAD_TESTING.md`](tests/docs/05_LOAD_TESTING.md) | k6 / Go load benchmarks |
+| [`06_TEST_SEEDING.md`](tests/docs/06_TEST_SEEDING.md) | Data seeder usage |
+| [`07_TEST_REPORTS.md`](tests/docs/07_TEST_REPORTS.md) | Report format & CI integration |
+| [`08_REGRESSION_TESTING.md`](tests/docs/08_REGRESSION_TESTING.md) | Regression suite |
+
+---
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Live services, Render + Neon setup, CI/CD, deploy checklist |
+| [`API_ENDPOINTS.md`](API_ENDPOINTS.md) | Full annotated API reference with cURL examples |
+| [`DATABASE_SCHEMA.md`](DATABASE_SCHEMA.md) | Schema tables, indexes, relationships |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Dev workflow, code standards, extension recipes |
+| [`SECURITY.md`](SECURITY.md) | Security model, DID auth, E2EE, threat model |
+| [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Common issues — DB connection, federation, DID |
+| [`CODING_STANDARDS.md`](CODING_STANDARDS.md) | Go style guide & naming conventions |
+| [`OPS.md`](OPS.md) | Operational runbooks |
+| [`DESIGN.md`](DESIGN.md) | Design decisions & ADRs |
+| [`ROADMAP.md`](ROADMAP.md) | Planned features & milestones |
+| [`BOTS.md`](BOTS.md) | Bot system architecture |
+| [`GLOSSARY.md`](GLOSSARY.md) | Domain terminology |
+| [`diagrams/`](diagrams/README.md) | Architecture, ER, sequence, state diagrams (Mermaid) |
+| [`migrations/README.md`](migrations/README.md) | Migration file inventory |
+| [`tests/docs/`](tests/docs/) | Full testing documentation suite |
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for:
+- Development setup
+- Branch & commit conventions
+- Code standards (Go formatting, error handling, naming)
+- How to add new endpoints, models, and handlers
+- Developer recipes (ActivityPub extensions, theming, bots)
+- PR checklist
+
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
 
 
 

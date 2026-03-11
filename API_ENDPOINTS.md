@@ -465,6 +465,67 @@ GET /admin/federation-inspector
 Authorization: Bearer <jwt_token>
 ```
 
+---
+
+## 🌐 Federation & Well-Known Endpoints
+
+Splitter implements ActivityPub for cross-instance federation. These endpoints follow the W3C ActivityPub and WebFinger standards.
+
+### Discovery Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /.well-known/webfinger?resource=acct:user@domain` | Resolves a user handle to an ActivityPub Actor URI (JRD response) |
+| `GET /.well-known/nodeinfo` | *(Planned)* Instance metadata: version, protocols, usage stats |
+
+#### WebFinger Example
+```http
+GET /.well-known/webfinger?resource=acct:alice@splitter-m0kv.onrender.com
+```
+```json
+{
+  "subject": "acct:alice@splitter-m0kv.onrender.com",
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/activity+json",
+      "href": "https://splitter-m0kv.onrender.com/ap/users/alice"
+    }
+  ]
+}
+```
+
+### ActivityPub Actor & Inbox/Outbox
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /ap/users/:username` | ActivityPub Actor JSON-LD profile |
+| `POST /ap/users/:username/inbox` | Receive inbound activities from remote instances |
+| `GET /ap/users/:username/outbox` | Paginated outbox of public activities |
+| `POST /ap/shared-inbox` | Shared inbox for optimised multi-recipient delivery |
+
+### Supported Activity Types
+
+| Activity | Direction | Description |
+|----------|-----------|-------------|
+| `Create` | In/Out | New posts and stories |
+| `Follow` | In/Out | Follow request to another actor |
+| `Accept` | In/Out | Acknowledge a follow request |
+| `Like` | In/Out | Like interaction on a post |
+| `Announce` | In/Out | Repost/Boost a post |
+| `Undo` | In/Out | Reverse a previous activity (unlike, unfollow) |
+| `Delete` | In/Out | Remove a post or story |
+
+### Security Requirements for Inbound Activities
+
+All inbound federation POST requests must include:
+- `Signature` header — HTTP Signatures (RSA-SHA256) signed with the sender's private key
+- `Digest` header — SHA-256 digest of the request body
+- `Date` header — within ±30 seconds (clock sync required; use NTP)
+
+Requests that fail signature verification are silently dropped.
+
+
 ### Domain Block
 Block a malicious instance.
 ```http
