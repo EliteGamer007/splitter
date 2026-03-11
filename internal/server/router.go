@@ -200,6 +200,7 @@ func setupRoutes(
 	postsAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	postsAuth.POST("", postHandler.CreatePost)
 	postsAuth.GET("/feed", postHandler.GetFeed)
+	postsAuth.POST("/:id/fetch-context", postHandler.FetchThreadContext)
 	postsAuth.PUT("/:id", postHandler.UpdatePost)
 	postsAuth.DELETE("/:id", postHandler.DeletePost)
 	postsAuth.POST("/:id/report", adminHandler.ReportPost)   // Report a post (triggers AI screen)

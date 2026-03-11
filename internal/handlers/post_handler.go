@@ -180,6 +180,77 @@ func (h *PostHandler) GetPost(c echo.Context) error {
 	return c.JSON(http.StatusOK, post)
 }
 
+// FetchThreadContext actively pulls missing remote parent context for a thread.
+// POST /api/v1/posts/:id/fetch-context
+func (h *PostHandler) FetchThreadContext(c echo.Context) error {
+	postID := c.Param("id")
+	if postID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid post ID",
+		})
+	}
+
+	post, err := h.postRepo.GetByID(c.Request().Context(), postID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Post not found",
+		})
+	}
+
+	if post.InReplyToURI == "" {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"message":        "Post has no parent context",
+			"fetched_count":  0,
+			"post":           post,
+			"parent_context": nil,
+		})
+	}
+
+	currentParentURI := post.InReplyToURI
+	fetchedCount := 0
+	var parentContext *models.ParentContextInfo
+
+	// Walk up the ancestor chain to opportunistically hydrate remote context.
+	for i := 0; i < 8 && currentParentURI != ""; i++ {
+		resolved := h.resolveParentContext(c.Request().Context(), currentParentURI)
+		parentContext = resolved
+		if resolved == nil || resolved.Status != "available" || resolved.Post == nil {
+			break
+		}
+
+		fetchedCount++
+
+		if strings.TrimSpace(resolved.Post.OriginalPostURI) == "" {
+			break
+		}
+
+		cachedParent, getErr := h.postRepo.GetByOriginalURI(c.Request().Context(), resolved.Post.OriginalPostURI)
+		if getErr != nil || cachedParent == nil || strings.TrimSpace(cachedParent.InReplyToURI) == "" {
+			break
+		}
+
+		currentParentURI = cachedParent.InReplyToURI
+	}
+
+	refreshedPost, err := h.postRepo.GetByID(c.Request().Context(), postID)
+	if err == nil && refreshedPost.InReplyToURI != "" {
+		refreshedPost.ParentContext = h.resolveParentContext(c.Request().Context(), refreshedPost.InReplyToURI)
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"message":        "Thread context fetched",
+			"fetched_count":  fetchedCount,
+			"post":           refreshedPost,
+			"parent_context": refreshedPost.ParentContext,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":        "Thread context fetch completed",
+		"fetched_count":  fetchedCount,
+		"post":           post,
+		"parent_context": parentContext,
+	})
+}
+
 func (h *PostHandler) resolveParentContext(ctx context.Context, parentURI string) *models.ParentContextInfo {
 	if parentURI == "" {
 		return nil
