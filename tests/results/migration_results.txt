@@ -223,3 +223,21 @@ Status: PASS
 Execution Time: 762.48ms
 Timestamp: 2026-03-11 07:54:18
 
+TestName: TestMigrationColumnAddition
+Status: FAIL
+Execution Time: 12.6128141s
+Timestamp: 2026-03-11 20:18:07
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
+TestName: TestMigrationStoriesTable
+Status: FAIL
+Execution Time: 12.4088566s
+Timestamp: 2026-03-11 20:18:20
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
+TestName: TestMigrationIdempotent
+Status: FAIL
+Execution Time: 6.3360192s
+Timestamp: 2026-03-11 20:18:26
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+

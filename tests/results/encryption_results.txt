@@ -478,3 +478,33 @@ Status: PASS
 Execution Time: 509.4µs
 Timestamp: 2026-03-11 07:54:13
 
+TestName: TestEd25519KeyGeneration
+Status: PASS
+Execution Time: 2.4449ms
+Timestamp: 2026-03-11 20:17:55
+
+TestName: TestEd25519SignVerify
+Status: PASS
+Execution Time: 562.2µs
+Timestamp: 2026-03-11 20:17:55
+
+TestName: TestEd25519RejectWrongKey
+Status: PASS
+Execution Time: 510.5µs
+Timestamp: 2026-03-11 20:17:55
+
+TestName: TestEd25519RejectTamperedMessage
+Status: PASS
+Execution Time: 438.4µs
+Timestamp: 2026-03-11 20:17:55
+
+TestName: TestBase64RoundTrip
+Status: PASS
+Execution Time: 0s
+Timestamp: 2026-03-11 20:17:55
+
+TestName: TestEd25519KeyRotationFlow
+Status: PASS
+Execution Time: 526.7µs
+Timestamp: 2026-03-11 20:17:55
+

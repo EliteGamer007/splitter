@@ -306,3 +306,21 @@ Status: PASS
 Execution Time: 1.0166834s
 Timestamp: 2026-03-11 07:54:19
 
+TestName: TestSchemaTablesExist
+Status: FAIL
+Execution Time: 49.6981212s
+Timestamp: 2026-03-11 20:18:46
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
+TestName: TestSchemaColumnTypes
+Status: FAIL
+Execution Time: 31.4006836s
+Timestamp: 2026-03-11 20:19:18
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
+TestName: TestSchemaIndexesExist
+Status: FAIL
+Execution Time: 6.2098944s
+Timestamp: 2026-03-11 20:19:24
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+

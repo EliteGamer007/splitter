@@ -478,3 +478,33 @@ Status: PASS
 Execution Time: 140.6939ms
 Timestamp: 2026-03-11 07:54:16
 
+TestName: TestE2EHealthCheck
+Status: PASS
+Execution Time: 18.7884ms
+Timestamp: 2026-03-11 20:17:57
+
+TestName: TestE2ERegisterAndLogin
+Status: PASS
+Execution Time: 2.1798ms
+Timestamp: 2026-03-11 20:17:57
+
+TestName: TestE2EUnauthenticatedAccessRejected
+Status: PASS
+Execution Time: 2.6446ms
+Timestamp: 2026-03-11 20:17:57
+
+TestName: TestE2EDuplicateRegistrationRejected
+Status: PASS
+Execution Time: 1.6367ms
+Timestamp: 2026-03-11 20:17:57
+
+TestName: TestE2EStoryFeedEndpoint
+Status: PASS
+Execution Time: 2.0418ms
+Timestamp: 2026-03-11 20:17:57
+
+TestName: TestE2EPublicFeed
+Status: PASS
+Execution Time: 2.1917ms
+Timestamp: 2026-03-11 20:17:57
+

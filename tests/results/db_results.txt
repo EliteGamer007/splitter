@@ -208,3 +208,21 @@ Status: PASS
 Execution Time: 1.2828336s
 Timestamp: 2026-03-11 07:54:20
 
+TestName: TestDatabaseConnectionLogged
+Status: FAIL
+Execution Time: 5.0015404s
+Timestamp: 2026-03-11 20:18:07
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (timeout: context deadline exceeded)
+
+TestName: TestSchemaChecksLogged
+Status: FAIL
+Execution Time: 6.1920724s
+Timestamp: 2026-03-11 20:18:13
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
+TestName: TestDatabaseTransactionRollback
+Status: FAIL
+Execution Time: 6.2461387s
+Timestamp: 2026-03-11 20:18:19
+Error: failed to connect to `host=ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech user=neondb_owner database=neondb`: dial error (dial tcp 13.228.46.236:5432: connectex: No connection could be made because the target machine actively refused it.)
+
