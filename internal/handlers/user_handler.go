@@ -396,16 +396,21 @@ func (h *UserHandler) AddToCircle(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
 	}
 
-	if owner.ID == memberID {
+	// Verify the target user exists and normalize ID
+	targetUser, err := h.userRepo.GetByID(c.Request().Context(), memberID)
+	if err != nil {
+		targetUser, err = h.userRepo.GetByDID(c.Request().Context(), memberID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Target user not found"})
+		}
+	}
+	actualMemberID := targetUser.ID
+
+	if owner.ID == actualMemberID {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Cannot add yourself to your own circle"})
 	}
 
-	// Verify the target user exists
-	if _, err := h.userRepo.GetByID(c.Request().Context(), memberID); err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "Target user not found"})
-	}
-
-	if err := h.circleRepo.AddCircleMember(c.Request().Context(), owner.ID, memberID); err != nil {
+	if err := h.circleRepo.AddCircleMember(c.Request().Context(), owner.ID, actualMemberID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to add to circle"})
 	}
 
@@ -426,7 +431,17 @@ func (h *UserHandler) RemoveFromCircle(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
 	}
 
-	if err := h.circleRepo.RemoveCircleMember(c.Request().Context(), owner.ID, memberID); err != nil {
+	// Verify the target user exists and normalize ID
+	targetUser, err := h.userRepo.GetByID(c.Request().Context(), memberID)
+	if err != nil {
+		targetUser, err = h.userRepo.GetByDID(c.Request().Context(), memberID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Target user not found"})
+		}
+	}
+	actualMemberID := targetUser.ID
+
+	if err := h.circleRepo.RemoveCircleMember(c.Request().Context(), owner.ID, actualMemberID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to remove from circle"})
 	}
 
@@ -447,7 +462,17 @@ func (h *UserHandler) IsInCircle(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
 	}
 
-	inCircle, err := h.circleRepo.IsInCircle(c.Request().Context(), owner.ID, memberID)
+	// Verify the target user exists and normalize ID
+	targetUser, err := h.userRepo.GetByID(c.Request().Context(), memberID)
+	if err != nil {
+		targetUser, err = h.userRepo.GetByDID(c.Request().Context(), memberID)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Target user not found"})
+		}
+	}
+	actualMemberID := targetUser.ID
+
+	inCircle, err := h.circleRepo.IsInCircle(c.Request().Context(), owner.ID, actualMemberID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to check circle membership"})
 	}
