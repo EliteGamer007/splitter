@@ -11,7 +11,6 @@ import (
 	"splitter/internal/middleware"
 	"splitter/internal/repository"
 	"splitter/internal/service"
-	"splitter/internal/worker"
 
 	govalidator "github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -52,8 +51,8 @@ func NewServer(cfg *config.Config) *Server {
 	storyService := service.NewStoryService(storyRepo)
 	storyHandler := handlers.NewStoryHandler(storyService)
 
-	// Start story cleanup worker
-	worker.StartStoryCleanup(storyRepo)
+	// Story cleanup worker disabled for portfolio mode to avoid background DB churn
+	// worker.StartStoryCleanup(storyRepo)
 
 	// Federation handlers
 	webfingerHandler := handlers.NewWebFingerHandler(userRepo, cfg)

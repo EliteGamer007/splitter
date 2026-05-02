@@ -35,6 +35,7 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+	SSLMode  string
 	MaxConns int32
 	MinConns int32
 }
@@ -82,6 +83,7 @@ func Load() *Config {
 			User:     getEnv("DB_USER", "splitter_user"),
 			Password: os.Getenv("DB_PASSWORD"),
 			Name:     getEnv("DB_NAME", "splitter_db"),
+			SSLMode:  getEnv("DB_SSLMODE", "require"),
 			MaxConns: 25,
 			MinConns: 5,
 		},
@@ -97,7 +99,7 @@ func Load() *Config {
 		Federation: FederationConfig{
 			Domain:  getEnv("FEDERATION_DOMAIN", "localhost"),
 			URL:     getEnv("FEDERATION_URL", "http://localhost:8000"),
-			Enabled: getEnv("FEDERATION_ENABLED", "true") == "true",
+			Enabled: false,
 		},
 		Worker: WorkerConfig{
 			RetryIntervalSeconds:      getEnvAsInt("WORKER_RETRY_INTERVAL_SECONDS", 15),

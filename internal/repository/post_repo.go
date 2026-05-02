@@ -25,8 +25,9 @@ func NewPostRepository() *PostRepository {
 	return &PostRepository{}
 }
 
-// Create creates a new post in the database
-func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaData []byte, mediaType string) (*models.Post, error) {
+// Create creates a new post in the database.
+// Media is referenced by URL only so binary bytes never hit Neon storage.
+func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaURL, mediaType string) (*models.Post, error) {
 	visibility := post.Visibility
 	if visibility == "" {
 		visibility = "public"
@@ -71,15 +72,15 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		return nil, fmt.Errorf("failed to create post: %w", err)
 	}
 
-	// Insert media if present
-	if len(mediaData) > 0 {
+	// Insert media metadata if present
+	if mediaURL != "" {
 		mediaQuery := `
-			INSERT INTO media (post_id, media_url, media_type, media_data)
-			VALUES ($1, '', $2, $3)
+			INSERT INTO media (post_id, media_url, media_type)
+			VALUES ($1, $2, $3)
 			RETURNING id, post_id, media_type, created_at
 		`
 		var media models.Media
-		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaType, mediaData).Scan(
+		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaURL, mediaType).Scan(
 			&media.ID,
 			&media.PostID,
 			&media.MediaType,
@@ -89,10 +90,7 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 			return nil, fmt.Errorf("failed to create media: %w", err)
 		}
 
-		media.MediaURL = fmt.Sprintf("/api/v1/media/%s/content", media.ID)
-		if _, err := tx.Exec(ctx, `UPDATE media SET media_url = $1 WHERE id = $2`, media.MediaURL, media.ID); err != nil {
-			return nil, fmt.Errorf("failed to update media url: %w", err)
-		}
+		media.MediaURL = mediaURL
 		newPost.Media = []models.Media{media}
 	}
 

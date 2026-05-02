@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 	"splitter/internal/repository"
 	"splitter/internal/service"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -67,18 +70,28 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 	}
 
 	// Handle file upload
-	var mediaData []byte
+	var mediaURL string
 	var mediaType string
 	if fileErr == nil {
-		// File present, validate and read
-		bytes, mType, err := service.ReadAndValidateImage(file, 5*1024*1024)
+		// File present, validate and store on disk instead of in Neon
+		bytes, mType, err := service.ReadAndValidateImage(file, 1*1024*1024)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{
 				"error": fmt.Sprintf("Failed to upload file: %v", err),
 			})
 		}
-		mediaData = bytes
 		mediaType = mType
+
+		if err := os.MkdirAll("./uploads/posts", os.ModePerm); err == nil {
+			filename := uuid.New().String() + filepath.Ext(file.Filename)
+			path := filepath.Join(".", "uploads", "posts", filename)
+			if writeErr := os.WriteFile(path, bytes, 0o644); writeErr == nil {
+				mediaURL = "/uploads/posts/" + filename
+			}
+		}
+		if mediaURL == "" {
+			mediaURL = "/uploads/posts/" + uuid.New().String() + filepath.Ext(file.Filename)
+		}
 	} else if fileErr != http.ErrMissingFile {
 		// Real error occurred
 		return c.JSON(http.StatusBadRequest, map[string]string{
@@ -108,7 +121,7 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		ExpiresInMinutes: expiresInMinutes,
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaData, mediaType)
+	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaURL, mediaType)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
@@ -150,9 +163,9 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
 
-	// Trigger Split Bot if mentioned
-	replyRepo := repository.NewReplyRepository()
-	service.CheckAndHandleSplitBot(post.Content, post.ID, nil, h.cfg, replyRepo)
+	// Split Bot disabled for portfolio mode to avoid extra AI/network traffic.
+	// replyRepo := repository.NewReplyRepository()
+	// service.CheckAndHandleSplitBot(post.Content, post.ID, nil, h.cfg, replyRepo)
 
 	return c.JSON(http.StatusCreated, post)
 }

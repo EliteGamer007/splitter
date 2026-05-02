@@ -200,14 +200,20 @@ func (h *UserHandler) UploadAvatar(c echo.Context) error {
 		})
 	}
 
-	avatarBytes, mediaType, err := service.ReadAndValidateImage(file, 5*1024*1024)
+	avatarBytes, mediaType, err := service.ReadAndValidateImage(file, 1*1024*1024)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": fmt.Sprintf("Invalid avatar image: %v", err),
 		})
 	}
 
-	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, mediaType)
+	avatarURL := "/uploads/avatars/" + file.Filename
+	if err := os.MkdirAll("./uploads/avatars", os.ModePerm); err == nil {
+		avatarPath := filepath.Join(".", "uploads", "avatars", file.Filename)
+		_ = os.WriteFile(avatarPath, avatarBytes, 0o644)
+	}
+
+	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, nil, mediaType, avatarURL)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to upload avatar",

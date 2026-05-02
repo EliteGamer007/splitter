@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +54,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	contentType := c.Request().Header.Get("Content-Type")
 	var avatarBytes []byte
 	var avatarMediaType string
+	var avatarFilename string
 
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		if err := c.Request().ParseMultipartForm(6 * 1024 * 1024); err != nil {
@@ -100,11 +103,17 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		}
 		if fileErr == nil {
 			var err error
-			avatarBytes, avatarMediaType, err = service.ReadAndValidateImage(avatarFile, 5*1024*1024)
+			avatarBytes, avatarMediaType, err = service.ReadAndValidateImage(avatarFile, 1*1024*1024)
 			if err != nil {
 				return c.JSON(http.StatusBadRequest, map[string]string{
 					"error": "Invalid avatar image: " + err.Error(),
 				})
+			}
+			avatarFilename = avatarFile.Filename
+
+			if err := os.MkdirAll("./uploads/avatars", os.ModePerm); err == nil {
+				avatarPath := filepath.Join(".", "uploads", "avatars", avatarFilename)
+				_ = os.WriteFile(avatarPath, avatarBytes, 0o644)
 			}
 		}
 	} else {
@@ -188,7 +197,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	if len(avatarBytes) > 0 {
-		updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, avatarMediaType)
+		updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, nil, avatarMediaType, "/uploads/avatars/"+avatarFilename)
 		if err != nil {
 			log.Printf("Update Avatar DB error: %v", err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{

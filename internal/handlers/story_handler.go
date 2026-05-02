@@ -58,27 +58,20 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 		}
 		defer src.Close()
 
-		mediaData, err = io.ReadAll(io.LimitReader(src, 10<<20))
+		mediaData, err = io.ReadAll(io.LimitReader(src, 1<<20))
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to read file contents"})
 		}
 		mediaType = http.DetectContentType(mediaData)
 
-		// Still fallback save to disk for backward compatibility
-		if err := os.MkdirAll("./uploads", os.ModePerm); err == nil {
+		if err := os.MkdirAll("./uploads/stories", os.ModePerm); err == nil {
 			filename := uuid.New().String() + filepath.Ext(file.Filename)
-			path := "./uploads/" + filename
-			if dst, err := os.Create(path); err == nil {
-				if _, err := dst.Write(mediaData); err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": "failed to save uploaded file",
-					})
-				}
-				dst.Close()
+			path := filepath.Join(".", "uploads", "stories", filename)
+			if writeErr := os.WriteFile(path, mediaData, 0o644); writeErr == nil {
+				mediaURL = "/uploads/stories/" + filename
 			}
-			mediaURL = "/media/" + filename
 		} else {
-			mediaURL = "/media/" + uuid.New().String() + ".jpg" // Virtual URL
+			mediaURL = "/uploads/stories/" + uuid.New().String() + ".jpg"
 		}
 	}
 
@@ -89,7 +82,7 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 		len(mediaData),
 	)
 
-	if err := h.service.CreateStory(c.Request().Context(), userID, mediaURL, mediaData, mediaType); err != nil {
+	if err := h.service.CreateStory(c.Request().Context(), userID, mediaURL, mediaType); err != nil {
 		c.Logger().Errorf("CreateStory failed: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": err.Error(),

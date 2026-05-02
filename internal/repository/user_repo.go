@@ -630,9 +630,11 @@ func (r *UserRepository) UpdateEncryptionKey(ctx context.Context, userID, encryp
 	return nil
 }
 
-// UpdateAvatar stores avatar binary data in DB and updates avatar URL.
-func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatarData []byte, mediaType string) (*models.User, error) {
-	avatarURL := fmt.Sprintf("/api/v1/users/%s/avatar", userID)
+// UpdateAvatar stores the avatar URL and clears the in-database blob to reduce Neon storage usage.
+func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatarData []byte, mediaType, avatarURL string) (*models.User, error) {
+	if avatarURL == "" {
+		avatarURL = fmt.Sprintf("/uploads/avatars/%s", userID)
+	}
 	query := `
 		UPDATE users
 		SET avatar_data = $1,

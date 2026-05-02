@@ -75,22 +75,22 @@ func deliverOutboxPayload(ctx context.Context, outboxID, activityType string, pa
 
 	if IsDomainBlocked(ctx, targetDomain) {
 		updateOutboxFailure(ctx, outboxID, fmt.Sprintf("target domain %s is blocked", targetDomain))
-		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
-		recordDeliveryFailure(ctx, targetDomain)
+		// recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		// recordDeliveryFailure(ctx, targetDomain)
 		return fmt.Errorf("target domain %s is blocked", targetDomain)
 	}
 
-	if IsCircuitOpen(ctx, targetDomain) {
-		updateOutboxFailure(ctx, outboxID, fmt.Sprintf("circuit breaker open for domain %s", targetDomain))
-		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
-		return fmt.Errorf("circuit breaker open for domain %s", targetDomain)
-	}
+	// if IsCircuitOpen(ctx, targetDomain) {
+	// 	updateOutboxFailure(ctx, outboxID, fmt.Sprintf("circuit breaker open for domain %s", targetDomain))
+	// 	recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+	// 	return fmt.Errorf("circuit breaker open for domain %s", targetDomain)
+	// }
 
 	req, err := http.NewRequest("POST", targetInbox, bytes.NewReader(payload))
 	if err != nil {
 		updateOutboxFailure(ctx, outboxID, "failed to create request")
-		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
-		recordDeliveryFailure(ctx, targetDomain)
+		// recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		// recordDeliveryFailure(ctx, targetDomain)
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/activity+json")
@@ -109,24 +109,24 @@ func deliverOutboxPayload(ctx context.Context, outboxID, activityType string, pa
 	resp, err := client.Do(req)
 	if err != nil {
 		updateOutboxFailure(ctx, outboxID, err.Error())
-		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
-		recordDeliveryFailure(ctx, targetDomain)
+		// recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+		// recordDeliveryFailure(ctx, targetDomain)
 		return fmt.Errorf("delivery failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		updateOutboxSent(ctx, outboxID)
-		recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "sent")
-		recordDeliverySuccess(ctx, targetDomain)
+		// recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "sent")
+		// recordDeliverySuccess(ctx, targetDomain)
 		log.Printf("[Federation] Delivered %s to %s (status: %d)", activityType, targetInbox, resp.StatusCode)
 		return nil
 	}
 
 	errMsg := fmt.Sprintf("delivery returned status %d", resp.StatusCode)
 	updateOutboxFailure(ctx, outboxID, errMsg)
-	recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
-	recordDeliveryFailure(ctx, targetDomain)
+	// recordFederationConnection(ctx, GetInstanceDomain(), targetDomain, "failed")
+	// recordDeliveryFailure(ctx, targetDomain)
 	return fmt.Errorf("%s", errMsg)
 }
 

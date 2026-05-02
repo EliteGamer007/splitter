@@ -19,12 +19,11 @@ func NewStoryService(repo *repository.StoryRepository) *StoryService {
 	return &StoryService{repo: repo}
 }
 
-func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaURL string, mediaData []byte, mediaType string) error {
+func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaURL, mediaType string) error {
 	now := time.Now()
 	story := &models.Story{
 		ID:        uuid.New(),
 		UserID:    userID,
-		MediaData: mediaData,
 		MediaType: mediaType,
 		CreatedAt: now,
 		ExpiresAt: now.Add(24 * time.Hour),

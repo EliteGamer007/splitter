@@ -21,10 +21,10 @@ func NewStoryRepository() *StoryRepository {
 
 func (r *StoryRepository) CreateStory(ctx context.Context, story *models.Story) error {
 	query := `
-		INSERT INTO stories (id, user_id, media_url, media_data, media_type, created_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO stories (id, user_id, media_url, media_type, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	_, err := db.GetDB().Exec(ctx, query, story.ID, story.UserID, story.MediaURL, story.MediaData, story.MediaType, story.CreatedAt, story.ExpiresAt)
+	_, err := db.GetDB().Exec(ctx, query, story.ID, story.UserID, story.MediaURL, story.MediaType, story.CreatedAt, story.ExpiresAt)
 	return err
 }
 
@@ -193,7 +193,10 @@ func (r *StoryRepository) GetStoryMedia(ctx context.Context, id string) ([]byte,
 		return mediaData, mediaType, nil
 	}
 
-	fileName := strings.TrimPrefix(mediaURL, "/media/")
+	fileName := strings.TrimPrefix(mediaURL, "/uploads/")
+	if fileName == mediaURL {
+		fileName = strings.TrimPrefix(mediaURL, "/media/")
+	}
 	filePath := "./uploads/" + fileName
 
 	bytes, err := os.ReadFile(filePath)
