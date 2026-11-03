@@ -1,32 +1,33 @@
-# Privacy & Data Ethics
+# Privacy and data handling
 
-Splitter is built with a "Privacy by Design" philosophy. We believe that users should own their identity and have full control over their data.
+Splitter is a college team project. This page describes the repaired web client and the hosted portfolio configuration as of 3 November 2026. An independently operated instance may have different settings.
 
-## Data Minimization
+## Account and social data
 
-Splitter follows the principle of data minimization. We only collect and store the data necessary to provide a functional social experience.
+The API stores account details such as username, email, bcrypt password hashes, public signing/encryption keys and profile settings. It also stores posts, media, replies, follows, audiences, reports and messaging metadata needed for the app. Public profile responses omit email and private moderation-request details; authenticated owners can access their account details.
 
-- **No Tracking**: We do not use third-party trackers, analytics, or advertising scripts.
-- **No IP Logging**: By default, Splitter instances are configured not to log full IP addresses in application logs (unless required for emergency DDoS mitigation).
-- **Pseudonymous Identity**: Users are identified by DIDs, not real names or phone numbers.
+Public posts and profiles can be read by other people and external servers. Followers-only and circle content uses audience checks, including its replies and media. Federation can deliver content to other administrators' servers; those operators control their own copies and retention.
 
-## Security & Encryption
+## Browser keys and messages
 
-### End-to-End Encryption (E2EE)
-All direct messages (DMs) in Splitter are end-to-end encrypted.
-- **Client-Side Encryption**: Messages are encrypted on the sender's device before being sent to the server.
-- **No Server Access**: The server only stores encrypted "blobs" (ciphertext). Instance administrators cannot read your private messages.
-- **Perfect Forward Secrecy**: We are working towards implementing double-ratchet algorithms to provide forward secrecy for all conversations.
+The current web client encrypts direct messages before sending them and omits their plaintext from encrypted send/edit payloads. The service retains ciphertext, wrapped message keys and routing/delivery metadata. Legacy clients and historical records may use different formats, so use the current encrypted flow for confidential messages.
 
-### Decentralized Identity
-Your identity is tied to your cryptographic keypair, not the server.
-- **Self-Sovereign**: You can move your identity across different servers (instances) without losing your social graph.
-- **Anti-Censorship**: No single instance owner can "delete" your identity from the entire network; they can only moderate your access to their specific server.
+Private signing and message-encryption keys stay in browser storage, scoped to the account and API origin. Recovery exports use a passphrase and validate imported keys. Keep an encrypted backup before clearing browser storage or changing devices. A password reset cannot reconstruct a lost message-encryption private key.
 
-## Data Persistence & Federation
+Logout clears the session, private caches and queued sends. Account-scoped key material is retained locally to avoid losing access to historical messages; manage that material on devices you share.
 
-Users should be aware of how data behaves in a federated network:
+## Hosting, analytics and logs
 
-1. **Deletion Latency**: When you delete a post, your server sends a `Delete` activity to all servers that received it. However, we cannot force remote servers to comply (though standard ActivityPub implementations do).
-2. **Public Content**: Posts marked as "Public" are visible to anyone on the web and may be indexed by search engines or archived by third parties.
-3. **Instance Selection**: Your privacy also depends on the instance you choose. Read the privacy policy of your specific instance administrator before signing up.
+The hosted frontend uses Vercel Analytics for site measurement. Vercel, Render and Neon also process operational data needed to host and secure their services. The API request logger can include IP addresses, request paths and response metadata. Passwords and provider credentials belong in private configuration, not source code or diagnostic output.
+
+The app does not display advertising in its feed. Hosting-provider data handling and retention are governed by those providers' settings and policies; the project does not promise zero tracking or zero operational logging.
+
+## Expiry, deletion and backups
+
+Expired stories stop being served and are cleaned up opportunistically. Posts and other records may use soft deletion, and operational backups can retain earlier copies. Remote federation peers may retain content they have already received. Deletion on the primary instance cannot guarantee deletion of every external copy.
+
+An encrypted deployment backup was taken before the November schema upgrade. Hosting recovery history and storage limits depend on the selected provider plan.
+
+## Administration
+
+Administrators can moderate accounts and content through role-guarded tools. Operators should protect deployment secrets, use explicit migrations, review access and keep private recovery material secure. Use the instance's support or administrator contact when you need account assistance; do not publish private keys, passwords or recovery exports in issues or chat.

@@ -1,6 +1,6 @@
 # Splitter demo and interview walkthrough
 
-Splitter is a college team project: a full-stack federated social network with browser-managed identity and encrypted messaging. Use the [live frontend](https://splitter-social.vercel.app) for the deployed revision, or the local repaired build for the November changes until rollout is complete.
+Splitter is a college team project: a full-stack federated social network with browser-managed identity and encrypted messaging. Use the [live frontend](https://splitter-social.vercel.app) for the repaired production release deployed on 3 November 2026.
 
 ## A five-minute walkthrough
 

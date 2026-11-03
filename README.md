@@ -4,7 +4,7 @@ A federated social network built as a college team project with Go, Next.js and 
 
 **[Live demo](https://splitter-social.vercel.app)** · [Backend health](https://splitter-m0kv.onrender.com/api/v1/health) · [Deployment guide](DEPLOYMENT.md) · [Demo walkthrough](docs/DEMO.md)
 
-> The November 2026 repair changes are in the local `codex/free-tier-repair` branches. The public links identify the existing deployment; they do not establish that these changes have been deployed. See [repair status](docs/REPAIR_STATUS.md).
+> The repaired portfolio deployment was released on 3 November 2026. The primary API reports its release revision at `/api/v1/status`; the historical second service is suspended. See the [release report](docs/REPAIR_STATUS.md) for verification and operational limits.
 
 ## Features
 

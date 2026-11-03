@@ -84,7 +84,7 @@ func SplitBotCapability(cfg *config.Config) SplitBotCapabilities {
 		case "openai":
 			c.Model = "gpt-4o-mini"
 		case "groq":
-			c.Model = "llama-3.3-70b-versatile"
+			c.Model = "qwen/qwen3.8-27b"
 		case "ollama":
 			c.Model = "llama3.2"
 		}
