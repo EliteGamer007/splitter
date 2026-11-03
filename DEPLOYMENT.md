@@ -8,10 +8,10 @@ The portfolio configuration targets **one existing Render free web service**, Ve
 |---|---|
 | Frontend | https://splitter-social.vercel.app |
 | Primary API | https://splitter-m0kv.onrender.com/api/v1 |
-| Historical peer | https://splitter-2.onrender.com (not a default dependency) |
+| Historical peer | https://splitter-2.onrender.com (suspended; database retained) |
 | Database | Existing private Neon PostgreSQL project |
 
-The old `splitter-red-phi.vercel.app` frontend address is obsolete. The 31 October audit observed both Render APIs and the current frontend working. The local November repair branch has not been deployed or verified against the production database. Never infer a production rollout from a local build.
+The old `splitter-red-phi.vercel.app` frontend address is obsolete. The repaired backend and frontend were deployed to the existing production services on 3 November 2026. Production migrations were applied after a verified encrypted backup, the exposed database password and JWT secret were rotated, and public health/readiness/feed/CORS checks passed. The secondary Render service is suspended with its database preserved. See [the release report](docs/REPAIR_STATUS.md).
 
 ## Backend configuration
 
@@ -28,11 +28,13 @@ Use Docker from the repository root. The image includes `server`, `migrate`, `bo
 | `JWT_SECRET` | Existing strong random secret, at least 32 characters |
 | `JWT_EXPIRATION_HOURS` | `24` |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Existing Neon credentials; port normally 5432 |
-| `DB_SSLMODE` | `require` |
+| `DB_SSLMODE` | `verify-full` |
 | `DB_MAX_CONNS` | `4` (minimum idle connections stay zero) |
 | `MEDIA_TOTAL_BUDGET_BYTES` | `33554432` |
 | `MEDIA_ACCOUNT_BUDGET_BYTES` | `2097152` |
 | `DB_WRITE_BUDGET_BYTES` | `268435456` |
+
+Use the provider-recommended pooled database hostname for the web service and its matching direct endpoint for maintenance. Production secrets belong in Render/Neon; CI uses disposable PostgreSQL and the obsolete GitHub production database secrets have been removed. Never place database passwords in scripts, command arguments or debug output. Automatic deploys on the Render primary are disabled so migrations can be reviewed and applied before manually releasing an application revision. Use Vercel's production branch for the frontend.
 
 Use the provider-recommended pooled database hostname where applicable. Do not change database names, federation identities or secrets as part of a routine deployment. `FEDERATION_INSTANCE_MAP` is optional for explicitly configured peers; leaving it absent avoids depending on the historical second service. `FEDERATION_LOCAL_PEERS` is a development-only exception for exact local endpoints and must be absent in production.
 

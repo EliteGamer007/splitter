@@ -23,7 +23,7 @@ services:
       - key: DB_MAX_CONNS
         value: "4"
       - key: DB_SSLMODE
-        value: require
+        value: verify-full
       - key: MEDIA_TOTAL_BUDGET_BYTES
         value: "33554432"
       - key: MEDIA_ACCOUNT_BUDGET_BYTES
