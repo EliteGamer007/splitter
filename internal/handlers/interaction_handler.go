@@ -35,11 +35,14 @@ func NewInteractionHandler(interactionRepo *repository.InteractionRepository, us
 // LikePost likes a post
 func (h *InteractionHandler) LikePost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -47,6 +50,10 @@ func (h *InteractionHandler) LikePost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Create like
 	if err := h.interactionRepo.CreateLike(c.Request().Context(), postID, currentUser.DID); err != nil {
@@ -65,11 +72,14 @@ func (h *InteractionHandler) LikePost(c echo.Context) error {
 // UnlikePost removes a like from a post
 func (h *InteractionHandler) UnlikePost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -77,6 +87,10 @@ func (h *InteractionHandler) UnlikePost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Delete like
 	if err := h.interactionRepo.DeleteLike(c.Request().Context(), postID, currentUser.DID); err != nil {
@@ -93,11 +107,14 @@ func (h *InteractionHandler) UnlikePost(c echo.Context) error {
 // RepostPost reposts/boosts a post
 func (h *InteractionHandler) RepostPost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -105,6 +122,10 @@ func (h *InteractionHandler) RepostPost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Create repost
 	if err := h.interactionRepo.CreateRepost(c.Request().Context(), postID, currentUser.DID); err != nil {
@@ -123,11 +144,14 @@ func (h *InteractionHandler) RepostPost(c echo.Context) error {
 // UnrepostPost removes a repost
 func (h *InteractionHandler) UnrepostPost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -135,6 +159,10 @@ func (h *InteractionHandler) UnrepostPost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Delete repost
 	if err := h.interactionRepo.DeleteRepost(c.Request().Context(), postID, currentUser.DID); err != nil {
@@ -151,11 +179,14 @@ func (h *InteractionHandler) UnrepostPost(c echo.Context) error {
 // BookmarkPost bookmarks a post (private)
 func (h *InteractionHandler) BookmarkPost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -163,6 +194,10 @@ func (h *InteractionHandler) BookmarkPost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Create bookmark
 	if err := h.interactionRepo.CreateBookmark(c.Request().Context(), currentUser.ID, postID); err != nil {
@@ -179,11 +214,14 @@ func (h *InteractionHandler) BookmarkPost(c echo.Context) error {
 // UnbookmarkPost removes a bookmark
 func (h *InteractionHandler) UnbookmarkPost(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
@@ -191,6 +229,10 @@ func (h *InteractionHandler) UnbookmarkPost(c echo.Context) error {
 
 	// Get post ID from path
 	postID := c.Param("id")
+	allowed, accessErr := h.postRepo.CanViewTarget(c.Request().Context(), postID, did)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 
 	// Delete bookmark
 	if err := h.interactionRepo.DeleteBookmark(c.Request().Context(), currentUser.ID, postID); err != nil {
@@ -207,18 +249,22 @@ func (h *InteractionHandler) UnbookmarkPost(c echo.Context) error {
 // GetBookmarks retrieves user's bookmarked posts
 func (h *InteractionHandler) GetBookmarks(c echo.Context) error {
 	// Get authenticated user's DID from JWT
-	did := c.Get("did").(string)
+	did := viewerDID(c)
+	if did == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
 	// Get current user
 	currentUser, err := h.userRepo.GetByDID(c.Request().Context(), did)
-	if err != nil {
+	if err != nil || currentUser.IsSuspended {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Current user not found",
 		})
 	}
 
 	// Get bookmarked posts
-	posts, err := h.interactionRepo.GetBookmarks(c.Request().Context(), currentUser.ID)
+	limit, offset := requestPage(c, 20)
+	posts, err := h.interactionRepo.GetBookmarksPage(c.Request().Context(), currentUser.ID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve bookmarks",

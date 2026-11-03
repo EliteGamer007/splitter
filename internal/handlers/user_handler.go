@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"splitter/internal/config"
@@ -17,9 +18,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type userProfileRepository interface {
+	GetByID(context.Context, string) (*models.User, error)
+	GetByDID(context.Context, string) (*models.User, error)
+	Update(context.Context, string, *models.UserUpdate) (*models.User, error)
+	UpdateAvatar(context.Context, string, []byte, string, string) (*models.User, error)
+	GetAvatarContentByUserID(context.Context, string) ([]byte, string, string, error)
+	Delete(context.Context, string) error
+	UpdateEncryptionKey(context.Context, string, string) error
+}
+
 // UserHandler handles user-related requests
 type UserHandler struct {
-	userRepo   *repository.UserRepository
+	userRepo   userProfileRepository
 	circleRepo *repository.CircleRepository
 	cfg        *config.Config
 }
@@ -44,7 +55,7 @@ func (h *UserHandler) GetProfile(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, user)
+	return c.JSON(http.StatusOK, models.ToPublicUser(user))
 }
 
 // GetProfileByDID retrieves a user's profile by DID
@@ -63,7 +74,7 @@ func (h *UserHandler) GetProfileByDID(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, user)
+	return c.JSON(http.StatusOK, models.ToPublicUser(user))
 }
 
 // GetCurrentUser retrieves the authenticated user's profile
@@ -108,6 +119,13 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		})
 	}
 
+	// Validate every setting before performing any profile mutation.
+	if req.MessagePrivacy != nil && *req.MessagePrivacy != "everyone" && *req.MessagePrivacy != "followers" && *req.MessagePrivacy != "none" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid message_privacy value"})
+	}
+	if req.DefaultVisibility != nil && *req.DefaultVisibility != "public" && *req.DefaultVisibility != "followers" && *req.DefaultVisibility != "circle" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid default_visibility value"})
+	}
 	profileReq := &models.UserUpdate{
 		DisplayName: req.DisplayName,
 		Bio:         req.Bio,
@@ -176,6 +194,10 @@ func (h *UserHandler) UpdateProfile(c echo.Context) error {
 		go federation.DeliverToFollowers(activity, user.DID)
 	}
 
+	// Return the saved settings as part of the owner's private account response.
+	if refreshed, readErr := h.userRepo.GetByID(c.Request().Context(), user.ID); readErr == nil {
+		updatedUser = refreshed
+	}
 	return c.JSON(http.StatusOK, updatedUser)
 }
 
@@ -200,21 +222,18 @@ func (h *UserHandler) UploadAvatar(c echo.Context) error {
 		})
 	}
 
-	avatarBytes, mediaType, err := service.ReadAndValidateImage(file, 1*1024*1024)
+	avatarBytes, mediaType, err := service.ReadAndValidateAvatar(file, service.MaxImageInput)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": fmt.Sprintf("Invalid avatar image: %v", err),
 		})
 	}
 
-	avatarURL := "/uploads/avatars/" + file.Filename
-	if err := os.MkdirAll("./uploads/avatars", os.ModePerm); err == nil {
-		avatarPath := filepath.Join(".", "uploads", "avatars", file.Filename)
-		_ = os.WriteFile(avatarPath, avatarBytes, 0o644)
-	}
-
-	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, nil, mediaType, avatarURL)
+	updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, mediaType, "")
 	if err != nil {
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to upload avatar",
 		})
@@ -257,7 +276,10 @@ func (h *UserHandler) GetAvatar(c echo.Context) error {
 	}
 
 	if strings.HasPrefix(avatarURL, "/uploads/") {
-		legacyPath := filepath.Join(".", filepath.FromSlash(strings.TrimPrefix(avatarURL, "/")))
+		legacyPath, valid := safeLegacyUploadPath(avatarURL)
+		if !valid {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Avatar not found"})
+		}
 		legacyData, readErr := os.ReadFile(legacyPath)
 		if readErr == nil && len(legacyData) > 0 {
 			detectedType := http.DetectContentType(legacyData)
@@ -340,9 +362,13 @@ func (h *UserHandler) UpdateEncryptionKey(c echo.Context) error {
 	// Update only the encryption_public_key field
 	err := h.userRepo.UpdateEncryptionKey(c.Request().Context(), userID, req.EncryptionPublicKey)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to update encryption key: " + err.Error(),
-		})
+		if errors.Is(err, repository.ErrInvalidEncryptionKey) {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
+		if errors.Is(err, repository.ErrKeyConflict) {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "This account already has an encryption key. Import your recovery keys instead of replacing it."})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update encryption key"})
 	}
 
 	if h.cfg != nil && h.cfg.Federation.Enabled {
@@ -376,7 +402,8 @@ func (h *UserHandler) GetCircle(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
 	}
 
-	members, err := h.circleRepo.GetCircleMembers(c.Request().Context(), user.ID)
+	limit, offset := requestPage(c, 20)
+	members, err := h.circleRepo.GetCircleMembersPage(c.Request().Context(), user.ID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get circle members"})
 	}
@@ -385,7 +412,7 @@ func (h *UserHandler) GetCircle(c echo.Context) error {
 		members = []*models.User{}
 	}
 
-	return c.JSON(http.StatusOK, members)
+	return c.JSON(http.StatusOK, models.ToPublicUsers(members))
 }
 
 // AddToCircle adds a user to the authenticated user's circle.

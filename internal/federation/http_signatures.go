@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -50,9 +51,9 @@ func SignRequest(req *http.Request, privateKey *rsa.PrivateKey, keyID string) er
 	for _, h := range headers {
 		switch h {
 		case "(request-target)":
-			signingParts = append(signingParts, fmt.Sprintf("(request-target): %s %s", strings.ToLower(req.Method), req.URL.Path))
+			signingParts = append(signingParts, fmt.Sprintf("(request-target): %s %s", strings.ToLower(req.Method), req.URL.RequestURI()))
 		case "host":
-			signingParts = append(signingParts, fmt.Sprintf("host: %s", req.Host))
+			signingParts = append(signingParts, fmt.Sprintf("host: %s", requestHost(req)))
 		case "date":
 			signingParts = append(signingParts, fmt.Sprintf("date: %s", req.Header.Get("Date")))
 		case "digest":
@@ -98,6 +99,48 @@ func VerifyRequest(req *http.Request, publicKeyPEM string) error {
 		return fmt.Errorf("missing headers param")
 	}
 
+	// Enforce integrity and freshness before accepting any cryptographic proof.
+	if params["algorithm"] != "rsa-sha256" || params["keyId"] == "" {
+		return fmt.Errorf("unsupported signature algorithm or missing keyId")
+	}
+	signed := make(map[string]bool)
+	for _, h := range strings.Fields(headersStr) {
+		if signed[h] {
+			return fmt.Errorf("duplicate signed header")
+		}
+		signed[h] = true
+	}
+	for _, h := range []string{"(request-target)", "host", "date"} {
+		if !signed[h] {
+			return fmt.Errorf("required header %s is not signed", h)
+		}
+	}
+	date, err := http.ParseTime(req.Header.Get("Date"))
+	if err != nil || time.Since(date) > 5*time.Minute || time.Until(date) > 5*time.Minute {
+		return fmt.Errorf("signature date is missing or stale")
+	}
+	if req.Method == http.MethodPost || req.Method == http.MethodPut {
+		if !signed["digest"] {
+			return fmt.Errorf("body digest must be signed")
+		}
+		if req.Body == nil {
+			return fmt.Errorf("missing signed body")
+		}
+		body, err := io.ReadAll(io.LimitReader(req.Body, 256*1024+1))
+		if err != nil {
+			return fmt.Errorf("cannot read signed body")
+		}
+		req.Body = io.NopCloser(strings.NewReader(string(body)))
+		if len(body) > 256*1024 {
+			return fmt.Errorf("signed payload too large")
+		}
+		sum := sha256.Sum256(body)
+		want := "SHA-256=" + base64.StdEncoding.EncodeToString(sum[:])
+		if subtle.ConstantTimeCompare([]byte(req.Header.Get("Digest")), []byte(want)) != 1 {
+			return fmt.Errorf("body digest mismatch")
+		}
+	}
+
 	// Decode signature
 	sigBytes, err := base64.StdEncoding.DecodeString(sigB64)
 	if err != nil {
@@ -110,7 +153,7 @@ func VerifyRequest(req *http.Request, publicKeyPEM string) error {
 	for _, h := range headerList {
 		switch h {
 		case "(request-target)":
-			signingParts = append(signingParts, fmt.Sprintf("(request-target): %s %s", strings.ToLower(req.Method), req.URL.Path))
+			signingParts = append(signingParts, fmt.Sprintf("(request-target): %s %s", strings.ToLower(req.Method), req.URL.RequestURI()))
 		case "host":
 			host := req.Host
 			if host == "" {
@@ -165,4 +208,11 @@ func parseSignatureHeader(header string) map[string]string {
 		params[key] = val
 	}
 	return params
+}
+
+func requestHost(req *http.Request) string {
+	if req.Host != "" {
+		return req.Host
+	}
+	return req.URL.Host
 }

@@ -25,7 +25,7 @@ func TestParsePaginationLogged(t *testing.T) {
 		{"Valid values", "50", "10", 50, 10},
 		{"Invalid non-numeric", "abc", "xyz", 20, 0},
 		{"Negative values", "-5", "-1", 20, 0},
-		{"Max limit cap", "500", "0", 100, 0},
+		{"Max limit cap", "500", "0", 50, 0},
 	}
 
 	for _, tt := range tests {

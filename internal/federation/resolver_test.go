@@ -12,6 +12,7 @@ func TestFetchRemoteNoteFromNoteObject(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"id":"https://remote.test/posts/abc",
 			"type":"Note",
+ "to":["https://www.w3.org/ns/activitystreams#Public"],
 			"attributedTo":"https://remote.test/ap/users/alice",
 			"content":"hello from remote",
 			"inReplyTo":"https://remote.test/posts/parent-1",
@@ -19,6 +20,8 @@ func TestFetchRemoteNoteFromNoteObject(t *testing.T) {
 		}`))
 	}))
 	defer ts.Close()
+	t.Setenv("ENV", "development")
+	t.Setenv("FEDERATION_LOCAL_PEERS", ts.URL)
 
 	note, err := FetchRemoteNote(ts.URL)
 	if err != nil {
@@ -51,12 +54,15 @@ func TestFetchRemoteNoteFromCreateActivity(t *testing.T) {
 			"object":{
 				"id":"https://remote.test/posts/reply-2",
 				"type":"Note",
+ "to":["https://www.w3.org/ns/activitystreams#Public"],
 				"content":"reply payload",
 				"inReplyTo":"https://remote.test/posts/parent-2"
 			}
 		}`))
 	}))
 	defer ts.Close()
+	t.Setenv("ENV", "development")
+	t.Setenv("FEDERATION_LOCAL_PEERS", ts.URL)
 
 	note, err := FetchRemoteNote(ts.URL)
 	if err != nil {
@@ -78,6 +84,8 @@ func TestFetchRemoteNoteHandlesMissingOrDeleted(t *testing.T) {
 		http.Error(w, "not found", http.StatusNotFound)
 	}))
 	defer ts.Close()
+	t.Setenv("ENV", "development")
+	t.Setenv("FEDERATION_LOCAL_PEERS", ts.URL)
 
 	note, err := FetchRemoteNote(ts.URL)
 	if err != nil {

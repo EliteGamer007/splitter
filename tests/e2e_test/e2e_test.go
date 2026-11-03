@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"splitter/tests/testenv"
 	"splitter/tests/testlogger"
 )
 
-const e2eBaseURL = "http://localhost:8000/api/v1"
+var e2eBaseURL string
 
 func doE2EJSON(method, url string, body interface{}, token string) (int, map[string]interface{}, error) {
 	var reqBody *bytes.Buffer
@@ -42,10 +43,7 @@ func doE2EJSON(method, url string, body interface{}, token string) (int, map[str
 
 func skipIfServerDown(t *testing.T) {
 	t.Helper()
-	_, _, err := doE2EJSON("GET", e2eBaseURL+"/health", nil, "")
-	if err != nil {
-		t.Skipf("Server not reachable (skip): %v", err)
-	}
+	e2eBaseURL = testenv.ServerURL(t) + "/api/v1"
 }
 
 // TestE2EHealthCheck verifies the health endpoint is reachable.

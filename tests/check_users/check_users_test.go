@@ -2,29 +2,18 @@ package main_test
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"splitter/tests/testenv"
 	"testing"
 	"time"
 
 	"splitter/tests/testlogger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
 
 func getUsersConnStr(t *testing.T) string {
 	t.Helper()
-	_ = godotenv.Load("../../.env")
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	pass := os.Getenv("DB_PASSWORD")
-	name := os.Getenv("DB_NAME")
-	if host == "" || port == "" || user == "" || pass == "" || name == "" {
-		t.Fatal("Missing required DB_* environment variables")
-	}
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=require", user, pass, host, port, name)
+	return testenv.DatabaseURL(t)
 }
 
 // TestUsersTableColumns verifies all required user columns exist.

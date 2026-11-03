@@ -1,6 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import { readFileSync } from 'fs';
-const sql = neon('postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech/neondb_2?sslmode=require');
+const connStr = process.env.SECONDARY_DATABASE_URL;
+if (!connStr) throw new Error('SECONDARY_DATABASE_URL must be supplied explicitly');
+const sql = neon(connStr);
 const migSQL = readFileSync(new URL('../migrations/021_ai_moderation.sql', import.meta.url), 'utf8');
 const statements = migSQL.split(';').map(s => { const lines = s.split('\n').filter(l => !l.trim().startsWith('--')).join('\n').trim(); return lines; }).filter(s => s.length > 0);
 for (const stmt of statements) {

@@ -209,7 +209,7 @@ func fetchRemoteEncryptionPublicKey(domain, username string) string {
 	}
 
 	baseURL := resolveInstanceURL(domain)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 	resp, err := client.Get(baseURL + "/api/v1/federation/public-users?limit=200")
 	if err != nil {
 		return ""

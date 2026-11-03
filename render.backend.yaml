@@ -1,109 +1,35 @@
+# Reference configuration for the existing primary service. Do not provision a
+# second service or worker for the portfolio deployment.
 services:
   - type: web
-    name: splitter-instance-1
+    name: splitter
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
+    healthCheckPath: /api/v1/health
     envVars:
       - key: ENV
         value: production
       - key: FEDERATION_ENABLED
         value: "true"
       - key: FEDERATION_DOMAIN
-        value: splitter-instance-1
+        value: splitter-1
       - key: FEDERATION_URL
-        value: https://splitter-instance-1.onrender.com
+        value: https://splitter-m0kv.onrender.com
       - key: BASE_URL
-        value: https://splitter-instance-1.onrender.com
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: "5432"
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-
-  - type: worker
-    name: splitter-worker-1
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
-    dockerCommand: worker
-    envVars:
-      - key: ENV
-        value: production
-      - key: FEDERATION_ENABLED
-        value: "true"
-      - key: FEDERATION_DOMAIN
-        value: splitter-instance-1
-      - key: FEDERATION_URL
-        value: https://splitter-instance-1.onrender.com
-      - key: BASE_URL
-        value: https://splitter-instance-1.onrender.com
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: "5432"
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-
-  - type: web
-    name: splitter-instance-2
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
-    envVars:
-      - key: ENV
-        value: production
-      - key: FEDERATION_ENABLED
-        value: "true"
-      - key: FEDERATION_DOMAIN
-        value: splitter-instance-2
-      - key: FEDERATION_URL
-        value: https://splitter-instance-2.onrender.com
-      - key: BASE_URL
-        value: https://splitter-instance-2.onrender.com
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: "5432"
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_NAME
-        sync: false
-      - key: JWT_SECRET
-        sync: false
-
-  - type: worker
-    name: splitter-worker-2
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
-    dockerCommand: worker
-    envVars:
-      - key: ENV
-        value: production
-      - key: FEDERATION_ENABLED
-        value: "true"
-      - key: FEDERATION_DOMAIN
-        value: splitter-instance-2
-      - key: FEDERATION_URL
-        value: https://splitter-instance-2.onrender.com
-      - key: BASE_URL
-        value: https://splitter-instance-2.onrender.com
+        value: https://splitter-m0kv.onrender.com
+      - key: CORS_ORIGINS
+        value: https://splitter-social.vercel.app
+      - key: DB_MAX_CONNS
+        value: "4"
+      - key: DB_SSLMODE
+        value: require
+      - key: MEDIA_TOTAL_BUDGET_BYTES
+        value: "33554432"
+      - key: MEDIA_ACCOUNT_BUDGET_BYTES
+        value: "2097152"
+      - key: DB_WRITE_BUDGET_BYTES
+        value: "268435456"
       - key: DB_HOST
         sync: false
       - key: DB_PORT

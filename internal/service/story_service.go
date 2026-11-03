@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,11 +22,22 @@ func NewStoryService(repo *repository.StoryRepository) *StoryService {
 }
 
 func (s *StoryService) CreateStory(ctx context.Context, userID uuid.UUID, mediaURL, mediaType string) error {
+	return s.CreateStoryWithMedia(ctx, userID, mediaURL, mediaType, nil)
+}
+func (s *StoryService) CreateStoryWithMedia(ctx context.Context, userID uuid.UUID, mediaURL, mediaType string, data []byte) error {
+	if len(data) == 0 {
+		parsed, err := url.Parse(mediaURL)
+		if err != nil || mediaURL == "" || ((parsed.Scheme != "https" && parsed.Scheme != "http") && !strings.HasPrefix(mediaURL, "/uploads/")) {
+			return fmt.Errorf("upload an image or provide a valid image URL")
+		}
+	}
+
 	now := time.Now()
 	story := &models.Story{
 		ID:        uuid.New(),
 		UserID:    userID,
 		MediaType: mediaType,
+		MediaData: data,
 		CreatedAt: now,
 		ExpiresAt: now.Add(24 * time.Hour),
 	}
@@ -56,4 +69,15 @@ func (s *StoryService) GetStoryFeed(ctx context.Context) ([]models.StoryUser, er
 
 func (s *StoryService) GetStoryMedia(ctx context.Context, id string) ([]byte, string, error) {
 	return s.repo.GetStoryMedia(ctx, id)
+}
+
+func (s *StoryService) GetLegacyMedia(ctx context.Context, path string) ([]byte, string, error) {
+	return s.repo.GetLegacyMedia(ctx, path)
+}
+
+func (s *StoryService) GetStoriesPage(ctx context.Context, limit, offset int) ([]models.Story, error) {
+	return s.repo.GetActiveStoriesPage(ctx, limit, offset)
+}
+func (s *StoryService) GetStoryFeedPage(ctx context.Context, limit, offset int) ([]models.StoryUser, error) {
+	return s.repo.GetStoryFeedPage(ctx, limit, offset)
 }

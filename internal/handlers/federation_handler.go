@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"splitter/internal/helpers"
 	"strings"
 	"time"
 
@@ -242,8 +243,8 @@ func (h *FederationHandler) FollowRemoteUser(c echo.Context) error {
 	remoteDID := remoteActor.ActorURI
 	_, err = db.GetDB().Exec(c.Request().Context(),
 		`INSERT INTO follows (follower_did, following_did, status)
-		 VALUES ($1, $2, 'accepted')
-		 ON CONFLICT (follower_did, following_did) DO UPDATE SET status = 'accepted'`,
+		 VALUES ($1, $2, 'pending')
+		 ON CONFLICT (follower_did, following_did) DO NOTHING`,
 		localUser.DID, remoteDID,
 	)
 	if err != nil {
@@ -259,9 +260,9 @@ func (h *FederationHandler) FollowRemoteUser(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"status":  "follow_accepted",
+		"status":  "follow_pending",
 		"target":  req.Handle,
-		"message": "Follow successful.",
+		"message": "Follow request sent; approval is handled by the remote instance.",
 	})
 }
 
@@ -269,6 +270,7 @@ func (h *FederationHandler) FollowRemoteUser(c echo.Context) error {
 // GET /api/v1/federation/timeline
 func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 	ctx := c.Request().Context()
+	limit, offset := helpers.ParsePagination(c.QueryParam("limit"), c.QueryParam("offset"))
 
 	// Phase 1: Get LOCAL posts from DB only (remote posts come from live fetch in Phase 2)
 	rows, err := db.GetDB().Query(ctx,
@@ -284,9 +286,9 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		 FROM posts p
 		 LEFT JOIN users u ON u.did = p.author_did
 		 LEFT JOIN media m ON p.id = m.post_id
-		 WHERE p.deleted_at IS NULL AND p.visibility = 'public'
+		 WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND (p.expires_at IS NULL OR p.expires_at>now())
 		 ORDER BY p.created_at DESC
-		 LIMIT 50`)
+		 LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "failed to get timeline",
@@ -299,7 +301,12 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 	addPost := func(post map[string]interface{}) {
 		author, _ := post["author_did"].(string)
 		content, _ := post["content"].(string)
-		key := author + "|" + content
+		key, _ := post["original_post_uri"].(string)
+		if key == "" {
+			id, _ := post["id"].(string)
+			key = author + "|" + id
+		}
+		_ = content
 		if existing, ok := seen[key]; ok {
 			// Prefer the version that has a username
 			existingUser, _ := existing["username"].(string)
@@ -520,8 +527,11 @@ func (h *FederationHandler) GetFederatedTimeline(c echo.Context) error {
 		return ti.After(tj)
 	})
 
-	if len(posts) > 50 {
-		posts = posts[:50]
+	if len(posts) > limit {
+		posts = posts[:limit]
+	}
+	if len(posts) == limit {
+		c.Response().Header().Set("X-Next-Offset", fmt.Sprint(offset+limit))
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -620,7 +630,7 @@ func (h *FederationHandler) GetAllFederatedUsers(c echo.Context) error {
 
 // fetchRemoteUserList fetches users from a remote instance's public federation API
 func fetchRemoteUserList(baseURL string) []map[string]interface{} {
-	client := &http.Client{}
+	client := federation.NewHTTPClient(10 * time.Second)
 	resp, err := client.Get(baseURL + "/api/v1/federation/public-users?limit=100")
 	if err != nil {
 		log.Printf("[Federation] Failed to fetch users from %s: %v", baseURL, err)

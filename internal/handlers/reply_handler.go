@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"splitter/internal/config"
@@ -56,6 +57,10 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
+	allowed, accessErr := h.PostRepo.CanView(c.Request().Context(), req.PostID, authorDID)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
 	// Calculate and validate depth
 	depth := 1 // Default depth (reply to post)
 	if req.ParentID != nil {
@@ -91,7 +96,7 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 	}
 
 	// Federation Hook: Deliver reply to remote instances
-	if h.cfg.Federation.Enabled {
+	if h.cfg != nil && h.cfg.Federation.Enabled {
 		go func() {
 			user, err := h.userRepo.GetByDID(context.Background(), authorDID)
 			if err != nil {
@@ -111,10 +116,27 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 			}
 
 			activity := federation.BuildCreateNoteActivity(actorURI, reply.ID, reply.Content, reply.CreatedAt, "", inReplyTo)
-			federation.DeliverToFollowers(activity, authorDID)
+			if pErr != nil || parentPost == nil {
+				return
+			}
+			audienceOwner := authorDID
+			if parentPost.Visibility != "public" {
+				audienceOwner = parentPost.AuthorDID
+			}
+			federation.DeliverPostToAudience(activity, audienceOwner, parentPost.Visibility)
 
 			// If replying to a remote post, also deliver directly to the remote author
 			if pErr == nil && parentPost.IsRemote && parentPost.AuthorDID != "" {
+				if parentPost.Visibility != "public" {
+					activity.To = []string{parentPost.AuthorDID}
+					activity.CC = nil
+					if note, ok := activity.Object.(federation.Note); ok {
+						note.To = activity.To
+						note.CC = nil
+						activity.Object = note
+					}
+				}
+
 				if dErr := federation.DeliverToActor(activity, parentPost.AuthorDID); dErr != nil {
 					log.Printf("[Federation] Failed to deliver reply to remote author %s: %v", parentPost.AuthorDID, dErr)
 				} else {
@@ -126,7 +148,8 @@ func (h *ReplyHandler) CreateReply(c echo.Context) error {
 		}()
 	}
 
-	// Trigger AI bot if mentioned
+	// The service checks public visibility, author status and persistent budgets
+	// before sending an actual mention to the configured provider.
 	service.CheckAndHandleSplitBot(reply.Content, req.PostID, &reply.ID, h.cfg, h.Repo)
 
 	return c.JSON(http.StatusCreated, reply)
@@ -142,10 +165,27 @@ func (h *ReplyHandler) GetReplies(c echo.Context) error {
 		userDID = did
 	}
 
-	replies, err := h.Repo.GetByPostID(c.Request().Context(), postID, userDID)
+	allowed, accessErr := h.PostRepo.CanView(c.Request().Context(), postID, userDID)
+	if accessErr != nil || !allowed {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Post not found"})
+	}
+	limit, offset := 20, 0
+	if n, err := strconv.Atoi(c.QueryParam("limit")); err == nil && n > 0 {
+		limit = n
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if n, err := strconv.Atoi(c.QueryParam("offset")); err == nil && n >= 0 {
+		offset = n
+	}
+	replies, err := h.Repo.GetByPostIDPage(c.Request().Context(), postID, userDID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch replies"})
 	}
 
+	if len(replies) == limit {
+		c.Response().Header().Set("X-Next-Offset", strconv.Itoa(offset+limit))
+	}
 	return c.JSON(http.StatusOK, replies)
 }

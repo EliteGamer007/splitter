@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"splitter/internal/db"
+	"splitter/internal/models"
 	"splitter/internal/repository"
 	"splitter/internal/security"
 
@@ -29,9 +30,22 @@ type AdminAction struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type adminUserRepository interface {
+	SearchUsers(ctx context.Context, searchTerm string, limit, offset int) ([]*models.User, error)
+	GetAllUsers(ctx context.Context, limit, offset int) ([]*models.User, int, error)
+	UpdateUserRole(ctx context.Context, userID, role string) error
+	RequestModeration(ctx context.Context, userID string) error
+	GetModerationRequests(ctx context.Context) ([]*models.User, error)
+	ApproveModerationRequest(ctx context.Context, userID string) error
+	RejectModerationRequest(ctx context.Context, userID string) error
+	SuspendUser(ctx context.Context, userID string) error
+	UnsuspendUser(ctx context.Context, userID string) error
+	GetSuspendedUsers(ctx context.Context, limit, offset int) ([]*models.User, error)
+}
+
 // AdminHandler handles admin-related requests
 type AdminHandler struct {
-	userRepo *repository.UserRepository
+	userRepo adminUserRepository
 }
 
 // NewAdminHandler creates a new AdminHandler
@@ -53,22 +67,18 @@ func (h *AdminHandler) logAdminAction(adminID, actionType, target, reason string
 
 // requireAdmin checks if the current user is an admin
 func (h *AdminHandler) requireAdmin(c echo.Context) error {
-	role := c.Get("role")
-	if role == nil || role.(string) != "admin" {
-		return c.JSON(http.StatusForbidden, map[string]string{
-			"error": "Admin access required",
-		})
+	role, _ := c.Get("role").(string)
+	if role != "admin" {
+		return echo.NewHTTPError(http.StatusForbidden, "Admin access required")
 	}
 	return nil
 }
 
-// requireModOrAdmin checks if the current user is a moderator or admin
+// requireModOrAdmin must return a non-nil error to stop the caller before writes.
 func (h *AdminHandler) requireModOrAdmin(c echo.Context) error {
-	role := c.Get("role")
-	if role == nil || (role.(string) != "admin" && role.(string) != "moderator") {
-		return c.JSON(http.StatusForbidden, map[string]string{
-			"error": "Moderator or admin access required",
-		})
+	role, _ := c.Get("role").(string)
+	if role != "admin" && role != "moderator" {
+		return echo.NewHTTPError(http.StatusForbidden, "Moderator or admin access required")
 	}
 	return nil
 }

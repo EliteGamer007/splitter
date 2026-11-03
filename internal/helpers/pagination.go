@@ -24,8 +24,8 @@ func ParsePagination(limitStr, offsetStr string) (int, int) {
 	}
 
 	// Safety cap on limit
-	if limit > 100 {
-		limit = 100
+	if limit > 50 {
+		limit = 50
 	}
 
 	return limit, offset

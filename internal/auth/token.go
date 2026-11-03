@@ -10,7 +10,7 @@ import (
 )
 
 // GenerateToken generates a JWT token for a user
-func GenerateToken(userID, did, username, role, secret string) (string, error) {
+func GenerateToken(userID, did, username, role, secret string, lifetimes ...time.Duration) (string, error) {
 	if secret == "" {
 		return "", errors.New("JWT secret cannot be empty")
 	}
@@ -19,13 +19,21 @@ func GenerateToken(userID, did, username, role, secret string) (string, error) {
 		role = "user"
 	}
 
+	lifetime := 24 * time.Hour
+	if len(lifetimes) > 0 {
+		lifetime = lifetimes[0]
+	}
+	if lifetime <= 0 {
+		return "", errors.New("JWT lifetime must be positive")
+	}
+	now := time.Now()
 	claims := jwt.MapClaims{
 		"sub":      userID,
 		"did":      did,
 		"username": username,
 		"role":     role,
-		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 days
-		"iat":      time.Now().Unix(),
+		"exp":      now.Add(lifetime).Unix(),
+		"iat":      now.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

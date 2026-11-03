@@ -1,7 +1,7 @@
 ﻿2026/03/10 22:28:29 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
 .env loaded successfully
 === RUN   TestAuthFlow
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:28:34 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:28:34 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:28:34 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -23,7 +23,7 @@
     --- PASS: TestAuthFlow/Register_User_Missing_Username (0.00s)
     --- PASS: TestAuthFlow/Access_Protected_Endpoint_Without_Token (0.00s)
 === RUN   TestKeyRotation
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:28:39 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:28:39 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:28:39 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -59,7 +59,7 @@
     multi_device_and_federated_dm_test.go:55: Skipped due to Neon pgBouncer transaction visibility issues in CI/regression environment
 --- SKIP: TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage (0.00s)
 === RUN   TestInvalidDeviceAuthorizationRequest
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:28:49 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:28:50 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:28:50 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -68,7 +68,7 @@
 {"time":"2026-03-10T22:28:51.5393144+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53074","method":"POST","uri":"/api/v1/auth/devices/request","user_agent":"Go-http-client/1.1","status":400,"error":"","latency":174989700,"latency_human":"174.9897ms","bytes_in":70,"bytes_out":61}
 --- PASS: TestInvalidDeviceAuthorizationRequest (5.30s)
 === RUN   TestOfflineMessageSync_IdempotentByClientMessageID
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:28:55 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:28:55 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:28:55 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -80,7 +80,7 @@
     offline_message_sync_test.go:90: expected login status 200, got 401
 --- FAIL: TestOfflineMessageSync_IdempotentByClientMessageID (5.04s)
 === RUN   TestPostFlow
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:28:59 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:28:59 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:28:59 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -103,7 +103,7 @@
     --- PASS: TestPostFlow/Get_Post (0.58s)
     --- PASS: TestPostFlow/Public_Feed (0.57s)
 === RUN   TestEphemeralPostExpiryEnforcement
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 22:29:05 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 22:29:05 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 22:29:05 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000

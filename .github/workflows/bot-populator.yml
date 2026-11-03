@@ -1,9 +1,7 @@
 name: Bot Populator
 
 on:
-  # Drip mode: runs every 30 minutes, posts 1 per bot each time
-  schedule:
-    - cron: "*/30 * * * *"
+  # Explicit manual use only; no automatic content/database growth.
   # Manual trigger with mode selection
   workflow_dispatch:
     inputs:

@@ -1,8 +1,15 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
 )
@@ -84,22 +91,22 @@ func Load() *Config {
 			Password: os.Getenv("DB_PASSWORD"),
 			Name:     getEnv("DB_NAME", "splitter_db"),
 			SSLMode:  getEnv("DB_SSLMODE", "require"),
-			MaxConns: 25,
-			MinConns: 5,
+			MaxConns: int32(boundedEnvInt("DB_MAX_CONNS", 4, 1, 8)),
+			MinConns: 0,
 		},
 		Server: ServerConfig{
-			Port:    getEnv("PORT", "8080"),
+			Port:    getEnv("PORT", "8000"),
 			Env:     getEnv("ENV", "development"),
-			BaseURL: getEnv("BASE_URL", "http://localhost:3000"),
+			BaseURL: getEnv("BASE_URL", "http://localhost:8000"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "your-secret-key"),
-			Expiration: 24, // 24 hours
+			Secret:     jwtSecret(),
+			Expiration: boundedEnvInt("JWT_EXPIRATION_HOURS", 24, 1, 24),
 		},
 		Federation: FederationConfig{
 			Domain:  getEnv("FEDERATION_DOMAIN", "localhost"),
 			URL:     getEnv("FEDERATION_URL", "http://localhost:8000"),
-			Enabled: false,
+			Enabled: strings.EqualFold(getEnv("FEDERATION_ENABLED", "true"), "true"),
 		},
 		Worker: WorkerConfig{
 			RetryIntervalSeconds:      getEnvAsInt("WORKER_RETRY_INTERVAL_SECONDS", 15),
@@ -112,6 +119,60 @@ func Load() *Config {
 			ApiKey: getEnvWithFallback("SPLIT_BOT_API_KEY", "GEMINI_API_KEY"),
 		},
 	}
+}
+
+var devSecretOnce sync.Once
+var devSecret string
+
+func jwtSecret() string {
+	if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
+		return secret
+	}
+	if strings.EqualFold(os.Getenv("ENV"), "production") {
+		return ""
+	}
+	devSecretOnce.Do(func() {
+		var b [32]byte
+		if _, err := rand.Read(b[:]); err != nil {
+			panic("cannot initialize development JWT key")
+		}
+		devSecret = hex.EncodeToString(b[:])
+	})
+	return devSecret
+}
+
+func boundedEnvInt(name string, fallback, minimum, maximum int) int {
+	n, err := strconv.Atoi(os.Getenv(name))
+	if err != nil {
+		return fallback
+	}
+	if n < minimum {
+		return minimum
+	}
+	if n > maximum {
+		return maximum
+	}
+	return n
+}
+
+// Validate rejects unsafe production defaults before opening a database connection.
+func (c *Config) Validate() error {
+	if c.Database.Host == "" || c.Database.User == "" || c.Database.Name == "" {
+		return fmt.Errorf("database host, user and name are required")
+	}
+	if strings.EqualFold(c.Server.Env, "production") {
+		if len(c.JWT.Secret) < 32 || c.JWT.Secret == "your-secret-key" {
+			return fmt.Errorf("JWT_SECRET must contain at least 32 characters in production")
+		}
+		u, err := url.Parse(c.Server.BaseURL)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+			return fmt.Errorf("BASE_URL must be a public HTTPS origin in production")
+		}
+		if c.Database.SSLMode == "disable" {
+			return fmt.Errorf("database TLS cannot be disabled in production")
+		}
+	}
+	return nil
 }
 
 // getEnv retrieves an environment variable or returns a default value

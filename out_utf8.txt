@@ -1,7 +1,7 @@
 ﻿2026/03/10 11:07:20 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
 .env loaded successfully
 === RUN   TestAuthFlow
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:07:23 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:07:24 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:07:24 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -17,7 +17,7 @@
     --- PASS: TestAuthFlow/Login_User_Success (0.24s)
     --- PASS: TestAuthFlow/Login_User_Invalid_Password (0.17s)
 === RUN   TestKeyRotation
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:07:28 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:07:28 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:07:28 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -63,7 +63,7 @@
     --- FAIL: TestKeyRotation/Invalid_Signature_-_Rejected (0.16s)
     --- FAIL: TestKeyRotation/Password-Only_User_-_No_Public_Key (0.07s)
 === RUN   TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:07:38 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:07:39 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:07:39 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -78,7 +78,7 @@
 {"time":"2026-03-10T11:07:50.6816088+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53567","method":"POST","uri":"/api/v1/messages/send","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":6567136700,"latency_human":"6.5671367s","bytes_in":195,"bytes_out":1193}
 --- PASS: TestMultiDeviceAuthorizationAndEncryptedEnvelopeStorage (18.38s)
 === RUN   TestOfflineMessageSync_IdempotentByClientMessageID
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:07:53 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:07:53 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:07:53 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -91,7 +91,7 @@
 {"time":"2026-03-10T11:07:56.9139708+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:53580","method":"POST","uri":"/api/v1/messages/sync","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":693820500,"latency_human":"693.8205ms","bytes_in":206,"bytes_out":633}
 --- PASS: TestOfflineMessageSync_IdempotentByClientMessageID (6.07s)
 === RUN   TestPostFlow
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:07:59 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:07:59 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:07:59 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -114,7 +114,7 @@
     --- PASS: TestPostFlow/Get_Post (0.16s)
     --- PASS: TestPostFlow/Public_Feed (0.21s)
 === RUN   TestEphemeralPostExpiryEnforcement
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:08:04 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:08:04 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:08:04 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000
@@ -131,7 +131,7 @@
 2026/03/10 11:08:06 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery failed: Post "http://localhost:8001/ap/shared-inbox": dial tcp [::1]:8001: connectex: No connection could be made because the target machine actively refused it.
 --- PASS: TestEphemeralPostExpiryEnforcement (4.72s)
 === RUN   TestReplyFlow
-    setup_test.go:54: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:54: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 11:08:08 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 11:08:08 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 11:08:08 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000

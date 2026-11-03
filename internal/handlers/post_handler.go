@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
+	"splitter/internal/db"
 	"strconv"
 	"strings"
 
@@ -16,7 +16,6 @@ import (
 	"splitter/internal/repository"
 	"splitter/internal/service"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -71,27 +70,15 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 
 	// Handle file upload
 	var mediaURL string
+	var mediaData []byte
 	var mediaType string
 	if fileErr == nil {
-		// File present, validate and store on disk instead of in Neon
-		bytes, mType, err := service.ReadAndValidateImage(file, 1*1024*1024)
+		var err error
+		mediaData, mediaType, err = service.ReadAndValidateImage(file, service.MaxImageInput)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{
-				"error": fmt.Sprintf("Failed to upload file: %v", err),
-			})
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
-		mediaType = mType
 
-		if err := os.MkdirAll("./uploads/posts", os.ModePerm); err == nil {
-			filename := uuid.New().String() + filepath.Ext(file.Filename)
-			path := filepath.Join(".", "uploads", "posts", filename)
-			if writeErr := os.WriteFile(path, bytes, 0o644); writeErr == nil {
-				mediaURL = "/uploads/posts/" + filename
-			}
-		}
-		if mediaURL == "" {
-			mediaURL = "/uploads/posts/" + uuid.New().String() + filepath.Ext(file.Filename)
-		}
 	} else if fileErr != http.ErrMissingFile {
 		// Real error occurred
 		return c.JSON(http.StatusBadRequest, map[string]string{
@@ -121,15 +108,21 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 		ExpiresInMinutes: expiresInMinutes,
 	}
 
-	post, err := h.postRepo.Create(c.Request().Context(), did, &req, mediaURL, mediaType)
+	if err := req.Validate(len(mediaData) > 0); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	post, err := h.postRepo.CreateWithMedia(c.Request().Context(), did, &req, mediaURL, mediaType, mediaData)
 	if err != nil {
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create post",
 		})
 	}
 
 	// Federation Hook: Deliver to remote followers
-	if h.cfg.Federation.Enabled {
+	if h.cfg != nil && h.cfg.Federation.Enabled {
 		log.Printf("[Federation] Post created by %s, triggering delivery...", did)
 		go func() {
 			// Fetch user to get username
@@ -157,15 +150,16 @@ func (h *PostHandler) CreatePost(c echo.Context) error {
 			activity := federation.BuildCreateNoteActivity(actorURI, post.ID, post.Content, post.CreatedAt, mediaURL, "")
 
 			// Deliver to followers
-			federation.DeliverToFollowers(activity, did)
+			federation.DeliverPostToAudience(activity, did, post.Visibility)
 		}()
 	} else {
 		log.Printf("[Federation] Federation disabled, skipping delivery for post %s", post.ID)
 	}
 
-	// Split Bot disabled for portfolio mode to avoid extra AI/network traffic.
-	// replyRepo := repository.NewReplyRepository()
-	// service.CheckAndHandleSplitBot(post.Content, post.ID, nil, h.cfg, replyRepo)
+	// Actual public @split mentions may schedule one bounded configured AI reply.
+	if post.Visibility == "public" {
+		service.CheckAndHandleSplitBot(post.Content, post.ID, nil, h.cfg, repository.NewReplyRepository())
+	}
 
 	return c.JSON(http.StatusCreated, post)
 }
@@ -179,7 +173,7 @@ func (h *PostHandler) GetPost(c echo.Context) error {
 		})
 	}
 
-	post, err := h.postRepo.GetByID(c.Request().Context(), postID)
+	post, err := h.postRepo.GetByIDForViewer(c.Request().Context(), postID, viewerDID(c))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Post not found",
@@ -187,7 +181,7 @@ func (h *PostHandler) GetPost(c echo.Context) error {
 	}
 
 	if post.InReplyToURI != "" {
-		post.ParentContext = h.resolveParentContext(c.Request().Context(), post.InReplyToURI)
+		post.ParentContext = h.resolveParentContext(c.Request().Context(), post.InReplyToURI, viewerDID(c))
 	}
 
 	return c.JSON(http.StatusOK, post)
@@ -203,7 +197,7 @@ func (h *PostHandler) FetchThreadContext(c echo.Context) error {
 		})
 	}
 
-	post, err := h.postRepo.GetByID(c.Request().Context(), postID)
+	post, err := h.postRepo.GetByIDForViewer(c.Request().Context(), postID, viewerDID(c))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Post not found",
@@ -225,7 +219,7 @@ func (h *PostHandler) FetchThreadContext(c echo.Context) error {
 
 	// Walk up the ancestor chain to opportunistically hydrate remote context.
 	for i := 0; i < 8 && currentParentURI != ""; i++ {
-		resolved := h.resolveParentContext(c.Request().Context(), currentParentURI)
+		resolved := h.resolveParentContext(c.Request().Context(), currentParentURI, viewerDID(c))
 		parentContext = resolved
 		if resolved == nil || resolved.Status != "available" || resolved.Post == nil {
 			break
@@ -245,9 +239,9 @@ func (h *PostHandler) FetchThreadContext(c echo.Context) error {
 		currentParentURI = cachedParent.InReplyToURI
 	}
 
-	refreshedPost, err := h.postRepo.GetByID(c.Request().Context(), postID)
+	refreshedPost, err := h.postRepo.GetByIDForViewer(c.Request().Context(), postID, viewerDID(c))
 	if err == nil && refreshedPost.InReplyToURI != "" {
-		refreshedPost.ParentContext = h.resolveParentContext(c.Request().Context(), refreshedPost.InReplyToURI)
+		refreshedPost.ParentContext = h.resolveParentContext(c.Request().Context(), refreshedPost.InReplyToURI, viewerDID(c))
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"message":        "Thread context fetched",
 			"fetched_count":  fetchedCount,
@@ -264,12 +258,26 @@ func (h *PostHandler) FetchThreadContext(c echo.Context) error {
 	})
 }
 
-func (h *PostHandler) resolveParentContext(ctx context.Context, parentURI string) *models.ParentContextInfo {
+func (h *PostHandler) resolveParentContext(ctx context.Context, parentURI, viewer string) *models.ParentContextInfo {
 	if parentURI == "" {
 		return nil
 	}
 
+	// Resolve local references through the same audience check as a direct read.
+	if h.cfg != nil && strings.HasPrefix(parentURI, strings.TrimRight(h.cfg.Federation.URL, "/")+"/posts/") {
+		id := strings.TrimPrefix(parentURI, strings.TrimRight(h.cfg.Federation.URL, "/")+"/posts/")
+		parent, err := h.postRepo.GetByIDForViewer(ctx, id, viewer)
+		if err != nil {
+			return &models.ParentContextInfo{Status: "missing", URI: parentURI, Message: "Parent post unavailable"}
+		}
+		return &models.ParentContextInfo{Status: "available", Source: "local", URI: parentURI, Post: summarizeParentPost(parent)}
+	}
 	if cachedParent, err := h.postRepo.GetByOriginalURI(ctx, parentURI); err == nil && cachedParent != nil {
+		allowed, err := h.postRepo.CanView(ctx, cachedParent.ID, viewer)
+		if err != nil || !allowed {
+			return &models.ParentContextInfo{Status: "missing", URI: parentURI, Message: "Parent post unavailable"}
+		}
+
 		return &models.ParentContextInfo{
 			Status: "available",
 			Source: "cache",
@@ -354,6 +362,9 @@ func (h *PostHandler) GetUserPosts(c echo.Context) error {
 	offset := 0
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			if parsed > 50 {
+				parsed = 50
+			}
 			limit = parsed
 		}
 	}
@@ -363,7 +374,7 @@ func (h *PostHandler) GetUserPosts(c echo.Context) error {
 		}
 	}
 
-	posts, err := h.postRepo.GetByAuthorDID(c.Request().Context(), authorDID, limit, offset)
+	posts, err := h.postRepo.GetByAuthorDIDForViewer(c.Request().Context(), authorDID, viewerDID(c), limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve posts",
@@ -387,6 +398,9 @@ func (h *PostHandler) GetFeed(c echo.Context) error {
 	offset := 0
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			if parsed > 50 {
+				parsed = 50
+			}
 			limit = parsed
 		}
 	}
@@ -413,6 +427,9 @@ func (h *PostHandler) GetPublicFeed(c echo.Context) error {
 	offset := 0
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			if parsed > 50 {
+				parsed = 50
+			}
 			limit = parsed
 		}
 	}
@@ -493,8 +510,11 @@ func (h *PostHandler) DeletePost(c echo.Context) error {
 	}
 
 	// Check if user is admin or moderator - they can delete any post
-	role, _ := c.Get("role").(string)
-	isAdmin := role == "admin" || role == "moderator"
+	current, err := h.userRepo.GetByDID(c.Request().Context(), did)
+	if err != nil || current.IsSuspended {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Account unavailable"})
+	}
+	isAdmin := current.Role == "admin" || current.Role == "moderator"
 
 	meta, _ := h.postRepo.GetFederationMeta(c.Request().Context(), postID)
 
@@ -521,3 +541,5 @@ func (h *PostHandler) DeletePost(c echo.Context) error {
 		"message": "Post deleted successfully",
 	})
 }
+
+func viewerDID(c echo.Context) string { did, _ := c.Get("did").(string); return did }

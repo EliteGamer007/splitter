@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"splitter/internal/config"
+	"splitter/internal/db"
 	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
@@ -38,10 +40,11 @@ func NewMessageHandler(msgRepo *repository.MessageRepository, userRepo *reposito
 func (h *MessageHandler) GetThreads(c echo.Context) error {
 	userID := c.Get("user_id").(string)
 
-	threads, err := h.msgRepo.GetUserThreads(c.Request().Context(), userID)
+	limit, offset := requestPage(c, 30)
+	threads, err := h.msgRepo.GetUserThreadsPage(c.Request().Context(), userID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to get threads: " + err.Error(),
+			"error": "Failed to get threads",
 		})
 	}
 
@@ -73,11 +76,14 @@ func (h *MessageHandler) GetMessages(c echo.Context) error {
 		})
 	}
 
-	limit := 50
+	limit := 30
 	offset := 0
 
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			if parsed > 50 {
+				parsed = 50
+			}
 			limit = parsed
 		}
 	}
@@ -90,7 +96,7 @@ func (h *MessageHandler) GetMessages(c echo.Context) error {
 	messages, err := h.msgRepo.GetThreadMessages(c.Request().Context(), threadID, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to get messages: " + err.Error(),
+			"error": "Failed to get messages",
 		})
 	}
 
@@ -132,6 +138,9 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 		})
 	}
 
+	if strings.TrimSpace(req.Ciphertext) != "" {
+		req.Content = ""
+	}
 	if req.RecipientID == userID {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Cannot send message to yourself",
@@ -163,8 +172,14 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	// Get or create thread
 	thread, err := h.msgRepo.GetOrCreateThread(ctx, userID, req.RecipientID)
 	if err != nil {
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
+		if errors.Is(err, repository.ErrMessageNotAllowed) {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "Recipient does not accept this message"})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to get/create thread: " + err.Error(),
+			"error": "Failed to create conversation",
 		})
 	}
 
@@ -182,20 +197,27 @@ func (h *MessageHandler) SendMessage(c echo.Context) error {
 	// Send message
 	msg, err := h.msgRepo.SendMessage(ctx, thread.ID, userID, req.RecipientID, req.Content, req.Ciphertext, encryptedKeysJSON)
 	if err != nil {
+		if errors.Is(err, repository.ErrMessagePayload) {
+			return c.JSON(http.StatusRequestEntityTooLarge, map[string]string{"error": err.Error()})
+		}
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
+
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to send message: " + err.Error(),
+			"error": "Failed to send message",
 		})
 	}
 
 	response := map[string]interface{}{
 		"message":   msg,
 		"thread":    thread,
-		"recipient": recipient,
+		"recipient": models.ToPublicUser(recipient),
 	}
 
 	if err := h.deliverFederatedDM(sender, recipient, req.Content, req.Ciphertext, req.EncryptedKeys); err != nil {
 		log.Printf("[DM] Federation delivery failed (message saved locally): %v", err)
-		response["federation_error"] = err.Error()
+		response["federation_error"] = "Delivery pending; the message is saved locally"
 	}
 
 	return c.JSON(http.StatusCreated, response)
@@ -223,12 +245,18 @@ func (h *MessageHandler) StartConversation(c echo.Context) error {
 	// Get or create thread
 	thread, err := h.msgRepo.GetOrCreateThread(c.Request().Context(), userID, otherUserID)
 	if err != nil {
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
+		if errors.Is(err, repository.ErrMessageNotAllowed) {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "Recipient does not accept messages"})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to start conversation: " + err.Error(),
+			"error": "Failed to start conversation",
 		})
 	}
 
-	thread.OtherUser = otherUser
+	thread.OtherUser = models.ToPublicUser(otherUser)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"thread": thread,
@@ -257,7 +285,7 @@ func (h *MessageHandler) MarkAsRead(c echo.Context) error {
 	err = h.msgRepo.MarkMessagesAsRead(c.Request().Context(), threadID, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to mark as read: " + err.Error(),
+			"error": "Failed to mark as read",
 		})
 	}
 
@@ -289,8 +317,9 @@ func (h *MessageHandler) EditMessage(c echo.Context) error {
 	messageID := c.Param("messageId")
 
 	var req struct {
-		Content    string `json:"content"`
-		Ciphertext string `json:"ciphertext"`
+		Content       string            `json:"content"`
+		Ciphertext    string            `json:"ciphertext"`
+		EncryptedKeys map[string]string `json:"encrypted_keys"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -299,7 +328,12 @@ func (h *MessageHandler) EditMessage(c echo.Context) error {
 		})
 	}
 
-	err := h.msgRepo.EditMessage(c.Request().Context(), messageID, userID, req.Content, req.Ciphertext)
+	var keys *string
+	if req.EncryptedKeys != nil {
+		raw := mapToJSONString(req.EncryptedKeys)
+		keys = &raw
+	}
+	err := h.msgRepo.EditMessageWithKeys(c.Request().Context(), messageID, userID, req.Content, req.Ciphertext, keys)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": err.Error(),
@@ -341,9 +375,9 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 		})
 	}
 
-	if len(req.QueuedMessages) > 100 {
+	if len(req.QueuedMessages) > 50 {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Batch too large. Maximum 100 queued messages per sync.",
+			"error": "Batch too large. Maximum 50 queued messages per sync.",
 		})
 	}
 
@@ -377,6 +411,9 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 	failureCount := 0
 
 	for _, queued := range req.QueuedMessages {
+		if strings.TrimSpace(queued.Ciphertext) != "" {
+			queued.Content = ""
+		}
 		if queued.RecipientID == "" || queued.ClientMessageID == "" || (queued.Content == "" && queued.Ciphertext == "") {
 			failureCount++
 			results = append(results, syncResult{
@@ -414,7 +451,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			results = append(results, syncResult{
 				ClientMessageID: queued.ClientMessageID,
 				Created:         false,
-				Error:           "failed to get/create thread: " + err.Error(),
+				Error:           "recipient unavailable or conversation could not be created",
 			})
 			continue
 		}
@@ -432,7 +469,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			results = append(results, syncResult{
 				ClientMessageID: queued.ClientMessageID,
 				Created:         false,
-				Error:           "failed to check duplicate message id: " + existsErr.Error(),
+				Error:           "failed to check queued message",
 			})
 			continue
 		}
@@ -453,7 +490,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			results = append(results, syncResult{
 				ClientMessageID: queued.ClientMessageID,
 				Created:         false,
-				Error:           "failed to sync message: " + err.Error(),
+				Error:           "recipient unavailable or message could not be saved",
 			})
 			continue
 		}
@@ -474,7 +511,7 @@ func (h *MessageHandler) SyncOfflineMessages(c echo.Context) error {
 			}
 			if fedErr := h.deliverFederatedDM(sender, recipient, queued.Content, queued.Ciphertext, queued.EncryptedKeys); fedErr != nil {
 				log.Printf("[DM] Sync federation delivery failed (message saved): %v", fedErr)
-				sr.Error = "federation delivery pending: " + fedErr.Error()
+				sr.Error = "federation delivery pending"
 			}
 			results = append(results, sr)
 		} else {
@@ -508,7 +545,7 @@ func mapToJSONString(value map[string]string) string {
 }
 
 func (h *MessageHandler) deliverFederatedDM(sender, recipient *models.User, content, ciphertext string, encryptedKeys map[string]string) error {
-	if !h.cfg.Federation.Enabled || recipient == nil || sender == nil {
+	if h.cfg == nil || !h.cfg.Federation.Enabled || recipient == nil || sender == nil {
 		return nil
 	}
 
@@ -546,6 +583,9 @@ func (h *MessageHandler) deliverFederatedDM(sender, recipient *models.User, cont
 		recipientURI = remoteActor.ActorURI
 	}
 
+	if strings.TrimSpace(ciphertext) != "" {
+		content = ""
+	}
 	activity := federation.BuildCreateDMActivity(actorURI, recipientURI, content, ciphertext, encryptedKeys)
 	return federation.DeliverActivity(activity, remoteActor.InboxURL)
 }

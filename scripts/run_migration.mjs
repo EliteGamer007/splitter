@@ -1,7 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import { readFileSync } from 'fs';
 
-const connStr = 'postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+const connStr = process.env.DATABASE_URL;
+if (!connStr) throw new Error('DATABASE_URL must be supplied explicitly');
 
 const sql = neon(connStr);
 

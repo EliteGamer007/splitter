@@ -72,8 +72,11 @@ func (p *PostCreate) Validate(hasMedia bool) error {
 	if p.Content == "" && !hasMedia {
 		return fmt.Errorf("either content or media is required")
 	}
-	if p.Visibility != "" && p.Visibility != "public" && p.Visibility != "followers" && p.Visibility != "private" {
+	if p.Visibility != "" && p.Visibility != "public" && p.Visibility != "followers" && p.Visibility != "private" && p.Visibility != "circle" {
 		return fmt.Errorf("invalid visibility setting")
+	}
+	if p.Visibility == "private" {
+		p.Visibility = "circle"
 	}
 	if p.ExpiresInMinutes != nil {
 		if *p.ExpiresInMinutes <= 0 {

@@ -2,8 +2,13 @@ package repository
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -13,6 +18,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 )
+
+var ErrKeyConflict = errors.New("account or device key has changed")
 
 // UserRepository handles database operations for users
 type UserRepository struct{}
@@ -27,7 +34,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, pa
 	query := `
 		INSERT INTO users (username, email, password_hash, instance_domain, did, display_name, bio, avatar_url, public_key, encryption_public_key, role)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'user')
-		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 	`
 
 	instanceDomain := user.InstanceDomain
@@ -76,7 +83,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.UserCreate, pa
 // GetByID retrieves a user by UUID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at, COALESCE(default_visibility, 'public'), COALESCE(message_privacy, 'everyone')
 		FROM users
 		WHERE id = $1
 	`
@@ -99,6 +106,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 		&user.IsSuspended,
 		&user.CreatedAt,
 		&user.UpdatedAt,
+		&user.DefaultVisibility,
+		&user.MessagePrivacy,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -114,9 +123,11 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 // GetByUsername retrieves a user by username (for login)
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, string, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), COALESCE(password_hash, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), COALESCE(password_hash, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
-		WHERE username = $1 OR email = $1
+		WHERE (username = $1 OR email = $1)
+ AND COALESCE(did,'') !~* '^https?://'
+ ORDER BY (COALESCE(password_hash,'')<>'') DESC,created_at ASC,id ASC LIMIT 1
 	`
 
 	var user models.User
@@ -154,9 +165,9 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
-		WHERE email = $1
+		WHERE email = $1 AND COALESCE(did,'') !~* '^https?://' ORDER BY created_at ASC,id ASC LIMIT 1
 	`
 
 	var user models.User
@@ -192,7 +203,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // GetByDID retrieves a user by DID (Decentralized Identifier)
 func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at, COALESCE(default_visibility, 'public'), COALESCE(message_privacy, 'everyone')
 		FROM users
 		WHERE did = $1
 	`
@@ -215,6 +226,8 @@ func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User
 		&user.IsSuspended,
 		&user.CreatedAt,
 		&user.UpdatedAt,
+		&user.DefaultVisibility,
+		&user.MessagePrivacy,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -231,13 +244,13 @@ func (r *UserRepository) GetByDID(ctx context.Context, did string) (*models.User
 func (r *UserRepository) Update(ctx context.Context, id string, update *models.UserUpdate) (*models.User, error) {
 	query := `
 		UPDATE users
-		SET 
+		SET
 			display_name = COALESCE($1, display_name),
 			bio = COALESCE($2, bio),
 			avatar_url = COALESCE($3, avatar_url),
 			updated_at = NOW()
 		WHERE id = $4
-		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), is_locked, is_suspended, created_at, updated_at
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), is_locked, is_suspended, created_at, updated_at
 	`
 
 	var user models.User
@@ -342,8 +355,9 @@ func (r *UserRepository) EmailExists(ctx context.Context, email string) (bool, e
 
 // SearchUsers searches for users by username or display name
 func (r *UserRepository) SearchUsers(ctx context.Context, searchTerm string, limit, offset int) ([]*models.User, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE (username ILIKE $1 OR display_name ILIKE $1 OR instance_domain ILIKE $1)
 		AND is_suspended = false
@@ -390,6 +404,7 @@ func (r *UserRepository) SearchUsers(ctx context.Context, searchTerm string, lim
 
 // GetAllUsers returns all users (admin only)
 func (r *UserRepository) GetAllUsers(ctx context.Context, limit, offset int) ([]*models.User, int, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	// Get total count
 	countQuery := `SELECT COUNT(*) FROM users`
 	var total int
@@ -399,7 +414,7 @@ func (r *UserRepository) GetAllUsers(ctx context.Context, limit, offset int) ([]
 	}
 
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -470,7 +485,7 @@ func (r *UserRepository) RequestModeration(ctx context.Context, userID string) e
 // GetModerationRequests gets all pending moderation requests (admin only)
 func (r *UserRepository) GetModerationRequests(ctx context.Context) ([]*models.User, error) {
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE moderation_requested = true AND role = 'user'
 		ORDER BY moderation_requested_at ASC
@@ -566,9 +581,10 @@ func (r *UserRepository) UnsuspendUser(ctx context.Context, userID string) error
 
 // GetSuspendedUsers returns all suspended users
 func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset int) ([]*models.User, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	query := `
-		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), 
-		       COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), 
+		SELECT id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''),
+		       COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false),
 		       is_locked, is_suspended, created_at, updated_at
 		FROM users
 		WHERE is_suspended = true
@@ -616,22 +632,60 @@ func (r *UserRepository) GetSuspendedUsers(ctx context.Context, limit, offset in
 	return users, nil
 }
 
-// UpdateEncryptionKey updates a user's encryption public key
-// This allows existing users without keys to add them
+var ErrInvalidEncryptionKey = errors.New("encryption key must be a base64 P-256 SPKI public key")
+
+// UpdateEncryptionKey publishes a first device key idempotently. Existing keys
+// cannot be overwritten by a new device or a bearer token alone.
 func (r *UserRepository) UpdateEncryptionKey(ctx context.Context, userID, encryptionPublicKey string) error {
-	query := `UPDATE users SET encryption_public_key = $1, updated_at = NOW() WHERE id = $2`
-	result, err := db.GetDB().Exec(ctx, query, encryptionPublicKey, userID)
+	if len(encryptionPublicKey) > 1024 {
+		return ErrInvalidEncryptionKey
+	}
+	der, err := base64.StdEncoding.DecodeString(encryptionPublicKey)
 	if err != nil {
-		return fmt.Errorf("failed to update encryption key: %w", err)
+		return ErrInvalidEncryptionKey
+	}
+	parsed, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return ErrInvalidEncryptionKey
+	}
+	public, ok := parsed.(*ecdsa.PublicKey)
+	if !ok || public.Curve != elliptic.P256() || !public.Curve.IsOnCurve(public.X, public.Y) {
+		return ErrInvalidEncryptionKey
+	}
+	result, err := db.GetDB().Exec(ctx, `UPDATE users SET encryption_public_key=$1,updated_at=NOW() WHERE id=$2 AND NOT is_suspended AND (COALESCE(encryption_public_key,'')='' OR encryption_public_key=$1)`, encryptionPublicKey, userID)
+	if err != nil {
+		return fmt.Errorf("unable to publish encryption key")
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("user not found")
+		return ErrKeyConflict
 	}
 	return nil
 }
 
-// UpdateAvatar stores the avatar URL and clears the in-database blob to reduce Neon storage usage.
+// UpdateAvatar atomically replaces durable bytes without double-counting prior usage.
 func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatarData []byte, mediaType, avatarURL string) (*models.User, error) {
+	if len(avatarData) > db.MaxStoredAvatar {
+		return nil, fmt.Errorf("avatar exceeds 128 KiB stored limit")
+	}
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err = db.LockMediaBudget(ctx, tx); err != nil {
+		return nil, err
+	}
+	var oldBytes int64
+	if err = tx.QueryRow(ctx, `SELECT COALESCE(octet_length(avatar_data),0)FROM users WHERE id=$1 AND NOT is_suspended FOR UPDATE`, userID).Scan(&oldBytes); err != nil {
+		return nil, fmt.Errorf("account unavailable")
+	}
+	if err = db.EnforceMediaBudget(ctx, tx, userID, int64(len(avatarData))-oldBytes); err != nil {
+		return nil, err
+	}
+	if len(avatarData) > 0 {
+		avatarURL = "/api/v1/users/" + userID + "/avatar"
+	}
+
 	if avatarURL == "" {
 		avatarURL = fmt.Sprintf("/uploads/avatars/%s", userID)
 	}
@@ -642,11 +696,11 @@ func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatar
 		    avatar_url = $3,
 		    updated_at = NOW()
 		WHERE id = $4
-		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), display_name, COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
+		RETURNING id, username, COALESCE(email, ''), instance_domain, COALESCE(did, ''), COALESCE(display_name, ''), COALESCE(bio, ''), COALESCE(avatar_url, ''), COALESCE(public_key, ''), COALESCE(encryption_public_key, ''), COALESCE(role, 'user'), COALESCE(moderation_requested, false), is_locked, is_suspended, created_at, updated_at
 	`
 
 	var user models.User
-	err := db.GetDB().QueryRow(ctx, query, avatarData, mediaType, avatarURL, userID).Scan(
+	err = tx.QueryRow(ctx, query, avatarData, mediaType, avatarURL, userID).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -671,6 +725,9 @@ func (r *UserRepository) UpdateAvatar(ctx context.Context, userID string, avatar
 		return nil, fmt.Errorf("failed to update avatar: %w", err)
 	}
 
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return &user, nil
 }
 
@@ -717,13 +774,13 @@ func (r *UserRepository) RotateKey(ctx context.Context, userID, oldPublicKey, ne
 	}
 
 	// Update active key on user
-	updateQuery := `UPDATE users SET public_key = $1, updated_at = NOW() WHERE id = $2`
-	result, err := tx.Exec(ctx, updateQuery, newPublicKey, userID)
+	updateQuery := `UPDATE users SET public_key = $1, updated_at = NOW() WHERE id = $2 AND public_key = $3 AND NOT COALESCE(is_suspended, false)`
+	result, err := tx.Exec(ctx, updateQuery, newPublicKey, userID, oldPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to update user public key: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("user not found")
+		return ErrKeyConflict
 	}
 
 	return tx.Commit(ctx)
@@ -837,12 +894,16 @@ func (r *UserRepository) RevokeCurrentKey(ctx context.Context, userID, oldKey st
 	}
 
 	// 2. Clear from user profile
-	updateQuery := `UPDATE users SET public_key = NULL, updated_at = NOW() WHERE id = $1`
-	if _, err := tx.Exec(ctx, updateQuery, userID); err != nil {
+	updateQuery := `UPDATE users SET public_key = NULL, updated_at = NOW() WHERE id = $1 AND public_key = $2 AND NOT COALESCE(is_suspended, false)`
+	result, err := tx.Exec(ctx, updateQuery, userID, oldKey)
+	if err != nil {
 		log.Printf("[UserRepository] RevokeCurrentKey: failed to clear public_key for user %s: %v", userID, err)
 		return fmt.Errorf("failed to clear user key: %w", err)
 	}
 
+	if result.RowsAffected() != 1 {
+		return ErrKeyConflict
+	}
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("[UserRepository] RevokeCurrentKey: failed to commit transaction for user %s: %v", userID, err)
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -929,96 +990,59 @@ func (r *UserRepository) ListApprovedDeviceKeysByDID(ctx context.Context, did st
 }
 
 func (r *UserRepository) RequestDeviceKey(ctx context.Context, userID, deviceID, deviceLabel, encryptionPublicKey string) (*models.DeviceKey, error) {
-	bootstrapQuery := `
-		SELECT COUNT(*)
-		FROM user_device_keys
-		WHERE user_id = $1 AND status = 'approved'
-	`
-
-	var approvedCount int
-	if err := db.GetDB().QueryRow(ctx, bootstrapQuery, userID).Scan(&approvedCount); err != nil {
-		return nil, fmt.Errorf("failed to evaluate bootstrap approval: %w", err)
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return nil, err
 	}
-
+	defer tx.Rollback(ctx)
+	// Serialize bootstrap decisions on the account, and bind any initial device
+	// to the encryption key already registered for this account.
+	var accountKey string
+	var suspended bool
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(encryption_public_key,''), COALESCE(is_suspended,false) FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&accountKey, &suspended); err != nil {
+		return nil, err
+	}
+	if suspended {
+		return nil, fmt.Errorf("account is suspended")
+	}
+	var approvedCount int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM user_device_keys WHERE user_id=$1 AND status='approved'`, userID).Scan(&approvedCount); err != nil {
+		return nil, err
+	}
 	status := "pending"
 	approvedBy := ""
-	if approvedCount == 0 {
+	if approvedCount == 0 && accountKey != "" && accountKey == encryptionPublicKey {
 		status = "approved"
 		approvedBy = "self-bootstrap"
 	}
-
 	query := `
-		INSERT INTO user_device_keys (user_id, device_id, device_label, encryption_public_key, status, approved_at, approved_by_device_id, last_seen_at)
-		VALUES (
-			$1,
-			$2,
-			$3,
-			$4,
-			$5,
-			CASE WHEN $5 = 'approved' THEN NOW() ELSE NULL END,
-			NULLIF($6, ''),
-			NOW()
-		)
-		ON CONFLICT (user_id, device_id)
-		DO UPDATE SET
-			device_label = EXCLUDED.device_label,
-			encryption_public_key = EXCLUDED.encryption_public_key,
-			status = CASE
-				WHEN user_device_keys.status = 'approved' THEN 'approved'
-				ELSE EXCLUDED.status
-			END,
-			approved_at = CASE
-				WHEN user_device_keys.status = 'approved' THEN user_device_keys.approved_at
-				WHEN EXCLUDED.status = 'approved' THEN NOW()
-				ELSE NULL
-			END,
-			approved_by_device_id = CASE
-				WHEN user_device_keys.status = 'approved' THEN user_device_keys.approved_by_device_id
-				ELSE EXCLUDED.approved_by_device_id
-			END,
-			last_seen_at = NOW()
-		RETURNING id, user_id, device_id, COALESCE(device_label, ''), encryption_public_key, status,
-		          requested_at, approved_at, COALESCE(approved_by_device_id, ''), last_seen_at
-	`
-
+ INSERT INTO user_device_keys(user_id,device_id,device_label,encryption_public_key,status,approved_at,approved_by_device_id,last_seen_at)
+ VALUES($1,$2,$3,$4,$5,CASE WHEN $5='approved' THEN NOW() ELSE NULL END,NULLIF($6,''),NOW())
+ ON CONFLICT(user_id,device_id) DO UPDATE SET
+  device_label=EXCLUDED.device_label,last_seen_at=NOW()
+ WHERE user_device_keys.encryption_public_key=EXCLUDED.encryption_public_key
+ RETURNING id,user_id,device_id,COALESCE(device_label,''),encryption_public_key,status,
+  requested_at,approved_at,COALESCE(approved_by_device_id,''),last_seen_at`
 	var item models.DeviceKey
-	if err := db.GetDB().QueryRow(ctx, query, userID, deviceID, deviceLabel, encryptionPublicKey, status, approvedBy).Scan(
-		&item.ID,
-		&item.UserID,
-		&item.DeviceID,
-		&item.DeviceLabel,
-		&item.EncryptionPublicKey,
-		&item.Status,
-		&item.RequestedAt,
-		&item.ApprovedAt,
-		&item.ApprovedByDeviceID,
-		&item.LastSeenAt,
-	); err != nil {
-		return nil, fmt.Errorf("failed to request device key: %w", err)
+	if err := tx.QueryRow(ctx, query, userID, deviceID, deviceLabel, encryptionPublicKey, status, approvedBy).Scan(&item.ID, &item.UserID, &item.DeviceID, &item.DeviceLabel, &item.EncryptionPublicKey, &item.Status, &item.RequestedAt, &item.ApprovedAt, &item.ApprovedByDeviceID, &item.LastSeenAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrKeyConflict
+		}
+		return nil, err
 	}
-
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return &item, nil
 }
 
 func (r *UserRepository) ApproveDeviceKey(ctx context.Context, userID, targetDeviceID, approverDeviceID string) (*models.DeviceKey, error) {
-	var approverStatus string
-	if err := db.GetDB().QueryRow(ctx,
-		`SELECT status FROM user_device_keys WHERE user_id = $1 AND device_id = $2`,
-		userID, approverDeviceID,
-	).Scan(&approverStatus); err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("approver device not found")
-		}
-		return nil, fmt.Errorf("failed to verify approver device: %w", err)
-	}
-	if approverStatus != "approved" {
-		return nil, fmt.Errorf("approver device is not authorized")
-	}
 
 	query := `
 		UPDATE user_device_keys
 		SET status = 'approved', approved_at = NOW(), approved_by_device_id = $3, last_seen_at = NOW()
-		WHERE user_id = $1 AND device_id = $2
+		WHERE user_id = $1 AND device_id = $2 AND status = 'pending'
+   AND EXISTS (SELECT 1 FROM user_device_keys approver WHERE approver.user_id = $1 AND approver.device_id = $3 AND approver.status = 'approved')
 		RETURNING id, user_id, device_id, COALESCE(device_label, ''), encryption_public_key, status,
 		          requested_at, approved_at, COALESCE(approved_by_device_id, ''), last_seen_at
 	`
@@ -1043,4 +1067,16 @@ func (r *UserRepository) ApproveDeviceKey(ctx context.Context, userID, targetDev
 	}
 
 	return &item, nil
+}
+
+// RegisterInitialKey sets a signing key only for password-only accounts.
+func (r *UserRepository) RegisterInitialKey(ctx context.Context, userID, publicKey string) error {
+	result, err := db.GetDB().Exec(ctx, `UPDATE users SET public_key=$1,updated_at=NOW() WHERE id=$2 AND COALESCE(public_key,'')='' AND NOT COALESCE(is_suspended,false)`, publicKey, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrKeyConflict
+	}
+	return nil
 }
