@@ -1,5 +1,5 @@
 // Package testlogger provides a concurrency-safe logging mechanism for test results.
-// Each test appends a formatted entry to tests/results/<category>_results.txt.
+// Each test appends a formatted entry to .cache/test-results/<category>_results.txt.
 package testlogger
 
 import (
@@ -16,7 +16,7 @@ import (
 var mu sync.Mutex
 
 // LogTestResult appends a single test result entry to
-// tests/results/<category>_results.txt.
+// .cache/test-results/<category>_results.txt.
 // Call it via defer at the top of each test function:
 //
 //	start := time.Now()
@@ -31,7 +31,7 @@ func LogTestResult(t *testing.T, category string, start time.Time, err error) {
 	// Walk up from the current working directory (or call site) to find go.mod
 	root := findModuleRoot()
 
-	resultsDir := filepath.Join(root, "tests", "results")
+	resultsDir := filepath.Join(root, ".cache", "test-results")
 	if mkErr := os.MkdirAll(resultsDir, 0o755); mkErr != nil {
 		t.Logf("[testlogger] failed to create results dir: %v", mkErr)
 		return
@@ -48,6 +48,8 @@ func LogTestResult(t *testing.T, category string, start time.Time, err error) {
 	status := "PASS"
 	if t.Failed() {
 		status = "FAIL"
+	} else if t.Skipped() {
+		status = "SKIP"
 	}
 
 	elapsed := time.Since(start)

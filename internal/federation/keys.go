@@ -6,10 +6,15 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"splitter/internal/db"
 )
 
@@ -20,70 +25,74 @@ var (
 	keyMu              sync.Mutex
 )
 
+type instanceKeyStore interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}
+
 // EnsureInstanceKeys generates or loads RSA-2048 keypair for this instance
 func EnsureInstanceKeys(domain string) error {
+	if db.GetDB() == nil {
+		return errors.New("instance key database is unavailable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return ensureInstanceKeys(ctx, domain, db.GetDB())
+}
+
+func ensureInstanceKeys(ctx context.Context, domain string, store instanceKeyStore) error {
 	keyMu.Lock()
 	defer keyMu.Unlock()
-
-	instanceDomain = domain
-	ctx := context.Background()
-
-	// Check if keys already exist in DB
+	if strings.TrimSpace(domain) == "" || len(domain) > 253 {
+		return errors.New("invalid instance domain")
+	}
 	var pubPEM, privPEM string
-	err := db.GetDB().QueryRow(ctx,
-		`SELECT public_key_pem, private_key_pem FROM instance_keys WHERE domain = $1`, domain,
-	).Scan(&pubPEM, &privPEM)
-
-	if err == nil {
-		// Keys exist — load them
-		block, _ := pem.Decode([]byte(privPEM))
-		if block == nil {
-			return fmt.Errorf("failed to decode private key PEM")
-		}
-		privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	err := store.QueryRow(ctx, `SELECT public_key_pem, private_key_pem FROM instance_keys WHERE domain=$1`, domain).Scan(&pubPEM, &privPEM)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("cannot read persisted instance keys: %w", err)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
-			return fmt.Errorf("failed to parse private key: %w", err)
+			return errors.New("cannot generate instance signing key")
 		}
-		instancePrivateKey = privKey
-		instancePublicPEM = pubPEM
-		log.Printf("[Federation] Loaded existing RSA keypair for domain '%s'", domain)
-		return nil
+		pubBytes, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+		if err != nil {
+			return errors.New("cannot encode instance public key")
+		}
+		pubPEM = string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes}))
+		privPEM = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+		// Another process may have won after our read. Never update a persisted
+		// identity during startup; always reload the winning database row.
+		if _, err := store.Exec(ctx, `INSERT INTO instance_keys(domain,public_key_pem,private_key_pem) VALUES($1,$2,$3) ON CONFLICT(domain) DO NOTHING`, domain, pubPEM, privPEM); err != nil {
+			return fmt.Errorf("cannot persist instance keys: %w", err)
+		}
+		if err := store.QueryRow(ctx, `SELECT public_key_pem, private_key_pem FROM instance_keys WHERE domain=$1`, domain).Scan(&pubPEM, &privPEM); err != nil {
+			return fmt.Errorf("cannot reload persisted instance keys: %w", err)
+		}
 	}
-
-	// Generate new RSA-2048 keypair
-	log.Printf("[Federation] Generating new RSA-2048 keypair for domain '%s'...", domain)
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	block, _ := pem.Decode([]byte(privPEM))
+	if block == nil {
+		return errors.New("invalid persisted instance private key")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil || key.Validate() != nil || key.N.BitLen() < 2048 {
+		return errors.New("invalid persisted instance private key")
+	}
+	publicBlock, _ := pem.Decode([]byte(pubPEM))
+	if publicBlock == nil {
+		return errors.New("invalid persisted instance public key")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(publicBlock.Bytes)
 	if err != nil {
-		return fmt.Errorf("failed to generate RSA key: %w", err)
+		return errors.New("invalid persisted instance public key")
 	}
-
-	// Encode private key to PEM
-	privBytes := x509.MarshalPKCS1PrivateKey(privKey)
-	privBlock := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}
-	privPEM = string(pem.EncodeToMemory(privBlock))
-
-	// Encode public key to PEM
-	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to marshal public key: %w", err)
+	public, ok := parsed.(*rsa.PublicKey)
+	if !ok || public.N.Cmp(key.N) != 0 || public.E != key.E {
+		return errors.New("persisted instance key pair does not match")
 	}
-	pubBlock := &pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes}
-	pubPEM = string(pem.EncodeToMemory(pubBlock))
-
-	// Store in DB
-	_, err = db.GetDB().Exec(ctx,
-		`INSERT INTO instance_keys (domain, public_key_pem, private_key_pem)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (domain) DO UPDATE SET public_key_pem = $2, private_key_pem = $3`,
-		domain, pubPEM, privPEM,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to store instance keys: %w", err)
-	}
-
-	instancePrivateKey = privKey
-	instancePublicPEM = pubPEM
-	log.Printf("[Federation] Generated and stored RSA keypair for domain '%s'", domain)
+	instancePrivateKey, instancePublicPEM, instanceDomain = key, pubPEM, domain
+	log.Printf("[Federation] Loaded persisted instance signing key for %s", domain)
 	return nil
 }
 

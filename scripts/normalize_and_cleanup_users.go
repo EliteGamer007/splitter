@@ -1,9 +1,12 @@
+//go:build ignore
+
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,17 +21,20 @@ func main() {
 	targets := []DBTarget{
 		{
 			Name:       "neondb",
-			ConnStr:    "postgres://neondb_owner:npg_doQ6W7BuhytJ@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require",
+			ConnStr:    os.Getenv("DATABASE_URL"),
 			LocalLabel: "splitter-1",
 		},
 		{
 			Name:       "neondb_2",
-			ConnStr:    "postgres://neondb_owner:npg_doQ6W7BuhytJ@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb_2?sslmode=require",
+			ConnStr:    os.Getenv("SECONDARY_DATABASE_URL"),
 			LocalLabel: "splitter-2",
 		},
 	}
 
 	for _, target := range targets {
+		if target.ConnStr == "" {
+			continue
+		}
 		fmt.Printf("\n=== Processing %s (%s) ===\n", target.Name, target.LocalLabel)
 		if err := processDB(target); err != nil {
 			log.Fatalf("failed processing %s: %v", target.Name, err)

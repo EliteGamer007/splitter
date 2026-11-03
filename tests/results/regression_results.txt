@@ -120,7 +120,7 @@ ok  	splitter/tests/fix_db	3.031s
 {"time":"2026-03-10T22:40:35.477465+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:54149","method":"GET","uri":"/api/v1/posts/b7c90d46-a356-4036-8017-130ecdf43dad","user_agent":"Go-http-client/1.1","status":404,"error":"","latency":359406800,"latency_human":"359.4068ms","bytes_in":0,"bytes_out":27}
 {"time":"2026-03-10T22:40:36.1571242+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:54149","method":"GET","uri":"/api/v1/posts/public","user_agent":"Go-http-client/1.1","status":200,"error":"","latency":276636900,"latency_human":"276.6369ms","bytes_in":0,"bytes_out":5}
 --- FAIL: TestPostFlow (7.95s)
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
     --- FAIL: TestPostFlow/Create_Post (1.66s)
         posts_test.go:83: Failed to query post from DB: no rows in result set
     --- FAIL: TestPostFlow/Get_Post (0.76s)

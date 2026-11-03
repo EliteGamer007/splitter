@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -40,6 +42,9 @@ func NewInboxHandler(userRepo *repository.UserRepository, msgRepo *repository.Me
 // POST /users/:username/inbox
 func (h *InboxHandler) Handle(c echo.Context) error {
 	ctx := c.Request().Context()
+	if h.cfg == nil || !h.cfg.Federation.Enabled {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Federation is not enabled on this instance"})
+	}
 	guard := security.GetMessagingGuard()
 
 	const maxInboxPayloadBytes int64 = 256 * 1024
@@ -53,12 +58,15 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 		})
 	}
 
-	// Parse the activity
+	// Bound and preserve exactly the bytes authenticated by Digest.
+	body, err := io.ReadAll(io.LimitReader(c.Request().Body, maxInboxPayloadBytes+1))
+	if err != nil || int64(len(body)) > maxInboxPayloadBytes {
+		return c.JSON(http.StatusRequestEntityTooLarge, map[string]string{"error": "payload too large"})
+	}
+	c.Request().Body = io.NopCloser(bytes.NewReader(body))
 	var activity map[string]interface{}
-	if err := json.NewDecoder(c.Request().Body).Decode(&activity); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "invalid activity JSON",
-		})
+	if err = json.Unmarshal(body, &activity); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid activity JSON"})
 	}
 
 	activityType, _ := activity["type"].(string)
@@ -86,12 +94,12 @@ func (h *InboxHandler) Handle(c echo.Context) error {
 		})
 	}
 
-	verificationKey := strings.TrimSpace(remoteActor.PublicKeyPEM)
-	if sigKeyID := parseSignatureKeyID(c.Request().Header.Get("Signature")); sigKeyID != "" {
-		if resolvedSigner, signerErr := resolveActorFromURI(stripFragment(sigKeyID)); signerErr == nil && resolvedSigner != nil && strings.TrimSpace(resolvedSigner.PublicKeyPEM) != "" {
-			verificationKey = strings.TrimSpace(resolvedSigner.PublicKeyPEM)
-		}
+	// A different actor's key must never authorize the claimed activity actor.
+	sigKeyID := parseSignatureKeyID(c.Request().Header.Get("Signature"))
+	if remoteActor.ActorURI != actorURI || stripFragment(sigKeyID) != actorURI || !strings.Contains(sigKeyID, "#") {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "signature key does not belong to activity actor"})
 	}
+	verificationKey := strings.TrimSpace(remoteActor.PublicKeyPEM)
 
 	if verificationKey == "" {
 		guard.RecordInboxRejected(actorURI, "missing verification key", map[string]interface{}{"domain": remoteActor.Domain})
@@ -205,6 +213,13 @@ func (h *InboxHandler) handleAnnounce(c echo.Context, activity map[string]interf
 	ctx := c.Request().Context()
 	actorURI, _ := activity["actor"].(string)
 	objectURI, _ := activity["object"].(string)
+	targetID := extractPostIDFromURI(objectURI)
+	if targetID != "" {
+		allowed, err := repository.NewPostRepository().CanViewTarget(ctx, targetID, actorURI)
+		if err != nil || !allowed {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "post not accessible"})
+		}
+	}
 
 	if strings.TrimSpace(objectURI) == "" {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ignored"})
@@ -316,23 +331,40 @@ func (h *InboxHandler) handleFollow(c echo.Context, activity map[string]interfac
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
 
+	if objectURI != strings.TrimRight(h.cfg.Federation.URL, "/")+"/ap/users/"+localUser.Username {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid local follow target"})
+	}
+	if _, err = federation.EnsureRemoteUser(ctx, actorURI); err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Unable to resolve follower"})
+	}
 	// Store follow relationship
 	// Use remote actor URI as follower_did for remote users
 	followerDID := actorURI
 	if remoteActor != nil {
-		followerDID = fmt.Sprintf("did:web:%s:%s", remoteActor.Domain, remoteActor.Username)
+		followerDID = remoteActor.ActorURI
 	}
 
 	_, err = db.GetDB().Exec(ctx,
 		`INSERT INTO follows (follower_did, following_did, status)
-		 VALUES ($1, $2, 'accepted')
+		 VALUES ($1, $2, $3)
 		 ON CONFLICT DO NOTHING`,
-		followerDID, localUser.DID,
+		followerDID, localUser.DID, func() string {
+			if localUser.IsLocked {
+				return "pending"
+			}
+			return "accepted"
+		}(),
 	)
 	if err != nil {
 		log.Printf("[Inbox] Failed to create follow: %v", err)
 	}
 
+	if localUser.IsLocked {
+		if id, _ := activity["id"].(string); id != "" {
+			federation.MarkActivityProcessed(ctx, id)
+		}
+		return c.JSON(http.StatusAccepted, map[string]string{"status": "pending"})
+	}
 	// Auto-accept: send Accept back
 	acceptActivity := &federation.Activity{
 		Context: "https://www.w3.org/ns/activitystreams",
@@ -361,41 +393,27 @@ func (h *InboxHandler) handleFollow(c echo.Context, activity map[string]interfac
 // handleAccept processes Accept responses to our Follow requests
 func (h *InboxHandler) handleAccept(c echo.Context, activity map[string]interface{}) error {
 	ctx := c.Request().Context()
-	log.Printf("[Inbox] Follow accepted")
-
-	// Mark the original follow as accepted
-	if object, ok := activity["object"].(map[string]interface{}); ok {
-		if followActor, ok := object["actor"].(string); ok {
-			if followTarget, ok := object["object"].(string); ok {
-				// Try exact match first (actor URI in follower_did), then fallback to DID match
-				result, err := db.GetDB().Exec(ctx,
-					`UPDATE follows SET status = 'accepted'
-					 WHERE following_did = $1 AND follower_did = $2 AND status = 'pending'`,
-					followTarget, followActor,
-				)
-				if err != nil {
-					log.Printf("[Inbox] Failed to update follow status (exact): %v", err)
-				}
-				// If exact match didn't find rows, try matching by username extraction
-				if err == nil && result.RowsAffected() == 0 {
-					_, err = db.GetDB().Exec(ctx,
-						`UPDATE follows SET status = 'accepted'
-						 WHERE follower_did LIKE '%' || $1 || '%' AND following_did LIKE '%' || $2 || '%' AND status = 'pending'`,
-						extractUsernameFromURI(followActor),
-						extractUsernameFromURI(followTarget),
-					)
-					if err != nil {
-						log.Printf("[Inbox] Failed to update follow status (fuzzy): %v", err)
-					}
-				}
-			}
-		}
+	signer, _ := activity["actor"].(string)
+	object, ok := activity["object"].(map[string]interface{})
+	if !ok {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing Follow object"})
 	}
-
+	follower, _ := object["actor"].(string)
+	target, _ := object["object"].(string)
+	if target != signer {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "accept actor mismatch"})
+	}
+	local, _, err := h.userRepo.GetByUsername(ctx, extractUsernameFromURI(follower))
+	if err != nil || local == nil || follower != strings.TrimRight(h.cfg.Federation.URL, "/")+"/ap/users/"+local.Username {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "invalid local follow actor"})
+	}
+	_, err = db.GetDB().Exec(ctx, "UPDATE follows SET status='accepted' WHERE follower_did=$1 AND following_did=$2 AND status='pending'", local.DID, target)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to accept follow"})
+	}
 	if id, _ := activity["id"].(string); id != "" {
 		federation.MarkActivityProcessed(ctx, id)
 	}
-
 	return c.JSON(http.StatusOK, map[string]string{"status": "accepted"})
 }
 
@@ -417,6 +435,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 	}
 
 	content, _ := object["content"].(string)
+	visibility, _ := object["splitter_visibility"].(string)
 	ciphertext, _ := object["ciphertext"].(string)
 	encryptedKeys := interfaceToStringMap(object["encrypted_keys"])
 	noteID, _ := object["id"].(string)
@@ -444,6 +463,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 
 	isPublic := false
 	var targetLocalUser *models.User
+	var localRecipients []string
 
 	for _, t := range recipients {
 		recipient, ok := t.(string)
@@ -462,7 +482,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 				// while still preferring non-ghost local accounts when duplicates exist.
 				var u models.User
 				err := db.GetDB().QueryRow(ctx,
-					`SELECT id, username, COALESCE(encryption_public_key, '')
+					`SELECT id, username, COALESCE(encryption_public_key, ''),COALESCE(did,'')
 					 FROM users
 					 WHERE username = $1
 					 ORDER BY CASE
@@ -472,9 +492,10 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 					 updated_at DESC
 					 LIMIT 1`,
 					username, h.cfg.Federation.Domain,
-				).Scan(&u.ID, &u.Username, &u.EncryptionPublicKey)
+				).Scan(&u.ID, &u.Username, &u.EncryptionPublicKey, &u.DID)
 				if err == nil {
 					targetLocalUser = &u
+					localRecipients = append(localRecipients, u.DID)
 				}
 			}
 		}
@@ -487,7 +508,7 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 		}
 	}
 
-	if !isPublic && targetLocalUser != nil {
+	if !isPublic && targetLocalUser != nil && visibility != "circle" && visibility != "followers" {
 		// THIS IS A DM
 		log.Printf("[Inbox] Handling DM from %s to %s", actorURI, targetLocalUser.Username)
 
@@ -527,19 +548,32 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 		return c.JSON(http.StatusOK, map[string]string{"status": "created"})
 	}
 
-	// PUBLIC POST Handling
-	log.Printf("[Inbox] Remote post from %s: %s", actorURI, truncate(content, 50))
+	if isPublic {
+		visibility = "public"
+	} else if (visibility != "circle" && visibility != "followers") || len(localRecipients) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Note must have an authorized audience"})
+	}
+	// Store explicit recipients and content together; never turn a restricted Note into a public feed item.
+	tx, err := db.GetDB().Begin(ctx)
+	if err != nil {
+		return c.JSON(503, map[string]string{"error": "Database unavailable"})
+	}
+	defer tx.Rollback(ctx)
+	// POST Handling
+	log.Printf("[Inbox] Remote post received")
 
 	// Store as remote post
-	log.Printf("[Inbox] DEBUG: Inserting remote post values: author_did=%s, content=%s, original_post_uri=%s, published=%v", actorURI, content, noteID, publishedTime)
+	if len([]rune(content)) > 5000 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "remote content too large"})
+	}
 
 	var postID string
-	err := db.GetDB().QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO posts (author_did, content, visibility, is_remote, original_post_uri, in_reply_to_uri, created_at)
-		 VALUES ($1, $2, 'public', true, $3, NULLIF($4, ''), $5)
+		 VALUES ($1, $2, $6, true, $3, NULLIF($4, ''), $5)
 		 ON CONFLICT DO NOTHING
 		 RETURNING id`,
-		actorURI, content, noteID, inReplyTo, publishedTime,
+		actorURI, content, noteID, inReplyTo, publishedTime, visibility,
 	).Scan(&postID)
 	if err != nil && err != pgx.ErrNoRows {
 		log.Printf("[Inbox] Failed to store remote post: %v", err)
@@ -547,7 +581,16 @@ func (h *InboxHandler) handleCreate(c echo.Context, activity map[string]interfac
 			"error": "failed to store post",
 		})
 	}
-	log.Printf("[Inbox] DEBUG: Successfully inserted remote post, id=%s", postID)
+	if postID != "" && visibility != "public" {
+		for _, did := range localRecipients {
+			if _, err = tx.Exec(ctx, "INSERT INTO remote_post_recipients(post_id,recipient_did) VALUES($1,$2) ON CONFLICT DO NOTHING", postID, did); err != nil {
+				return c.JSON(503, map[string]string{"error": "Unable to persist audience"})
+			}
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return c.JSON(503, map[string]string{"error": "Unable to persist post"})
+	}
 
 	// Store media attachments from the Note
 	if postID != "" {
@@ -589,6 +632,13 @@ func (h *InboxHandler) handleLike(c echo.Context, activity map[string]interface{
 	ctx := c.Request().Context()
 	actorURI, _ := activity["actor"].(string)
 	objectURI, _ := activity["object"].(string)
+	targetID := extractPostIDFromURI(objectURI)
+	if targetID != "" {
+		allowed, err := repository.NewPostRepository().CanViewTarget(ctx, targetID, actorURI)
+		if err != nil || !allowed {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "post not accessible"})
+		}
+	}
 
 	log.Printf("[Inbox] Like from %s on %s", actorURI, objectURI)
 
@@ -629,6 +679,9 @@ func (h *InboxHandler) handleDelete(c echo.Context, activity map[string]interfac
 		isActorDelete := strings.Contains(objectURI, "/ap/users/") && !strings.Contains(objectURI, "/posts/")
 
 		if isActorDelete {
+			if objectURI != actorURI {
+				return c.JSON(http.StatusForbidden, map[string]string{"error": "actor delete owner mismatch"})
+			}
 			if _, err := db.GetDB().Exec(ctx, `UPDATE posts SET deleted_at = now() WHERE author_did = $1`, objectURI); err != nil {
 				log.Printf("[Inbox] Failed to delete remote actor posts: %v", err)
 			}
@@ -646,7 +699,7 @@ func (h *InboxHandler) handleDelete(c echo.Context, activity map[string]interfac
 			}
 		} else {
 			_, err := db.GetDB().Exec(ctx,
-				`UPDATE posts SET deleted_at = now() WHERE original_post_uri = $1 OR (author_did = $2 AND id::text = $3)`,
+				`UPDATE posts SET deleted_at = now() WHERE author_did = $2 AND is_remote = true AND (original_post_uri = $1 OR id::text = $3)`,
 				objectURI, actorURI, extractPostIDFromURI(objectURI),
 			)
 			if err != nil {
@@ -671,6 +724,11 @@ func (h *InboxHandler) handleUndo(c echo.Context, activity map[string]interface{
 		return c.JSON(http.StatusOK, map[string]string{"status": "accepted"})
 	}
 
+	claimedActor, _ := object["actor"].(string)
+	signer, _ := activity["actor"].(string)
+	if claimedActor != "" && claimedActor != signer {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "undo actor mismatch"})
+	}
 	undoType, _ := object["type"].(string)
 	switch undoType {
 	case "Follow":
@@ -735,11 +793,11 @@ func extractDomainFromURI(uri string) string {
 		}
 	}
 
-	return host
+	return parsed.Host
 }
 
 func extractUsernameFromURI(uri string) string {
-	// Extract username from http://localhost:8000/users/alice → alice
+	// Extract username from http://localhost:8000/users/alice Ã¢â€ â€™ alice
 	parts := splitURI(uri)
 	for i, p := range parts {
 		if p == "users" && i+1 < len(parts) {

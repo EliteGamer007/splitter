@@ -79,3 +79,6 @@ uploads/
 node_modules/
 package.json
 package-lock.json
+
+# Frontend has its own repository and release history.
+/Splitter-frontend/

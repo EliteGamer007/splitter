@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -46,7 +47,6 @@ type RemoteNote struct {
 //	"splitter-1=https://splitter-m0kv.onrender.com,splitter-2=https://splitter-2.onrender.com"
 var InstanceURLMap = map[string]string{
 	"splitter-1": "https://splitter-m0kv.onrender.com",
-	"splitter-2": "https://splitter-2.onrender.com",
 }
 
 func init() {
@@ -155,7 +155,7 @@ func fetchActor(actorURI string) (*RemoteActor, error) {
 	}
 	req.Header.Set("Accept", "application/activity+json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -197,6 +197,9 @@ func fetchActor(actorURI string) (*RemoteActor, error) {
 		EncryptionPublicKey: actorJSON.EncryptionPublicKey,
 		DisplayName:         actorJSON.Name,
 	}
+	if actorJSON.ID != actorURI || actorJSON.PublicKey == nil || actorJSON.PublicKey.Owner != actorURI || actorJSON.PublicKey.ID == "" {
+		return nil, fmt.Errorf("remote actor or key owner mismatch")
+	}
 	if actorJSON.PublicKey != nil {
 		actor.PublicKeyPEM = actorJSON.PublicKey.PublicKeyPEM
 	}
@@ -211,6 +214,14 @@ func fetchActor(actorURI string) (*RemoteActor, error) {
 func resolveInstanceURL(domain string) string {
 	if url, ok := InstanceURLMap[domain]; ok {
 		return url
+	}
+	if !strings.EqualFold(os.Getenv("ENV"), "production") {
+		for _, peer := range strings.Split(os.Getenv("FEDERATION_LOCAL_PEERS"), ",") {
+			u, err := url.Parse(strings.TrimSpace(peer))
+			if err == nil && u.Host == domain {
+				return strings.TrimRight(peer, "/")
+			}
+		}
 	}
 	// If not in map, assume HTTPS
 	return "https://" + domain
@@ -292,7 +303,7 @@ func GetAllRemoteActors(ctx context.Context) ([]*RemoteActor, error) {
 
 // httpGet is a helper for simple GET requests with timeout
 func httpGet(url string) (*http.Response, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 	return client.Get(url)
 }
 
@@ -308,7 +319,7 @@ func FetchRemoteNote(noteURI string) (*RemoteNote, error) {
 	}
 	req.Header.Set("Accept", "application/activity+json, application/ld+json")
 
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := NewHTTPClient(12 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -342,6 +353,20 @@ func FetchRemoteNote(noteURI string) (*RemoteNote, error) {
 		}
 	}
 
+	// Unauthenticated remote hydration must never cache a private/unaddressed note as public.
+	public := false
+	for _, field := range []string{"to", "cc"} {
+		if targets, ok := objectPayload[field].([]interface{}); ok {
+			for _, target := range targets {
+				if target == publicAudience || target == "as:Public" {
+					public = true
+				}
+			}
+		}
+	}
+	if !public {
+		return nil, fmt.Errorf("remote note is not public")
+	}
 	objectType, _ := objectPayload["type"].(string)
 	if objectType != "" && !strings.EqualFold(objectType, "Note") {
 		return nil, fmt.Errorf("unsupported object type %s", objectType)

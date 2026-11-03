@@ -18,8 +18,13 @@ func NewCircleRepository() *CircleRepository {
 
 // GetCircleMembers returns all circle members for a given owner (by UUID).
 func (r *CircleRepository) GetCircleMembers(ctx context.Context, ownerID string) ([]*models.User, error) {
+	return r.GetCircleMembersPage(ctx, ownerID, 20, 0)
+}
+func (r *CircleRepository) GetCircleMembersPage(ctx context.Context, ownerID string, limit, offset int) ([]*models.User, error) {
+	limit, offset = boundedPage(limit, offset, 20)
+
 	query := `
-		SELECT u.id, u.username, COALESCE(u.email, ''), u.instance_domain,
+		SELECT u.id, u.username, ''::text, u.instance_domain,
 		       COALESCE(u.did, ''), COALESCE(u.display_name, ''), COALESCE(u.bio, ''),
 		       COALESCE(u.avatar_url, ''), COALESCE(u.public_key, ''),
 		       COALESCE(u.encryption_public_key, ''), COALESCE(u.role, 'user'),
@@ -28,10 +33,10 @@ func (r *CircleRepository) GetCircleMembers(ctx context.Context, ownerID string)
 		FROM circle_members cm
 		JOIN users u ON cm.member_id = u.id
 		WHERE cm.owner_id = $1
-		ORDER BY cm.created_at DESC
+		ORDER BY cm.created_at DESC,cm.member_id DESC LIMIT $2 OFFSET $3
 	`
 
-	rows, err := db.GetDB().Query(ctx, query, ownerID)
+	rows, err := db.GetDB().Query(ctx, query, ownerID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get circle members: %w", err)
 	}

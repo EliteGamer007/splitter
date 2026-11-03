@@ -5,149 +5,84 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
-	"splitter/internal/config"
-	"splitter/internal/db"
-	"splitter/internal/server"
 	"testing"
 	"time"
 
+	"splitter/internal/config"
+	"splitter/internal/db"
+	"splitter/internal/server"
+	"splitter/tests/testdb"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
 
 var (
 	TestServer *httptest.Server
-	SchemaName string // Exported for cleanup
+	SchemaName string
 )
 
-func TestMain(m *testing.M) {
-	// Load .env from root
-	// We are in tests/integration, so root is ../../
-	// Load .env from root
-	// We are in tests/integration, so root is ../../
-	if err := godotenv.Load("../../.env"); err != nil {
-		fmt.Printf("Error loading .env: %v\n", err)
-	} else {
-		fmt.Println(".env loaded successfully")
-	}
-
-	// Set ENV to test
-	os.Setenv("ENV", "test")
-
-	code := m.Run()
-	os.Exit(code)
-}
-
-// SetupTestEnv initializes the test environment
-// It returns a cleanup function that should be deferred
+// SetupTestEnv requires explicit disposable PostgreSQL credentials. It never
+// loads application .env files or falls back to the configured application DB.
 func SetupTestEnv(t *testing.T) func() {
-	// Load Config
-	cfg := config.Load()
-
-	// Generate unique schema name
+	t.Helper()
+	raw := os.Getenv("TEST_DATABASE_URL")
+	if raw == "" {
+		t.Skip("set TEST_DATABASE_URL to a loopback splitter_repair* database to run integration tests")
+	}
+	if _, err := testdb.ParseLocalURL(raw); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	poolConfig, err := pgxpool.ParseConfig(raw)
+	if err != nil {
+		t.Fatal("invalid disposable database connection configuration")
+	}
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	poolConfig.MaxConns = 4
+	poolConfig.MinConns = 0
+	adminPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		t.Fatal("cannot initialize disposable database pool")
+	}
 	SchemaName = fmt.Sprintf("test_schema_%d_%d", os.Getpid(), time.Now().UnixNano())
-
-	// 1. Connect to DB to create Schema (using default public schema initially)
-	// We need to parse the config to get connection string
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=require",
-		cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name)
-	t.Logf("Connecting with: %s", connString)
-
-	poolConfig, err := pgxpool.ParseConfig(connString)
-	if err != nil {
-		t.Fatalf("Failed to parse config: %v", err)
+	schema := SchemaName
+	quotedSchema := pgx.Identifier{schema}.Sanitize()
+	if _, err := adminPool.Exec(ctx, "CREATE SCHEMA "+quotedSchema); err != nil {
+		adminPool.Close()
+		t.Fatalf("create isolated test schema: %v", err)
 	}
-
-	adminPool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
-	if err != nil {
-		t.Fatalf("Failed to connect to DB: %v", err)
-	}
-
-	// Drop if exists (cleanup from previous fail) and Create Schema
-	_, err = adminPool.Exec(context.Background(), fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", SchemaName))
-	if err != nil {
-		t.Logf("Warning dropping schema: %v", err)
-	}
-	_, err = adminPool.Exec(context.Background(), fmt.Sprintf("CREATE SCHEMA %s", SchemaName))
-	if err != nil {
-		t.Fatalf("Failed to create schema: %v", err)
-	}
-
-	// 2. Run Migrations on this schema
-	// We read the SQL files and execute them
-	// search_path is critical here
-	migrationSQL := fmt.Sprintf("SET search_path TO %s, public;", SchemaName)
-	migrationSQL += `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`
-
-	files := []string{
-		"../../migrations/001_initial_schema.sql",
-		"../../migrations/002_upgrade_to_current.sql",
-		"../../migrations/014_add_key_rotations.sql",
-		"../../migrations/015_revocation_reason.sql",
-		"../../migrations/016_add_offline_message_sync.sql",
-		"../../migrations/017_add_multi_device_and_federated_dm_encryption.sql",
-		"../../migrations/018_fix_messages_schema.sql",
-		"../../migrations/019_add_stories.sql",
-		"../../migrations/020_add_story_views.sql",
-	}
-
-	for _, f := range files {
-		content, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatalf("Failed to read migration file %s: %v", f, err)
+	cleanup := func() {
+		cleanupCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if _, err := adminPool.Exec(cleanupCtx, "DROP SCHEMA IF EXISTS "+quotedSchema+" CASCADE"); err != nil {
+			t.Errorf("clean isolated test schema: %v", err)
 		}
-		sContent := string(content)
-		migrationSQL += sContent
+		adminPool.Close()
 	}
-
-	// execute all migrations in one go or separate transactions?
-	// one go is fine for setup
-	_, err = adminPool.Exec(context.Background(), migrationSQL)
+	success := false
+	defer func() {
+		if !success {
+			cleanup()
+		}
+	}()
+	testConfig := poolConfig.Copy()
+	testConfig.ConnConfig.RuntimeParams["search_path"] = schema + ",public"
+	testPool, err := pgxpool.NewWithConfig(ctx, testConfig)
 	if err != nil {
-		fmt.Printf("Migration Error: %v\n", err) // Force stdout print
-		t.Fatalf("Failed to run migrations: %v", err)
+		t.Fatal("cannot initialize isolated test pool")
 	}
-	adminPool.Close()
-
-	// 3. Initialize App DB with specific search_path
-	// This ensures the application uses the test schema by default
-	testConnString := fmt.Sprintf("%s&search_path=%s,public", connString, SchemaName)
-
-	// HACK: We need to set the global DB pool in internal/db package
-	// But InitDB takes config. We can modify InitDB or manually set db.DB
-	// Let's manually set it to ensure isolation
-
-	testPoolConfig, _ := pgxpool.ParseConfig(testConnString)
-	// Add AfterConnect hook to guarantee the search_path is set correctly
-	// even when Neon's pgBouncer pooler reuses connections and ignores URL params.
-	testPoolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		_, err := conn.Exec(ctx, fmt.Sprintf("SET search_path = %s, public", SchemaName))
-		return err
-	}
-	testPool, err := pgxpool.NewWithConfig(context.Background(), testPoolConfig)
-	if err != nil {
-		t.Fatalf("Failed to connect to test schema: %v", err)
+	t.Cleanup(testPool.Close)
+	if err := db.ApplyMigrations(ctx, testPool, "../../migrations"); err != nil {
+		t.Fatalf("prepare disposable schema: %v", err)
 	}
 
-	// Override the global DB variable
-	// Note: db.DB field must be exported (capitalized) in internal/db/postgres.go
-	// Checking previous view_file... yes, "var DB *pgxpool.Pool" is exported!
+	previous := db.DB
 	db.DB = testPool
-
-	// 4. Start Server
-	// Provide the config
-	srv := server.NewServer(cfg)
-	TestServer = httptest.NewServer(srv.Echo())
-
-	// Return Cleanup Function
-	return func() {
-		TestServer.Close()
-		db.DB.Close() // Close test pool
-
-		// Clean schema using admin connection
-		cleanupPool, _ := pgxpool.New(context.Background(), connString)
-		_, _ = cleanupPool.Exec(context.Background(), fmt.Sprintf("DROP SCHEMA %s CASCADE", SchemaName))
-		cleanupPool.Close()
-	}
+	cfg := &config.Config{Server: config.ServerConfig{Env: "test", BaseURL: "http://localhost:3000"}, JWT: config.JWTConfig{Secret: "disposable-integration-secret-only", Expiration: 24}, Federation: config.FederationConfig{Domain: "test.local", URL: "http://127.0.0.1", Enabled: false}}
+	TestServer = httptest.NewServer(server.NewServer(cfg).Echo())
+	srv := TestServer
+	success = true
+	return func() { srv.Close(); testPool.Close(); db.DB = previous; cleanup() }
 }

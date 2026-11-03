@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"splitter/tests/testenv"
 	"splitter/tests/testlogger"
 )
 
-const loadBaseURL = "http://localhost:8000/api/v1"
+var loadBaseURL string
 
 func doLoadJSON(method, url string, body interface{}, token string) (int, error) {
 	var reqBody *bytes.Buffer
@@ -41,10 +42,7 @@ func doLoadJSON(method, url string, body interface{}, token string) (int, error)
 
 func skipIfLoadServerDown(t *testing.T) {
 	t.Helper()
-	_, err := doLoadJSON("GET", loadBaseURL+"/health", nil, "")
-	if err != nil {
-		t.Skipf("Server not reachable for load test (skip): %v", err)
-	}
+	loadBaseURL = testenv.ServerURL(t) + "/api/v1"
 }
 
 // TestLoadPublicFeedConcurrent runs 25 concurrent requests to the public feed.

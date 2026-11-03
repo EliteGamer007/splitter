@@ -29,7 +29,7 @@ func (r *ReplyRepository) Create(ctx context.Context, authorDID string, reply *m
 	// Insert Reply
 	query := `
 		INSERT INTO replies (post_id, parent_id, author_did, content, depth)
-		VALUES ($1, $2, $3, $4, $5)
+		SELECT $1::uuid, $2::uuid, $3, $4, $5 FROM posts p WHERE p.id=$1 AND ` + postVisibilitySQL("p", "$3") + ` AND ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM replies parent WHERE parent.id=$2 AND parent.post_id=$1 AND parent.deleted_at IS NULL))
 		RETURNING id, post_id, parent_id, author_did, content, depth, likes_count, direct_reply_count, total_reply_count, created_at, updated_at
 	`
 	var newReply models.Reply
@@ -124,7 +124,19 @@ func (r *ReplyRepository) Create(ctx context.Context, authorDID string, reply *m
 }
 
 // GetByPostID retrieves all replies for a post, sorted by popularity then time
-func (r *ReplyRepository) GetByPostID(ctx context.Context, postID string, userDID string) ([]*models.Reply, error) {
+func (r *ReplyRepository) GetByPostID(ctx context.Context, postID, userDID string) ([]*models.Reply, error) {
+	return r.GetByPostIDPage(ctx, postID, userDID, 20, 0)
+}
+func (r *ReplyRepository) GetByPostIDPage(ctx context.Context, postID, userDID string, limit, offset int) ([]*models.Reply, error) {
+	limit, offset = boundedPage(limit, offset, 20)
+
+	allowed, err := NewPostRepository().CanView(ctx, postID, userDID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, fmt.Errorf("post not found")
+	}
 	// If userDID is provided, check liked status
 	var query string
 	var args []interface{}
@@ -134,25 +146,27 @@ func (r *ReplyRepository) GetByPostID(ctx context.Context, postID string, userDI
 			SELECT r.id, r.post_id, r.parent_id, r.author_did, r.content, r.depth,
 			       r.likes_count, r.direct_reply_count, r.total_reply_count, r.created_at, r.updated_at,
 			       COALESCE(u.username, 'unknown'),
-			       COALESCE((SELECT COUNT(*) > 0 FROM interactions WHERE post_id = r.id AND actor_did = $2 AND interaction_type = 'like'), false) as liked
+			       COALESCE((SELECT COUNT(*) > 0 FROM reply_interactions WHERE reply_id = r.id AND actor_did = $2), false) as liked
 			FROM replies r
+ JOIN posts p ON p.id=r.post_id
 			LEFT JOIN users u ON r.author_did = u.did
-			WHERE r.post_id = $1 AND r.deleted_at IS NULL
-			ORDER BY r.likes_count DESC, r.created_at ASC
+			WHERE r.post_id = $1 AND r.deleted_at IS NULL AND ` + postVisibilitySQL("p", "$2") + `
+			ORDER BY r.likes_count DESC, r.created_at ASC,r.id ASC LIMIT $3 OFFSET $4
 		`
-		args = []interface{}{postID, userDID}
+		args = []interface{}{postID, userDID, limit, offset}
 	} else {
 		query = `
 			SELECT r.id, r.post_id, r.parent_id, r.author_did, r.content, r.depth,
 			       r.likes_count, r.direct_reply_count, r.total_reply_count, r.created_at, r.updated_at,
 			       COALESCE(u.username, 'unknown'),
-			       false as liked
+			       ($2::text<>'' AND false) as liked
 			FROM replies r
+ JOIN posts p ON p.id=r.post_id
 			LEFT JOIN users u ON r.author_did = u.did
-			WHERE r.post_id = $1 AND r.deleted_at IS NULL
-			ORDER BY r.likes_count DESC, r.created_at ASC
+			WHERE r.post_id = $1 AND r.deleted_at IS NULL AND ` + postVisibilitySQL("p", "$2") + `
+			ORDER BY r.likes_count DESC, r.created_at ASC,r.id ASC LIMIT $3 OFFSET $4
 		`
-		args = []interface{}{postID}
+		args = []interface{}{postID, userDID, limit, offset}
 	}
 
 	rows, err := db.GetDB().Query(ctx, query, args...)
@@ -161,7 +175,7 @@ func (r *ReplyRepository) GetByPostID(ctx context.Context, postID string, userDI
 	}
 	defer rows.Close()
 
-	var replies []*models.Reply
+	replies := make([]*models.Reply, 0)
 	for rows.Next() {
 		var reply models.Reply
 		err := rows.Scan(

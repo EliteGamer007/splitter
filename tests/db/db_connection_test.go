@@ -2,32 +2,17 @@ package db
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"splitter/tests/testenv"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/joho/godotenv"
 )
 
 // getConnectionString loads environment variables and returns a proper connection string
 func getConnectionString(t *testing.T) string {
-	// Try loading .env from root if available.
-	// We are in tests/db, so root is ../../
-	_ = godotenv.Load("../../.env")
-
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-
-	if host == "" || port == "" || user == "" || password == "" || dbname == "" {
-		t.Fatal("Missing required environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)")
-	}
-
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=require", user, password, host, port, dbname)
+	t.Helper()
+	return testenv.DatabaseURL(t)
 }
 
 // TestDatabaseConnection verifies that the application can connect to the database

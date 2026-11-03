@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
@@ -65,7 +64,7 @@ func IsPeerHealthy(domain string) bool {
 // ProbePeerHealth performs a single health check against a peer instance.
 func ProbePeerHealth(domain, baseURL string) *InstanceHealth {
 	start := time.Now()
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 
 	healthy := false
 	resp, err := client.Get(baseURL + "/api/v1/federation/public-users?limit=1")
@@ -215,7 +214,7 @@ func GetCachedPeerPosts(domain string) []map[string]interface{} {
 
 // FetchAndCachePeerUsers fetches and caches users from a healthy peer.
 func FetchAndCachePeerUsers(domain, baseURL string) []map[string]interface{} {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 	resp, err := client.Get(baseURL + "/api/v1/federation/public-users?limit=100")
 	if err != nil {
 		log.Printf("[FederationCache] Failed to fetch users from %s: %v", domain, err)
@@ -242,7 +241,7 @@ func FetchAndCachePeerUsers(domain, baseURL string) []map[string]interface{} {
 
 // FetchAndCachePeerPosts fetches and caches posts from a healthy peer.
 func FetchAndCachePeerPosts(domain, baseURL string) []map[string]interface{} {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NewHTTPClient(10 * time.Second)
 	resp, err := client.Get(baseURL + "/api/v1/posts/public?limit=50&offset=0&local_only=true")
 	if err != nil {
 		log.Printf("[FederationCache] Failed to fetch posts from %s: %v", domain, err)

@@ -26,13 +26,23 @@ func NewPostRepository() *PostRepository {
 }
 
 // Create creates a new post in the database.
-// Media is referenced by URL only so binary bytes never hit Neon storage.
+// Media bytes are stored durably with the post inside one quota-checked transaction.
 func (r *PostRepository) Create(ctx context.Context, authorDID string, post *models.PostCreate, mediaURL, mediaType string) (*models.Post, error) {
+	return r.CreateWithMedia(ctx, authorDID, post, mediaURL, mediaType, nil)
+}
+func (r *PostRepository) CreateWithMedia(ctx context.Context, authorDID string, post *models.PostCreate, mediaURL, mediaType string, mediaData []byte) (*models.Post, error) {
+	if len(mediaData) > db.MaxStoredMedia {
+		return nil, fmt.Errorf("stored image exceeds 256 KiB")
+	}
+
 	visibility := post.Visibility
 	if visibility == "" {
 		visibility = "public"
 	}
 
+	if visibility != "public" && visibility != "followers" && visibility != "circle" {
+		return nil, fmt.Errorf("invalid visibility")
+	}
 	var expiresAt *time.Time
 	if post.ExpiresInMinutes != nil && *post.ExpiresInMinutes > 0 {
 		t := time.Now().UTC().Add(time.Duration(*post.ExpiresInMinutes) * time.Minute)
@@ -44,7 +54,17 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
-
+	if len(mediaData) > 0 {
+		var ownerID string
+		if err = tx.QueryRow(ctx, `SELECT id FROM users WHERE did=$1 AND NOT is_suspended`, authorDID).Scan(&ownerID); err != nil {
+			return nil, fmt.Errorf("account unavailable")
+		}
+		if err = db.EnforceMediaBudget(ctx, tx, ownerID, int64(len(mediaData))); err != nil {
+			return nil, err
+		}
+	} else if err = db.CheckGrowthBudget(ctx, tx, int64(len(post.Content)+1024)); err != nil {
+		return nil, err
+	}
 	query := `
 		INSERT INTO posts (author_did, content, visibility, expires_at)
 		VALUES ($1, $2, $3, $4)
@@ -73,14 +93,14 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 	}
 
 	// Insert media metadata if present
-	if mediaURL != "" {
+	if mediaURL != "" || len(mediaData) > 0 {
 		mediaQuery := `
-			INSERT INTO media (post_id, media_url, media_type)
-			VALUES ($1, $2, $3)
+			INSERT INTO media (post_id, media_url, media_type,media_data)
+			VALUES ($1, $2, $3,$4)
 			RETURNING id, post_id, media_type, created_at
 		`
 		var media models.Media
-		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaURL, mediaType).Scan(
+		err = tx.QueryRow(ctx, mediaQuery, newPost.ID, mediaURL, mediaType, mediaData).Scan(
 			&media.ID,
 			&media.PostID,
 			&media.MediaType,
@@ -90,6 +110,12 @@ func (r *PostRepository) Create(ctx context.Context, authorDID string, post *mod
 			return nil, fmt.Errorf("failed to create media: %w", err)
 		}
 
+		if len(mediaData) > 0 {
+			mediaURL = "/api/v1/media/" + media.ID
+			if _, err = tx.Exec(ctx, `UPDATE media SET media_url=$1 WHERE id=$2`, mediaURL, media.ID); err != nil {
+				return nil, err
+			}
+		}
 		media.MediaURL = mediaURL
 		newPost.Media = []models.Media{media}
 	}
@@ -124,6 +150,9 @@ func (r *PostRepository) GetMediaContent(ctx context.Context, mediaID string) ([
 
 // GetByID retrieves a post by ID
 func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, error) {
+	return r.getByID(ctx, id, "", false)
+}
+func (r *PostRepository) getByID(ctx context.Context, id, viewerDID string, checkAudience bool) (*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
 		       COALESCE(p.original_post_uri, ''), COALESCE(p.in_reply_to_uri, ''),
@@ -139,11 +168,16 @@ func (r *PostRepository) GetByID(ctx context.Context, id string) (*models.Post, 
 		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
 	`
 
+	args := []interface{}{id}
+	if checkAudience {
+		query += " AND " + postVisibilitySQL("p", "$2")
+		args = append(args, viewerDID)
+	}
 	var post models.Post
 	var mediaID, mediaURL, mediaType *string
 	var mediaCreatedAt *time.Time
 
-	err := db.GetDB().QueryRow(ctx, query, id).Scan(
+	err := db.GetDB().QueryRow(ctx, query, args...).Scan(
 		&post.ID,
 		&post.AuthorDID,
 		&post.Content,
@@ -284,9 +318,14 @@ func (r *PostRepository) CreateRemoteCachedPost(ctx context.Context, authorDID, 
 
 // GetByAuthorDID retrieves all posts by a specific author
 func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, limit, offset int) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
+	return r.GetByAuthorDIDForViewer(ctx, authorDID, "", limit, offset)
+}
+func (r *PostRepository) GetByAuthorDIDForViewer(ctx context.Context, authorDID, viewerDID string, limit, offset int) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
-		       p.created_at, p.updated_at, p.expires_at,
+		       COALESCE(p.original_post_uri,''),COALESCE(p.in_reply_to_uri,''),p.created_at, p.updated_at, p.expires_at,
 		       COALESCE(u.username, '') as username, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE((SELECT COUNT(*) FROM interactions WHERE post_id = p.id AND interaction_type = 'like'), 0) as like_count,
 		       p.direct_reply_count, p.total_reply_count
@@ -294,17 +333,18 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 		LEFT JOIN users u ON p.author_did = u.did
 		WHERE p.author_did = $1 AND p.deleted_at IS NULL
 		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
-		ORDER BY p.created_at DESC
+		AND ` + postVisibilitySQL("p", "$4") + `
+ ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := db.GetDB().Query(ctx, query, authorDID, limit, offset)
+	rows, err := db.GetDB().Query(ctx, query, authorDID, limit, offset, viewerDID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user posts: %w", err)
 	}
 	defer rows.Close()
 
-	var posts []*models.Post
+	posts := make([]*models.Post, 0)
 	for rows.Next() {
 		var post models.Post
 		if err := rows.Scan(
@@ -313,6 +353,8 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 			&post.Content,
 			&post.Visibility,
 			&post.IsRemote,
+			&post.OriginalPostURI,
+			&post.InReplyToURI,
 			&post.CreatedAt,
 			&post.UpdatedAt,
 			&post.ExpiresAt,
@@ -327,11 +369,41 @@ func (r *PostRepository) GetByAuthorDID(ctx context.Context, authorDID string, l
 		posts = append(posts, &post)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if len(posts) > 0 {
+		ids := make([]string, 0, len(posts))
+		byID := make(map[string]*models.Post, len(posts))
+		for _, post := range posts {
+			ids = append(ids, post.ID)
+			byID[post.ID] = post
+		}
+		mediaRows, err := db.GetDB().Query(ctx, `SELECT m.id,m.post_id,COALESCE(m.media_url,''),COALESCE(m.media_type,''),m.created_at FROM media m JOIN posts p ON p.id=m.post_id WHERE m.post_id=ANY($1::uuid[]) AND `+postVisibilitySQL("p", "$2")+` ORDER BY m.created_at,m.id LIMIT 2500`, ids, viewerDID)
+		if err != nil {
+			return nil, err
+		}
+		defer mediaRows.Close()
+		for mediaRows.Next() {
+			var media models.Media
+			if err = mediaRows.Scan(&media.ID, &media.PostID, &media.MediaURL, &media.MediaType, &media.CreatedAt); err != nil {
+				return nil, err
+			}
+			if post := byID[media.PostID]; post != nil {
+				post.Media = append(post.Media, media)
+			}
+		}
+		if err = mediaRows.Err(); err != nil {
+			return nil, err
+		}
+	}
 	return posts, nil
 }
 
 // GetFeed retrieves posts from users that the given user follows
 func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, offset int) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	query := `
 		SELECT p.id, p.author_did, p.content, p.visibility, p.is_remote,
 		       p.created_at, p.updated_at, p.expires_at,
@@ -344,20 +416,9 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 		       m.id, m.media_url, m.media_type, m.created_at
 		FROM posts p
 		LEFT JOIN users u ON p.author_did = u.did
-		LEFT JOIN follows f ON p.author_did = f.following_did AND f.follower_did = $1
+		LEFT JOIN follows f ON p.author_did = f.following_did AND f.follower_did = $1 AND f.status = 'accepted'
 		LEFT JOIN media m ON p.id = m.post_id
-		WHERE (f.follower_did = $1 OR p.author_did = $1) AND p.deleted_at IS NULL
-		  AND (p.expires_at IS NULL OR p.expires_at > NOW())
-		  AND (
-		    p.author_did = $1
-		    OR p.visibility = 'public'
-		    OR (p.visibility = 'followers' AND f.follower_did = $1)
-		    OR (p.visibility = 'circle' AND EXISTS (
-		        SELECT 1 FROM circle_members cm
-		        JOIN users u_owner  ON cm.owner_id  = u_owner.id  AND u_owner.did  = p.author_did
-		        JOIN users u_viewer ON cm.member_id = u_viewer.id AND u_viewer.did = $1
-		    ))
-		  )
+WHERE (f.follower_did=$1 OR p.author_did=$1) AND ` + postVisibilitySQL("p", "$1") + `
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -415,6 +476,7 @@ func (r *PostRepository) GetFeed(ctx context.Context, userDID string, limit, off
 
 // GetPublicFeed retrieves public posts for unauthenticated users or with optional user context
 func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID string, limit, offset int, localOnly bool) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	var query string
 	var args []interface{}
 	localFilterClause := ""
@@ -519,11 +581,15 @@ func (r *PostRepository) GetPublicFeedWithUser(ctx context.Context, userDID stri
 
 // GetPublicFeed retrieves public posts for unauthenticated users
 func (r *PostRepository) GetPublicFeed(ctx context.Context, limit, offset int) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	return r.GetPublicFeedWithUser(ctx, "", limit, offset, false)
 }
 
 // Update updates a post's content
 func (r *PostRepository) Update(ctx context.Context, postID, authorDID string, update *models.PostUpdate) (*models.Post, error) {
+	if update.Visibility != nil && *update.Visibility != "public" && *update.Visibility != "followers" && *update.Visibility != "circle" {
+		return nil, fmt.Errorf("invalid visibility")
+	}
 	query := `
 		UPDATE posts
 		SET 
@@ -658,6 +724,7 @@ func (r *PostRepository) GetTrendingHashtags(ctx context.Context, limit int) ([]
 
 // GetPostsByHashtag returns posts containing a specific hashtag
 func (r *PostRepository) GetPostsByHashtag(ctx context.Context, tag string, userDID string, limit, offset int) ([]*models.Post, error) {
+	limit, offset = boundedPage(limit, offset, 20)
 	// In PostgreSQL POSIX regex, \y is the word boundary marker, not \b
 	pattern := `#` + tag + `\y`
 
@@ -822,4 +889,51 @@ func (r *PostRepository) CountPostsByHashtag(ctx context.Context, tag string) (i
 		return 0, fmt.Errorf("failed to count posts by hashtag: %w", err)
 	}
 	return count, nil
+}
+
+// postVisibilitySQL is the single audience predicate for reads and writes.
+// Both arguments are fixed SQL fragments supplied only by this package.
+func postVisibilitySQL(alias, viewer string) string {
+	return fmt.Sprintf(`(%[1]s.deleted_at IS NULL AND (%[1]s.expires_at IS NULL OR %[1]s.expires_at > NOW()) AND (
+ %[1]s.visibility = 'public' OR (%[2]s <> '' AND EXISTS(SELECT 1 FROM users active_viewer WHERE active_viewer.did=%[2]s AND NOT active_viewer.is_suspended) AND (
+ %[1]s.author_did = %[2]s
+ OR (%[1]s.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows vf WHERE vf.follower_did = %[2]s AND vf.following_did = %[1]s.author_did AND vf.status = 'accepted'))
+ OR (%[1]s.is_remote AND EXISTS(SELECT 1 FROM remote_post_recipients rp WHERE rp.post_id=%[1]s.id AND rp.recipient_did=%[2]s))
+ OR (%[1]s.visibility = 'circle' AND EXISTS (SELECT 1 FROM circle_members vc JOIN users vo ON vo.id=vc.owner_id JOIN users vv ON vv.id=vc.member_id WHERE vo.did=%[1]s.author_did AND vv.did=%[2]s))
+ ))))`, alias, viewer)
+}
+
+// CanView checks an existing, live post using the current accepted audience.
+func (r *PostRepository) CanView(ctx context.Context, id, viewerDID string) (bool, error) {
+	var allowed bool
+	err := db.GetDB().QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM posts p WHERE p.id=$1 AND `+postVisibilitySQL("p", "$2")+`)`, id, viewerDID).Scan(&allowed)
+	return allowed, err
+}
+
+// CanViewTarget also resolves a reply to its root post; replies inherit that audience.
+func (r *PostRepository) CanViewTarget(ctx context.Context, id, viewerDID string) (bool, error) {
+	var allowed bool
+	err := db.GetDB().QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM posts p WHERE (p.id=$1 OR p.id IN (SELECT post_id FROM replies WHERE id=$1 AND deleted_at IS NULL)) AND `+postVisibilitySQL("p", "$2")+`)`, id, viewerDID).Scan(&allowed)
+	return allowed, err
+}
+func (r *PostRepository) GetByIDForViewer(ctx context.Context, id, viewerDID string) (*models.Post, error) {
+	return r.getByID(ctx, id, viewerDID, true)
+}
+func (r *PostRepository) GetMediaContentForViewer(ctx context.Context, id, viewerDID string) ([]byte, string, string, error) {
+	var data []byte
+	var kind, legacyURL string
+	err := db.GetDB().QueryRow(ctx, `SELECT COALESCE(m.media_data,''::bytea),COALESCE(m.media_type,''),COALESCE(m.media_url,'') FROM media m JOIN posts p ON p.id=m.post_id WHERE m.id=$1 AND `+postVisibilitySQL("p", "$2"), id, viewerDID).Scan(&data, &kind, &legacyURL)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("media not found")
+	}
+	return data, kind, legacyURL, nil
+}
+
+func (r *PostRepository) GetLegacyMediaURL(ctx context.Context, path, viewerDID string) ([]byte, string, string, error) {
+	var id string
+	err := db.GetDB().QueryRow(ctx, `SELECT m.id FROM media m JOIN posts p ON p.id=m.post_id WHERE m.media_url=$1 AND `+postVisibilitySQL("p", "$2")+` LIMIT 1`, path, viewerDID).Scan(&id)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("media not found")
+	}
+	return r.GetMediaContentForViewer(ctx, id, viewerDID)
 }

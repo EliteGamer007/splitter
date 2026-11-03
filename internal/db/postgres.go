@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
+	"net/url"
+	"time"
 
 	"splitter/internal/config"
 
@@ -15,39 +18,21 @@ var DB *pgxpool.Pool
 
 // InitDB initializes the PostgreSQL database connection pool
 func InitDB(cfg *config.Config) error {
-	// Build connection string from config
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.Name,
-		cfg.Database.SSLMode,
-	)
-
-	log.Printf("Connecting to database: %s:%s/%s as %s", cfg.Database.Host, cfg.Database.Port, cfg.Database.Name, cfg.Database.User)
-
-	// Parse connection config
-	poolConfig, err := pgxpool.ParseConfig(connString)
+	poolConfig, err := BuildPoolConfig(cfg)
 	if err != nil {
-		return fmt.Errorf("unable to parse connection string: %w", err)
+		return err
 	}
-
-	// Use simple protocol to avoid prepared statement conflicts with Neon's pooler
-	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-
-	// Configure pool settings
-	poolConfig.MaxConns = cfg.Database.MaxConns
-	poolConfig.MinConns = cfg.Database.MinConns
-
 	// Create connection pool
-	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return fmt.Errorf("unable to create connection pool: %w", err)
 	}
 
 	// Test the connection
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return fmt.Errorf("unable to ping database: %w", err)
 	}
 
@@ -67,4 +52,29 @@ func Close() {
 // GetDB returns the database connection pool
 func GetDB() *pgxpool.Pool {
 	return DB
+}
+
+// BuildPoolConfig uses escaped URI components and bounded, idle-friendly settings.
+func BuildPoolConfig(cfg *config.Config) (*pgxpool.Config, error) {
+	u := url.URL{Scheme: "postgres", Host: net.JoinHostPort(cfg.Database.Host, cfg.Database.Port), Path: "/" + cfg.Database.Name, User: url.UserPassword(cfg.Database.User, cfg.Database.Password)}
+	q := u.Query()
+	q.Set("sslmode", cfg.Database.SSLMode)
+	q.Set("connect_timeout", "5")
+	u.RawQuery = q.Encode()
+	p, err := pgxpool.ParseConfig(u.String())
+	if err != nil {
+		return nil, fmt.Errorf("invalid database configuration")
+	}
+	p.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	p.MaxConns = cfg.Database.MaxConns
+	if p.MaxConns < 1 || p.MaxConns > 8 {
+		p.MaxConns = 4
+	}
+	p.MinConns = 0
+	p.MaxConnIdleTime = time.Minute
+	p.MaxConnLifetime = 30 * time.Minute
+	p.HealthCheckPeriod = 30 * time.Second
+	p.ConnConfig.RuntimeParams["statement_timeout"] = "10000"
+	p.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = "10000"
+	return p, nil
 }

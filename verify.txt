@@ -29,7 +29,7 @@
 {"time":"2026-03-10T13:19:06.6073893+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63009","method":"POST","uri":"/api/v1/auth/register","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":369194700,"latency_human":"369.1947ms","bytes_in":109,"bytes_out":834}
 {"time":"2026-03-10T13:19:07.0924771+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63009","method":"POST","uri":"/api/v1/auth/rotate-key","user_agent":"Go-http-client/1.1","status":400,"error":"","latency":282857600,"latency_human":"282.8576ms","bytes_in":222,"bytes_out":94}
 --- FAIL: TestKeyRotation (9.85s)
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
     --- FAIL: TestKeyRotation/Replay_Attack_-_Nonce_Reuse_Rejected (0.96s)
         key_rotation_test.go:173: First rotation should succeed, got 500
 2026/03/10 13:19:09 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
@@ -98,7 +98,7 @@
 2026/03/10 13:19:44 [Federation] Failed to deliver to http://localhost:8001/ap/shared-inbox: delivery returned status 401
 {"time":"2026-03-10T13:19:45.7848537+05:30","id":"","remote_ip":"127.0.0.1","host":"127.0.0.1:63061","method":"POST","uri":"/api/v1/posts/52e654e3-592e-47ea-90d8-02915f0a552b/replies","user_agent":"Go-http-client/1.1","status":201,"error":"","latency":954858100,"latency_human":"954.8581ms","bytes_in":348,"bytes_out":370}
 --- FAIL: TestReplyFlow (6.70s)
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
     --- FAIL: TestReplyFlow/Create_First_Reply (1.64s)
         replies_test.go:82: no rows in result set
 FAIL

@@ -1,20 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"splitter/internal/auth"
 	"splitter/internal/config"
-	"splitter/internal/db"
 	"splitter/internal/federation"
 	"splitter/internal/models"
 	"splitter/internal/repository"
@@ -23,9 +22,29 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type authUserRepository interface {
+	RegisterInitialKey(context.Context, string, string) error
+	Create(ctx context.Context, user *models.UserCreate, passwordHash string) (*models.User, error)
+	GetByID(ctx context.Context, id string) (*models.User, error)
+	GetByUsername(ctx context.Context, username string) (*models.User, string, error)
+	GetByDID(ctx context.Context, did string) (*models.User, error)
+	UsernameExists(ctx context.Context, username string) (bool, error)
+	EmailExists(ctx context.Context, email string) (bool, error)
+	UpdateAvatar(ctx context.Context, userID string, avatarData []byte, mediaType, avatarURL string) (*models.User, error)
+	RotateKey(ctx context.Context, userID, oldPublicKey, newPublicKey, nonce, reason string) error
+	GetKeyHistory(ctx context.Context, userID string) ([]*models.KeyRotation, error)
+	GetKeyHistoryByDID(ctx context.Context, did string) ([]*models.KeyRotation, error)
+	IsKeyRevoked(ctx context.Context, publicKey string) (bool, error)
+	RevokeCurrentKey(ctx context.Context, userID, oldKey string) error
+	ListDeviceKeys(ctx context.Context, userID string) ([]*models.DeviceKey, error)
+	ListApprovedDeviceKeysByDID(ctx context.Context, did string) ([]*models.DeviceKey, error)
+	RequestDeviceKey(ctx context.Context, userID, deviceID, deviceLabel, encryptionPublicKey string) (*models.DeviceKey, error)
+	ApproveDeviceKey(ctx context.Context, userID, targetDeviceID, approverDeviceID string) (*models.DeviceKey, error)
+}
+
 // AuthHandler handles authentication-related requests
 type AuthHandler struct {
-	userRepo   *repository.UserRepository
+	userRepo   authUserRepository
 	cfg        *config.Config
 	jwtSecret  string
 	challenges map[string]*models.AuthChallenge // In-memory challenge store
@@ -41,9 +60,6 @@ func NewAuthHandler(userRepo *repository.UserRepository, cfg *config.Config) *Au
 		challenges: make(map[string]*models.AuthChallenge),
 	}
 
-	// Start challenge cleanup goroutine
-	go handler.cleanupExpiredChallenges()
-
 	return handler
 }
 
@@ -54,7 +70,6 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	contentType := c.Request().Header.Get("Content-Type")
 	var avatarBytes []byte
 	var avatarMediaType string
-	var avatarFilename string
 
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		if err := c.Request().ParseMultipartForm(6 * 1024 * 1024); err != nil {
@@ -103,17 +118,11 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		}
 		if fileErr == nil {
 			var err error
-			avatarBytes, avatarMediaType, err = service.ReadAndValidateImage(avatarFile, 1*1024*1024)
+			avatarBytes, avatarMediaType, err = service.ReadAndValidateAvatar(avatarFile, 5*1024*1024)
 			if err != nil {
 				return c.JSON(http.StatusBadRequest, map[string]string{
 					"error": "Invalid avatar image: " + err.Error(),
 				})
-			}
-			avatarFilename = avatarFile.Filename
-
-			if err := os.MkdirAll("./uploads/avatars", os.ModePerm); err == nil {
-				avatarPath := filepath.Join(".", "uploads", "avatars", avatarFilename)
-				_ = os.WriteFile(avatarPath, avatarBytes, 0o644)
 			}
 		}
 	} else {
@@ -192,12 +201,12 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	if err != nil {
 		log.Printf("Create User DB error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create user: " + err.Error(),
+			"error": "Failed to create user",
 		})
 	}
 
 	if len(avatarBytes) > 0 {
-		updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, nil, avatarMediaType, "/uploads/avatars/"+avatarFilename)
+		updatedUser, err := h.userRepo.UpdateAvatar(c.Request().Context(), user.ID, avatarBytes, avatarMediaType, "/api/v1/users/"+user.ID+"/avatar")
 		if err != nil {
 			log.Printf("Update Avatar DB error: %v", err)
 			return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -208,7 +217,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	}
 
 	// Generate JWT token
-	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret, h.tokenLifetime())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -260,7 +269,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Generate JWT token
-	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret, h.tokenLifetime())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -283,11 +292,22 @@ func (h *AuthHandler) GetChallenge(c echo.Context) error {
 	}
 
 	// Verify that the DID exists
-	_, err := h.userRepo.GetByDID(c.Request().Context(), req.DID)
+	req.DID = strings.TrimSpace(req.DID)
+	if req.DID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "DID is required"})
+	}
+	user, err := h.userRepo.GetByDID(c.Request().Context(), req.DID)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "DID not found",
 		})
+	}
+
+	if user.IsSuspended {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Account is suspended"})
+	}
+	if _, err := auth.DecodeEd25519PublicKey(user.PublicKey); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Account has no usable signing key"})
 	}
 
 	// Generate random challenge nonce (32 bytes)
@@ -303,6 +323,11 @@ func (h *AuthHandler) GetChallenge(c echo.Context) error {
 
 	// Store challenge
 	h.mu.Lock()
+	h.cleanupExpiredChallenges(time.Now())
+	if len(h.challenges) >= 4096 && h.challenges[req.DID] == nil {
+		h.mu.Unlock()
+		return c.JSON(http.StatusTooManyRequests, map[string]string{"error": "Authentication capacity reached; retry shortly"})
+	}
 	h.challenges[req.DID] = &models.AuthChallenge{
 		DID:       req.DID,
 		Challenge: challenge,
@@ -325,49 +350,39 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 		})
 	}
 
-	// Retrieve stored challenge
+	if req.DID == "" || req.Challenge == "" || req.Signature == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "A complete signed challenge is required"})
+	}
+	// Snapshot under the lock, but do not hold it during the database lookup.
 	h.mu.RLock()
 	storedChallenge, exists := h.challenges[req.DID]
 	h.mu.RUnlock()
-
-	if !exists {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Challenge not found or expired",
-		})
+	if !exists || storedChallenge.Challenge != req.Challenge || !time.Now().Before(storedChallenge.ExpiresAt) {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid or expired challenge"})
 	}
-
-	// Check if challenge matches
-	if storedChallenge.Challenge != req.Challenge {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Invalid challenge",
-		})
-	}
-
-	// Check if challenge has expired
-	if time.Now().After(storedChallenge.ExpiresAt) {
-		h.mu.Lock()
-		delete(h.challenges, req.DID)
-		h.mu.Unlock()
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Challenge expired",
-		})
-	}
-
-	// Get user
 	user, err := h.userRepo.GetByDID(c.Request().Context(), req.DID)
-	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "User not found",
-		})
+	if err != nil || user == nil || user.DID != req.DID {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid authentication proof"})
 	}
-
-	// Remove used challenge
+	if user.IsSuspended {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Account is suspended"})
+	}
+	if err := auth.VerifyEd25519Signature(user.PublicKey, req.Challenge, req.Signature); err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid authentication proof"})
+	}
+	// Compare and consume atomically. Concurrent verifications, expiration, and a
+	// newer challenge must never allow the same nonce to mint a second token.
 	h.mu.Lock()
+	current, exists := h.challenges[req.DID]
+	if !exists || current != storedChallenge || !time.Now().Before(current.ExpiresAt) {
+		h.mu.Unlock()
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid or expired challenge"})
+	}
 	delete(h.challenges, req.DID)
 	h.mu.Unlock()
 
 	// Generate JWT token
-	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret)
+	token, err := auth.GenerateToken(user.ID, user.DID, user.Username, user.Role, h.jwtSecret, h.tokenLifetime())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to generate token",
@@ -380,20 +395,21 @@ func (h *AuthHandler) VerifyChallenge(c echo.Context) error {
 	})
 }
 
-// cleanupExpiredChallenges removes expired challenges periodically
-func (h *AuthHandler) cleanupExpiredChallenges() {
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
+// tokenLifetime uses the same configured lifetime for all login methods.
+func (h *AuthHandler) tokenLifetime() time.Duration {
+	if h.cfg != nil && h.cfg.JWT.Expiration > 0 {
+		return time.Duration(h.cfg.JWT.Expiration) * time.Hour
+	}
+	return 24 * time.Hour
+}
 
-	for range ticker.C {
-		h.mu.Lock()
-		now := time.Now()
-		for did, challenge := range h.challenges {
-			if now.After(challenge.ExpiresAt) {
-				delete(h.challenges, did)
-			}
+// cleanupExpiredChallenges is request-triggered: idle instances do no work.
+// The caller holds h.mu.
+func (h *AuthHandler) cleanupExpiredChallenges(now time.Time) {
+	for did, challenge := range h.challenges {
+		if !now.Before(challenge.ExpiresAt) {
+			delete(h.challenges, did)
 		}
-		h.mu.Unlock()
 	}
 }
 
@@ -419,7 +435,10 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 	}
 
 	// Bind and validate request body
-	var req models.KeyRotationRequest
+	var req struct {
+		models.KeyRotationRequest
+		CurrentPassword string `json:"current_password"`
+	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
@@ -474,7 +493,7 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 
 	// Verify the signature is valid. The client must sign: "{new_public_key}|{nonce}|{timestamp}"
 	// using their CURRENT (old) active private key.
-	if req.Signature == "" {
+	if req.Signature == "" && req.CurrentPassword == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "signature is required",
 		})
@@ -485,9 +504,17 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 
 	// Verify using the old public key
 	err = auth.VerifyEd25519Signature(user.PublicKey, msg, req.Signature)
+	// Explicit password proof recovers legacy nonstandard browser signing keys.
+	// A session token alone never authorizes replacing an existing signing key.
+	if err != nil && req.CurrentPassword != "" {
+		account, hash, passwordErr := h.userRepo.GetByUsername(c.Request().Context(), user.Username)
+		if passwordErr == nil && account != nil && account.ID == userID && !account.IsSuspended && auth.CheckPasswordHash(req.CurrentPassword, hash) {
+			err = nil
+		}
+	}
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{
-			"error": "Invalid signature. Rotation request must be signed by the current active key.",
+			"error": "Invalid signing proof or current password.",
 		})
 	}
 
@@ -497,6 +524,9 @@ func (h *AuthHandler) RotateKey(c echo.Context) error {
 		rotationReason = "rotated"
 	}
 	if err := h.userRepo.RotateKey(c.Request().Context(), userID, user.PublicKey, req.NewPublicKey, rotationNonce, rotationReason); err != nil {
+		if errors.Is(err, repository.ErrKeyConflict) {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "Signing key changed; reload before rotating"})
+		}
 		log.Printf("RotateKey DB error for user %s: %v", userID, err)
 		// Check if it's a unique constraint violation on the nonce
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"key_rotations_nonce_key\"") {
@@ -605,16 +635,14 @@ func (h *AuthHandler) RegisterKey(c echo.Context) error {
 		})
 	}
 
-	// Store the initial public key using the global DB connection
-	if _, err := db.GetDB().Exec(
-		c.Request().Context(),
-		`UPDATE users SET public_key = $1 WHERE id = $2`,
-		req.PublicKey, userID,
-	); err != nil {
+	// Compare-and-set in the repository closes the check/write race between
+	// concurrent key registrations from different devices.
+	if err := h.userRepo.RegisterInitialKey(c.Request().Context(), userID, req.PublicKey); err != nil {
+		if errors.Is(err, repository.ErrKeyConflict) {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "Account signing key changed; reload before continuing"})
+		}
 		log.Printf("RegisterKey DB error for user %s: %v", userID, err)
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to register key",
-		})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register key"})
 	}
 
 	log.Printf("Initial public key registered for user %s (DID: %s)", userID, user.DID)
@@ -804,6 +832,9 @@ func (h *AuthHandler) RequestDeviceKey(c echo.Context) error {
 
 	deviceKey, err := h.userRepo.RequestDeviceKey(c.Request().Context(), userID, req.DeviceID, req.DeviceLabel, req.EncryptionPublicKey)
 	if err != nil {
+		if errors.Is(err, repository.ErrKeyConflict) {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "Device already has a different key; import its recovery material or use another device ID"})
+		}
 		log.Printf("RequestDeviceKey error for user %s: %v", userID, err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register device key"})
 	}
@@ -834,6 +865,9 @@ func (h *AuthHandler) ApproveDeviceKey(c echo.Context) error {
 
 	var req struct {
 		ApproverDeviceID string `json:"approver_device_id"`
+		Signature        string `json:"signature"`
+		Timestamp        int64  `json:"timestamp"`
+		Password         string `json:"password"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -847,6 +881,44 @@ func (h *AuthHandler) ApproveDeviceKey(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "approver and target devices must be different"})
 	}
 
+	user, err := h.userRepo.GetByID(c.Request().Context(), userID)
+	if err != nil || user == nil || user.IsSuspended {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "Account unavailable"})
+	}
+	keys, err := h.userRepo.ListDeviceKeys(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "Device keys temporarily unavailable"})
+	}
+	var target *models.DeviceKey
+	approverApproved := false
+	for _, key := range keys {
+		if key.DeviceID == targetDeviceID && key.Status == "pending" {
+			target = key
+		}
+		if key.DeviceID == req.ApproverDeviceID && key.Status == "approved" {
+			approverApproved = true
+		}
+	}
+	if target == nil || !approverApproved {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "A pending target and approved authorizing device are required"})
+	}
+	// A caller-supplied device ID is not proof of possession. Require a fresh
+	// signature from the account signing key, or explicit password reauthentication.
+	now := time.Now().Unix()
+	if req.Timestamp == 0 || now-req.Timestamp > 300 || req.Timestamp-now > 60 {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "A fresh approval proof is required"})
+	}
+	validProof := false
+	if req.Signature != "" {
+		message := fmt.Sprintf("approve-device|%s|%s|%s|%s|%d", userID, targetDeviceID, req.ApproverDeviceID, target.EncryptionPublicKey, req.Timestamp)
+		validProof = auth.VerifyEd25519Signature(user.PublicKey, message, req.Signature) == nil
+	} else if req.Password != "" {
+		account, hash, err := h.userRepo.GetByUsername(c.Request().Context(), user.Username)
+		validProof = err == nil && account != nil && account.ID == userID && !account.IsSuspended && auth.CheckPasswordHash(req.Password, hash)
+	}
+	if !validProof {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Device approval requires a valid account signature or current password"})
+	}
 	deviceKey, err := h.userRepo.ApproveDeviceKey(c.Request().Context(), userID, targetDeviceID, req.ApproverDeviceID)
 	if err != nil {
 		errText := strings.ToLower(err.Error())

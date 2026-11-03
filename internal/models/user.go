@@ -26,6 +26,40 @@ type User struct {
 	IsSuspended           bool       `json:"is_suspended"`
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
+	DefaultVisibility     string     `json:"default_visibility"`
+	MessagePrivacy        string     `json:"message_privacy"`
+}
+
+// PublicUser is an explicit allowlist for profile and relationship responses.
+// Account settings, email and moderation requests remain available only to the owner.
+type PublicUser struct {
+	ID                  string    `json:"id"`
+	Username            string    `json:"username"`
+	InstanceDomain      string    `json:"instance_domain"`
+	DID                 string    `json:"did"`
+	DisplayName         string    `json:"display_name"`
+	Bio                 string    `json:"bio,omitempty"`
+	AvatarURL           string    `json:"avatar_url,omitempty"`
+	PublicKey           string    `json:"public_key"`
+	EncryptionPublicKey string    `json:"encryption_public_key"`
+	Role                string    `json:"role"`
+	IsLocked            bool      `json:"is_locked"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+func ToPublicUser(u *User) *PublicUser {
+	if u == nil {
+		return nil
+	}
+	return &PublicUser{ID: u.ID, Username: u.Username, InstanceDomain: u.InstanceDomain, DID: u.DID, DisplayName: u.DisplayName, Bio: u.Bio, AvatarURL: u.AvatarURL, PublicKey: u.PublicKey, EncryptionPublicKey: u.EncryptionPublicKey, Role: u.Role, IsLocked: u.IsLocked, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+}
+func ToPublicUsers(users []*User) []*PublicUser {
+	result := make([]*PublicUser, 0, len(users))
+	for _, u := range users {
+		result = append(result, ToPublicUser(u))
+	}
+	return result
 }
 
 // Message represents a direct message between two users
@@ -54,9 +88,9 @@ type MessageThread struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	// Populated fields
-	OtherUser   *User    `json:"other_user,omitempty"`
-	LastMessage *Message `json:"last_message,omitempty"`
-	UnreadCount int      `json:"unread_count"`
+	OtherUser   *PublicUser `json:"other_user,omitempty"`
+	LastMessage *Message    `json:"last_message,omitempty"`
+	UnreadCount int         `json:"unread_count"`
 }
 
 // ModerationRequest represents a request for moderation privileges

@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"context"
-	"io"
+	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
+	"splitter/internal/db"
 
 	"splitter/internal/models"
 	"splitter/internal/service"
@@ -52,26 +51,9 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 			})
 		}
 
-		src, err := file.Open()
+		mediaData, mediaType, err = service.ReadAndValidateImage(file, service.MaxImageInput)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to open uploaded file"})
-		}
-		defer src.Close()
-
-		mediaData, err = io.ReadAll(io.LimitReader(src, 1<<20))
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to read file contents"})
-		}
-		mediaType = http.DetectContentType(mediaData)
-
-		if err := os.MkdirAll("./uploads/stories", os.ModePerm); err == nil {
-			filename := uuid.New().String() + filepath.Ext(file.Filename)
-			path := filepath.Join(".", "uploads", "stories", filename)
-			if writeErr := os.WriteFile(path, mediaData, 0o644); writeErr == nil {
-				mediaURL = "/uploads/stories/" + filename
-			}
-		} else {
-			mediaURL = "/uploads/stories/" + uuid.New().String() + ".jpg"
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
 	}
 
@@ -82,10 +64,13 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 		len(mediaData),
 	)
 
-	if err := h.service.CreateStory(c.Request().Context(), userID, mediaURL, mediaType); err != nil {
+	if err := h.service.CreateStoryWithMedia(c.Request().Context(), userID, mediaURL, mediaType, mediaData); err != nil {
 		c.Logger().Errorf("CreateStory failed: %v", err)
+		if errors.Is(err, db.ErrStorageQuota) {
+			return c.JSON(http.StatusInsufficientStorage, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "Unable to create story",
 		})
 	}
 
@@ -93,7 +78,7 @@ func (h *StoryHandler) CreateStory(c echo.Context) error {
 }
 
 func (h *StoryHandler) GetStories(c echo.Context) error {
-	ctx := c.Request().Context()
+	ctx := storyContext(c)
 
 	userIDStr, ok := c.Get("user_id").(string)
 	if ok && userIDStr != "" {
@@ -102,7 +87,8 @@ func (h *StoryHandler) GetStories(c echo.Context) error {
 		}
 	}
 
-	stories, err := h.service.GetStories(ctx)
+	limit, offset := requestPage(c, 20)
+	stories, err := h.service.GetStoriesPage(ctx, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch stories"})
 	}
@@ -187,12 +173,13 @@ func (h *StoryHandler) ViewStory(c echo.Context) error {
 }
 
 func (h *StoryHandler) GetStoryFeed(c echo.Context) error {
-	ctx := c.Request().Context()
+	ctx := storyContext(c)
 
-	stories, err := h.service.GetStoryFeed(ctx)
+	limit, offset := requestPage(c, 20)
+	stories, err := h.service.GetStoryFeedPage(ctx, limit, offset)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": err.Error(),
+			"error": "Unable to load story feed",
 		})
 	}
 
@@ -202,9 +189,10 @@ func (h *StoryHandler) GetStoryFeed(c echo.Context) error {
 }
 
 func (h *StoryHandler) GetStoryMedia(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "private, no-store")
 	id := c.Param("id")
 
-	media, contentType, err := h.service.GetStoryMedia(c.Request().Context(), id)
+	media, contentType, err := h.service.GetStoryMedia(storyContext(c), id)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "story media not found",
@@ -212,4 +200,22 @@ func (h *StoryHandler) GetStoryMedia(c echo.Context) error {
 	}
 
 	return c.Blob(http.StatusOK, contentType, media)
+}
+
+func storyContext(c echo.Context) context.Context {
+	ctx := c.Request().Context()
+	if raw, ok := c.Get("user_id").(string); ok {
+		if id, err := uuid.Parse(raw); err == nil {
+			return context.WithValue(ctx, "viewer_id", id)
+		}
+	}
+	return ctx
+}
+func (h *StoryHandler) GetLegacyStoryMedia(c echo.Context) error {
+	c.Response().Header().Set("Cache-Control", "private, no-store")
+	data, kind, err := h.service.GetLegacyMedia(storyContext(c), c.Request().URL.Path)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Story media not found"})
+	}
+	return c.Blob(http.StatusOK, kind, data)
 }

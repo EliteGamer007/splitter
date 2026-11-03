@@ -29,6 +29,7 @@ type Note struct {
 	Context       interface{}       `json:"@context,omitempty"`
 	ID            string            `json:"id"`
 	Type          string            `json:"type"`
+	Visibility    string            `json:"splitter_visibility,omitempty"`
 	AttributedTo  string            `json:"attributedTo"`
 	Content       string            `json:"content"`
 	Ciphertext    string            `json:"ciphertext,omitempty"`
@@ -97,15 +98,21 @@ func deliverOutboxPayload(ctx context.Context, outboxID, activityType string, pa
 	req.Header.Set("Accept", "application/activity+json")
 
 	privKey := GetInstancePrivateKey()
-	domain := GetInstanceDomain()
+	if privKey == nil {
+		return fmt.Errorf("federation signing key unavailable")
+	}
 	if privKey != nil {
-		keyID := fmt.Sprintf("%s/ap/users/%s#main-key", resolveInstanceURL(domain), "admin")
+		var signedActivity Activity
+		if err := json.Unmarshal(payload, &signedActivity); err != nil || signedActivity.Actor == "" {
+			return fmt.Errorf("missing activity actor")
+		}
+		keyID := signedActivity.Actor + "#main-key"
 		if err := SignRequest(req, privKey, keyID); err != nil {
 			log.Printf("[Federation] Warning: failed to sign request: %v", err)
 		}
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := NewHTTPClient(15 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		updateOutboxFailure(ctx, outboxID, err.Error())
@@ -151,85 +158,13 @@ func DeliverToActor(activity *Activity, actorURI string) error {
 // DeliverToFollowers delivers an activity to all remote followers of a user
 // For public posts, also delivers to all known instance shared inboxes
 func DeliverToFollowers(activity *Activity, authorDID string) {
-	ctx := context.Background()
-	domain := GetInstanceDomain()
-	log.Printf("[Federation] DeliverToFollowers: authorDID=%s, domain=%s", authorDID, domain)
-
-	var inboxes []string
-
-	// Get remote followers (followers from other instances)
-	rows, err := db.GetDB().Query(ctx,
-		`SELECT DISTINCT ra.inbox_url
-		 FROM follows f
-		 JOIN remote_actors ra ON ra.actor_uri = (
-			SELECT actor_uri FROM remote_actors WHERE username || '@' || domain = 
-			  SUBSTRING(f.follower_did FROM 'did:key:(.+)')
-		 )
-		 WHERE f.following_did = $1 AND f.status = 'accepted'`, authorDID)
-
-	if err != nil {
-		log.Printf("[Federation] Complex follower query failed: %v", err)
-	} else {
-		defer rows.Close()
-		for rows.Next() {
-			var inbox string
-			if err := rows.Scan(&inbox); err == nil {
-				inboxes = append(inboxes, inbox)
-			}
+	visibility := "followers"
+	for _, to := range activity.To {
+		if to == publicAudience {
+			visibility = "public"
 		}
 	}
-
-	// For public posts (addressed to Public), also deliver to all known instance shared inboxes
-	isPublic := false
-	if activity.To != nil {
-		for _, to := range activity.To {
-			if to == "https://www.w3.org/ns/activitystreams#Public" {
-				isPublic = true
-				break
-			}
-		}
-	}
-
-	if isPublic {
-		for otherDomain, otherURL := range InstanceURLMap {
-			if otherDomain != domain {
-				sharedInbox := otherURL + "/ap/shared-inbox"
-				log.Printf("[Federation] Adding shared inbox for %s: %s", otherDomain, sharedInbox)
-				inboxes = append(inboxes, sharedInbox)
-			}
-		}
-	}
-
-	// Also get inboxes from remote_actors table
-	actorRows, err := db.GetDB().Query(ctx,
-		`SELECT DISTINCT inbox_url FROM remote_actors WHERE domain != $1 AND domain != '' AND inbox_url != ''`, domain)
-	if err == nil {
-		defer actorRows.Close()
-		for actorRows.Next() {
-			var inbox string
-			if err := actorRows.Scan(&inbox); err == nil {
-				inboxes = append(inboxes, inbox)
-			}
-		}
-	}
-
-	// Deduplicate and deliver
-	seen := make(map[string]bool)
-	deliveryCount := 0
-	for _, inbox := range inboxes {
-		if seen[inbox] {
-			continue
-		}
-		seen[inbox] = true
-		deliveryCount++
-		go func(inboxURL string) {
-			if err := DeliverActivity(activity, inboxURL); err != nil {
-				log.Printf("[Federation] Failed to deliver to %s: %v", inboxURL, err)
-			}
-		}(inbox)
-	}
-
-	log.Printf("[Federation] Delivering to %d unique inboxes", deliveryCount)
+	DeliverPostToAudience(activity, authorDID, visibility)
 }
 
 // deliverToAllKnownInboxes delivers to all unique remote inboxes

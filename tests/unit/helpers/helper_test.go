@@ -14,7 +14,7 @@ WHY THIS TEST EXISTS:
 EXPECTED BEHAVIOR:
 - Valid inputs return parsed values.
 - Invalid inputs return defaults (limit: 20, offset: 0).
-- Limit is capped (e.g., at 100).
+- Limit is capped at 50 to bound database work per request.
 
 TEST RESULT SUMMARY:
 - Passed: Default values, valid inputs, invalid inputs, max limit cap.
@@ -60,7 +60,7 @@ func TestParsePagination(t *testing.T) {
 			name:       "Max limit cap",
 			limitStr:   "500",
 			offsetStr:  "0",
-			wantLimit:  100, // capped
+			wantLimit:  50, // capped
 			wantOffset: 0,
 		},
 	}

@@ -1,9 +1,12 @@
 package server
 
 import (
+	"context"
 	"log"
 	"os"
+	"splitter/internal/db"
 	"strings"
+	"time"
 
 	"splitter/internal/config"
 	"splitter/internal/federation"
@@ -26,6 +29,10 @@ type Server struct {
 // NewServer creates a new server instance
 func NewServer(cfg *config.Config) *Server {
 	e := echo.New()
+	e.Server.ReadHeaderTimeout = 5 * time.Second
+	e.Server.ReadTimeout = 30 * time.Second
+	e.Server.WriteTimeout = 45 * time.Second
+	e.Server.IdleTimeout = 60 * time.Second
 	e.Validator = &CustomValidator{validator: govalidator.New()}
 
 	// Initialize repositories
@@ -41,7 +48,7 @@ func NewServer(cfg *config.Config) *Server {
 	userHandler := handlers.NewUserHandler(userRepo, cfg)
 	postHandler := handlers.NewPostHandler(postRepo, userRepo, cfg)
 	mediaHandler := handlers.NewMediaHandler(postRepo)
-	followHandler := handlers.NewFollowHandler(followRepo, userRepo)
+	followHandler := handlers.NewFollowHandler(followRepo, userRepo, cfg)
 	interactionHandler := handlers.NewInteractionHandler(interactionRepo, userRepo, postRepo, cfg)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	messageHandler := handlers.NewMessageHandler(messageRepo, userRepo, cfg)
@@ -73,11 +80,13 @@ func NewServer(cfg *config.Config) *Server {
 	// Global middleware
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
+	e.Use(echomiddleware.ContextTimeout(12 * time.Second))
 	e.Use(echomiddleware.BodyLimit("6M")) // Limit body size to 6MB (allow overhead for 5MB file)
 	// CORS: use CORS_ORIGINS env var if set, otherwise default to localhost
 	corsOrigins := []string{
 		"http://localhost:3000", "http://127.0.0.1:3000",
 		"http://localhost:3001", "http://127.0.0.1:3001",
+		"http://localhost:3017", "http://127.0.0.1:3017", "http://127.0.0.1:3100",
 		"http://localhost:8000", "http://localhost:8001",
 	}
 	if extra := os.Getenv("CORS_ORIGINS"); extra != "" {
@@ -93,12 +102,14 @@ func NewServer(cfg *config.Config) *Server {
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAuthorization, "Signature", "Date", "Digest"},
 		AllowCredentials: true,
+		ExposeHeaders:    []string{"X-Next-Offset"},
 	}))
 
 	// Static routes (legacy uploads fallback)
-	e.Static("/uploads", "uploads")
+	e.GET("/uploads/posts/*", mediaHandler.GetLegacyPostMedia, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
+	e.GET("/uploads/stories/*", storyHandler.GetLegacyStoryMedia, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 	// Media routes for stories
-	e.Static("/media", "./uploads")
+	e.GET("/media/*", mediaHandler.GetLegacyPostMedia, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 
 	// Routes
 	setupRoutes(e, cfg, authHandler, userHandler, postHandler, mediaHandler, followHandler, interactionHandler, adminHandler, messageHandler, replyHandler, hashtagHandler, webfingerHandler, actorHandler, inboxHandler, outboxHandler, federationHandler, storyHandler)
@@ -140,6 +151,29 @@ func setupRoutes(
 		})
 	})
 
+	api.GET("/status", func(c echo.Context) error {
+		version := os.Getenv("APP_VERSION")
+		if version == "" {
+			version = os.Getenv("RENDER_GIT_COMMIT")
+		}
+		if version == "" {
+			version = "development"
+		}
+		return c.JSON(200, map[string]interface{}{"version": version, "federation_enabled": cfg.Federation.Enabled, "instance": cfg.Federation.Domain, "image_input_bytes": service.MaxImageInput, "split_bot": service.SplitBotCapability(cfg)})
+	})
+	api.GET("/ready", func(c echo.Context) error {
+		c.Response().Header().Set("Cache-Control", "no-store")
+		if db.GetDB() == nil {
+			return c.JSON(503, map[string]string{"status": "unavailable"})
+		}
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 1500*time.Millisecond)
+		defer cancel()
+		if err := db.GetDB().Ping(ctx); err != nil {
+			return c.JSON(503, map[string]string{"status": "unavailable"})
+		}
+		return c.JSON(200, map[string]string{"status": "ready"})
+	})
+
 	// Auth routes (public)
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)      // Register with username/email/password
@@ -147,7 +181,7 @@ func setupRoutes(
 	auth.POST("/challenge", authHandler.GetChallenge) // Get challenge nonce for DID login (optional)
 	auth.POST("/verify", authHandler.VerifyChallenge) // Verify signed challenge and get JWT (optional)
 
-	// Auth routes (authenticated) — key management
+	// Auth routes (authenticated) â€” key management
 	authAuth := api.Group("/auth")
 	authAuth.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	authAuth.POST("/register-key", authHandler.RegisterKey)   // Set initial public key (password-only users)
@@ -159,7 +193,7 @@ func setupRoutes(
 	authAuth.POST("/devices/:deviceId/approve", authHandler.ApproveDeviceKey)
 	authAuth.GET("/devices", authHandler.ListDeviceKeys)
 
-	// Public revocation endpoints — no auth required (for federation)
+	// Public revocation endpoints â€” no auth required (for federation)
 	api.GET("/auth/check-key", authHandler.CheckKeyRevocation)           // GET /api/v1/auth/check-key?key=<b64>
 	api.GET("/dids/:did/revoked-keys", authHandler.GetPublicRevokedKeys) // Per-DID revocation list
 	api.GET("/dids/:did/device-keys", authHandler.GetPublicDeviceKeys)
@@ -179,13 +213,18 @@ func setupRoutes(
 	usersAuth.PUT("/me/encryption-key", userHandler.UpdateEncryptionKey) // Add encryption key for existing users
 	usersAuth.DELETE("/me", userHandler.DeleteAccount)
 	// Circle (close friends) endpoints
+	usersAuth.GET("/me/follow-requests", followHandler.GetFollowRequests)
+	usersAuth.POST("/me/follow-requests/:id/accept", followHandler.AcceptFollowRequest)
+	usersAuth.DELETE("/me/follow-requests/:id", followHandler.RejectFollowRequest)
+	usersAuth.GET("/:id/follow-status", followHandler.GetFollowStatus)
 	usersAuth.GET("/me/circle", userHandler.GetCircle)
 	usersAuth.POST("/me/circle/:id", userHandler.AddToCircle)
 	usersAuth.DELETE("/me/circle/:id", userHandler.RemoveFromCircle)
 	usersAuth.GET("/me/circle/:id/check", userHandler.IsInCircle)
 
 	// Media routes
-	api.GET("/media/:id/content", mediaHandler.GetMediaContent)
+	api.GET("/media/:id/content", mediaHandler.GetMediaContent, middleware.OptionalAuthMiddleware(cfg.JWT.Secret), handlers.FederationViewer(cfg))
+	api.GET("/media/:id", mediaHandler.GetMediaContent, middleware.OptionalAuthMiddleware(cfg.JWT.Secret), handlers.FederationViewer(cfg))
 
 	// Post routes
 	posts := api.Group("/posts")
@@ -294,6 +333,7 @@ func setupRoutes(
 
 	// WebFinger & ActivityPub (public, no auth)
 	e.GET("/.well-known/webfinger", webfingerHandler.Handle)
+	e.GET("/posts/:id", postHandler.GetActivityPubPost, middleware.OptionalAuthMiddleware(cfg.JWT.Secret), handlers.FederationViewer(cfg))
 	e.GET("/ap/users/:username", actorHandler.GetActor)          // ActivityPub Actor
 	e.POST("/ap/users/:username/inbox", inboxHandler.Handle)     // Receive activities (per-user)
 	e.POST("/ap/shared-inbox", inboxHandler.Handle)              // Shared inbox (federation)
@@ -335,7 +375,7 @@ func setupRoutes(
 	story.POST("/:id/view", storyHandler.ViewStory, middleware.AuthMiddleware(cfg.JWT.Secret))
 
 	// Serve story media
-	api.GET("/stories/:id/media", storyHandler.GetStoryMedia)
+	api.GET("/stories/:id/media", storyHandler.GetStoryMedia, middleware.OptionalAuthMiddleware(cfg.JWT.Secret))
 }
 
 // Start starts the HTTP server

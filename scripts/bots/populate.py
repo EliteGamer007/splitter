@@ -25,7 +25,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 INSTANCE_1_URL = os.environ.get("SPLITTER_INSTANCE_1_URL", "https://splitter-m0kv.onrender.com")
 INSTANCE_2_URL = os.environ.get("SPLITTER_INSTANCE_2_URL", "https://splitter-2.onrender.com")
 BOT_MODE = os.environ.get("BOT_MODE", "drip")  # "seed" or "drip"
-BOT_PASSWORD = os.environ.get("BOT_PASSWORD", "BotPass#2026!")
+BOT_PASSWORD = os.environ.get("BOT_PASSWORD", "")
 
 # Seed mode: 5 posts per bot x 100 bots = 500 posts per run. Run 8x for 4000.
 SEED_POSTS_PER_BOT = 5
@@ -404,6 +404,9 @@ def run_drip_mode(tokens: dict):
 
 
 def main():
+    if len(BOT_PASSWORD) < 16:
+        print("ERROR: Supply a strong BOT_PASSWORD (at least 16 characters); there is no default password.")
+        sys.exit(1)
     if not GEMINI_API_KEY:
         print("[WARNING] GEMINI_API_KEY not set — using fallback templates (no AI generation)")
 

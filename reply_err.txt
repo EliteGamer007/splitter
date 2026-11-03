@@ -1,7 +1,7 @@
 2026/03/10 13:17:58 Warning: Could not load env file .env: open .env: The system cannot find the file specified.
 .env loaded successfully
 === RUN   TestReplyFlow
-    setup_test.go:55: Connecting with: postgres://neondb_owner:npg_mV2byJtuqlc1@ep-falling-mode-a1k832j8-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require
+    setup_test.go:55: Connecting with: postgresql://[REDACTED-CREDENTIAL]
 2026/03/10 13:18:00 [Federation] Generating new RSA-2048 keypair for domain 'splitter-1'...
 2026/03/10 13:18:00 [Federation] Generated and stored RSA keypair for domain 'splitter-1'
 2026/03/10 13:18:00 [Federation] Initialized for domain 'splitter-1' at http://localhost:8000

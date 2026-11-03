@@ -142,7 +142,10 @@ func TestKeyRotation(t *testing.T) {
 		// Verify key history shows 1 entry
 		histReq, _ := http.NewRequest(http.MethodGet, TestServer.URL+"/api/v1/auth/key-history", nil)
 		histReq.Header.Set("Authorization", "Bearer "+token)
-		histResp, _ := (&http.Client{}).Do(histReq)
+		histResp, err := (&http.Client{}).Do(histReq)
+		if err != nil {
+			t.Fatalf("key-history request failed: %v", err)
+		}
 		defer histResp.Body.Close()
 
 		if histResp.StatusCode != http.StatusOK {
